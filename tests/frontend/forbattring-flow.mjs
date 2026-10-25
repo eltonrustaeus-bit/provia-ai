@@ -117,7 +117,8 @@ const synliga = page => page.evaluate(() =>
     JSON.stringify(v.map(x => x.mål)) === '["felbank","prov","coach","rapport"]',
     JSON.stringify(v));
   ok("F3 coach och rapport utlovar bara det funktionerna visar",
-    v.some(x => x.mål === "coach" && /Fråga P\.E\.R vad du ska göra/i.test(x.label) && /analys/i.test(x.small)) &&
+    v.some(x => x.mål === "coach" && /Fråga P\.E\.R vad du ska göra/i.test(x.label) &&
+      /(?:personlig vägledning från verifierat underlag|öppna sparad rekommendation)/i.test(x.small)) &&
     v.some(x => x.mål === "rapport" && /Skapa övningsrapport/i.test(x.label) && /minst 3 verifierat rättade prov/i.test(x.small)) &&
     !JSON.stringify(v).match(/personlig studieplan|Rapport till läraren/i), JSON.stringify(v));
   await ctx.close();
@@ -167,8 +168,8 @@ for (const mål of ["felbank", "prov", "coach", "rapport"]) {
   await ctx.close();
 }
 
-// F7: utan data byter ingången roll. En väg som inte går att ta ska säga
-// varför — en spärrad knapp utan skäl är en återvändsgränd.
+// F7: empty local history must not hide server-backed coaching. Routes that
+// truly need local history explain why they are unavailable.
 {
   const { ctx, page } = await open("", { nExams: 0 });
   const v = await page.evaluate(() => ({
@@ -179,8 +180,11 @@ for (const mål of ["felbank", "prov", "coach", "rapport"]) {
     tillAppen: !!document.querySelector('[data-screen="hem"] a[href="app.html"]'),
   }));
   const spärrade = v.vägar.filter(x => x.av);
-  ok("F7 utan data är vägarna spärrade, säger varför, och pekar på appen",
-    spärrade.length >= 3 && spärrade.every(x => x.small.length > 0) && v.tillAppen,
+  const coach = v.vägar.find(x => x.mål === "coach");
+  ok("F7 tom lokal historik spärrar bara lokala träningsvägar och lämnar P.E.R tillgänglig",
+    spärrade.length === 2 && spärrade.every(x => x.small.length > 0) &&
+    spärrade.every(x => ["felbank", "prov"].includes(x.mål)) &&
+    coach?.av === false && /verifierat underlag/i.test(coach.small) && v.tillAppen,
     JSON.stringify(v));
   await ctx.close();
 }

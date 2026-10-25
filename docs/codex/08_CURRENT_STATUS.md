@@ -3887,3 +3887,32 @@ liveförsök förrän statusen och återstående stagingbudget har kontrollerats
 
 **PILOT NOT READY.** Den visuella coachleveransen är live-verifierad, men färsk
 modellgenerering, felstatusens liveorsak och aktiv provhjälp återstår.
+
+## P.E.R kontexttester och aktiv provhjälp — 2026-10-25
+
+- [x] Två gamla frontendassertions uppdaterades i
+  `tests/frontend/forbattring-flow.mjs`: coachvägen är avsiktligt tillgänglig
+  även när lokal historik är tom, eftersom servern kan ha verifierat underlag;
+  felbank och provlista förblir låsta när deras lokala data saknas. Testet
+  verifierar nu denna skillnad i stället för att kräva en spärr som skulle
+  hindra serverbaserad P.E.R.
+- [x] `forbattring-flow` **46/46** och `per-page-targets` **73/73** passerade.
+  Det senare täcker startsidans separata kontext, förbättringsvyn, konto-/sid-
+  bundna coachsvar, avbrutna frågor, cachebevis och att servercoach går att nå
+  utan lokal historik.
+- [x] Sju riktade API-tester för aktiv provhjälp passerade: signerad
+  frågekontext, svarsfri ledtråd, olika fråge-/hjälpintentioner, saknat bevis,
+  konceptfrågor och fail-closed vid osäker provstatus.
+- [x] Oberoende read-only review av aktivprovsvägen fann inga blockerare:
+  aktivt prov ger deterministiska ledtrådar, kontrollerar frågebevis mot elev,
+  prov och frågeposition, och passerar inte till OpenAI eller
+  `reserve_per_chat_quota`.
+- [x] En separat read-only testgranskning bekräftade att F3/F7 var föråldrade
+  påståenden, inte produktfel: UI:t visar serververifierad vägledning och
+  håller Felbank/Prov låsta när deras lokala underlag saknas.
+- [!] Inget nytt staginganrop eller liveprov kördes. De riktade testerna är
+  mock/offlinebevis och visar inte den aktuella Preview-sessionens livebeteende.
+
+**PILOT NOT READY.** Lokala P.E.R-kontext- och aktivprovstester är nu gröna;
+färsk modellgenerering och aktiv provhjälp behöver fortfarande verifieras live
+med ett bekräftat syntetiskt stagingprov. Ingen öppen provstatus ändrades.
