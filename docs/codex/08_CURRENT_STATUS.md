@@ -4516,3 +4516,16 @@ enda 12-frågetest. Offline- och mocktester bevisar inte live-modellens
 - [!] Mockade verifierarutdata testar kodens avvisningsflöde, inte att en live
   modell alltid upptäcker varje semantisk qualifierförlust. Ingen live-AI,
   Supabase, databas, konto, kvot, `main` eller Production användes.
+
+### Uppföljning: reparationsprompt på svenska — 2026-10-25
+
+- [x] Slutgranskning fann att en äldre svensk reparationsinstruktion fortfarande
+  krävde kortaste möjliga svarutdrag generellt, trots den ämnesspecifika regeln.
+  Reparationsprompten använder nu samma villkorade svar- och källreferensregler
+  som första genereringen: korta naturvetenskapliga svar endast när de behåller
+  betydelsen; fullständiga källmeningar för övriga ämnen.
+- [x] Regressionen kontrollerar att vanliga ämnen behåller hela källmeningar och
+  inte får en “kortaste utdrag”-regel; naturvetenskaplig reparation behåller
+  villkor, negationer, enheter och orsakssamband. Inga kvalitetsgrindar ändrades.
+- [x] Oberoende slutgranskning: inga kvarvarande promptkonflikter eller
+  försvagade kvalitetsgrindar hittades.

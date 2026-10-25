@@ -292,8 +292,8 @@ const biologyRepair = generateExam.buildRepairPayload({
 });
 assert.match(biologyRepair.input.at(-1).content, /NATURVETENSKAPLIGA KORTSVAR:.*På A-nivå/i,
   "science-specific source-answer requirements persist through repair attempts");
-assert.match(biologyRepair.input.at(-1).content, /kortaste sammanhängande utdraget.*Lägg inte till eller parafrasera text/i,
-  "repair instructions continue to direct candidates toward exact, fully supported source answers");
+assert.match(biologyRepair.input.at(-1).content, /kortaste exakta källutdrag.*utan att tappa nödvändiga villkor/i,
+  "science repair uses concise exact answers while retaining meaning-critical qualifiers");
 assert.match(biologyRepair.input.at(-1).content, /utan att tappa nödvändiga villkor, negationer, enheter eller orsakssamband/i,
   "science repair preserves qualifiers and conditions in short answer spans");
 assert.match(biologyRepair.input.at(-1).content, /source_references ska visa hela relevanta källmeningar/i,
@@ -307,6 +307,8 @@ const historyRepair = generateExam.buildRepairPayload({
 });
 assert.match(historyRepair.input.at(-1).content, /en eller flera hela, sammanhängande källmeningar kopierade exakt/i,
   "non-science repair retains complete-sentence extraction");
+assert.doesNotMatch(historyRepair.input.at(-1).content, /kortaste.{0,100}(?:utdrag|excerpt)/i,
+  "non-science repair does not inherit the science-only shortest-answer rule");
 assert.match(biologyRepair.input.at(-1).content, /En källmening får stödja flera reparationsfrågor bara om varje uppgift har ett eget, tydligt avgränsat svarsmål med ett eget exakt svarutdrag/i,
   "repair batches may reuse a source sentence only for distinct exact answer targets");
 const mathPrompt = generateExam.buildExamPrompts({
@@ -411,7 +413,7 @@ assert.match(repairPayload.input.at(-1).content, /exakt 4 nya frågekandidater.*
 assert.match(repairPayload.input.at(-1).content, /konkreta uppgifter från materialet/i);
 assert.match(repairPayload.input.at(-1).content, /självständig, tydligt avgränsad uppgift.*klart svarsmål/i);
 assert.match(repairPayload.input.at(-1).content, /alla värden och villkor.*behövs för lösningen/i);
-assert.match(repairPayload.input.at(-1).content, /ORDAGRANT utdrag från materialet.*inte en parafras/i);
+assert.match(repairPayload.input.at(-1).content, /hela, sammanhängande källmeningar kopierade exakt; parafrasera inte/i);
 assert.match(repairPayload.input.at(-1).content, /rimliga, relevanta distraktorer.*samma kategori/i);
 assert.match(repairPayload.input.at(-1).content, /Behåll samma strikta kvalitetskrav/i);
 const categorizedRepairPayload = generateExam.buildRepairPayload({
