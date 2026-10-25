@@ -3756,3 +3756,24 @@ nytt uttryckligt godkännande.
 **PILOT NOT READY.** Nästa steg är att få en separat staging-session utan
 personlig eller pågående provdata för livekontroll av aktiv provledtråd och
 förbättringscoach. Startsidan behöver inget ytterligare betalt test nu.
+
+## P.E.R utgånget prov: stagingkontroll — 2026-10-25
+
+- [x] Den tidigare uttryckligen godkända syntetiska provfliken kontrollerades
+  read-only innan en enda P.E.R-fråga skickades. UI:t visade fråga 1 av 12,
+  obesvarad, med en provtid över 3 000 minuter. Ingen answer-, nästa-, lämna
+  in- eller avbryt-åtgärd användes.
+- [x] P.E.R svarade att provet inte längre är öppet för svar, gav endast en
+  generell metodledtråd och höll fullständigt svar låst tills verifierad
+  rättning. Provet förblev orört. Stagingens budgetsnapshot var oförändrad
+  efter anropet, så inget modellanrop registrerades.
+- [!] Detta verifierar livegrinden för utgånget prov, inte vägledning under ett
+  faktiskt aktivt prov. Förbättringscoachens modellrespons har fortfarande
+  inte live-testats med bekräftat syntetisk verifierad historik.
+- [x] Inget provsvar, provstatus, resultat, kvot eller konto ändrades. Det
+  skickade P.E.R-meddelandet kan sparas i kontots vanliga P.E.R-chathistorik.
+  `main`, Production och Supabase-schema lämnades orörda.
+
+**PILOT NOT READY.** Nästa blockerare för bredare liveverifiering är en
+staging-session där den relevanta prov-/coachhistoriken är bekräftat syntetisk
+och den aktuella provfrågan faktiskt är aktiv.
