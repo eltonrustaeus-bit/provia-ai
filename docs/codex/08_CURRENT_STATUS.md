@@ -3126,14 +3126,22 @@ att kontot inte äger det bevarade 9/12-provet innan något syntetiskt AI-test.
   saknad proof ger neutral hjälp; ett lutningsord efter tecken 620 väljer
   fortfarande rätt, facitfri vägledning.
 - [!] Den godkända enstaka syntetiska ledtråden i den tidigare Previewn föll
-  tillbaka på ett generiskt meddelande om att provet inte var öppet. Ingen
+  tillbaka på ett generiskt meddelande om att provet inte var öppet. Inget
   nytt betalt AI-anrop gjordes: aktuell kvarvarande budget verifierades inte,
-  och det synliga provet lämnades orört. Preview/deployment för den här
-  ändringen har ännu inte skapats.
-- [!] Ändringarna är lokala och ocommittade. Inget ändrades i `main`, Vercel
-  Production, Supabase, konton, kvoter eller hemligheter.
+  och det synliga provet lämnades orört.
+- [x] Commit `07f7abb542b243c947b51c0632739d9109a6419c` är pushad enbart till
+  `codex/exgen-generation-quality-2026-10-20`. Vercel deployment
+  `dpl_FL1gTcAxHoMBxomiUjz2e3DhSFjo` är `READY` i det befintliga `provia-ai`
+  projektet på exakt denna commit. Preview:
+  `https://provia-9xd4xuoxp-eltons-projects-4adfb1a3.vercel.app/app.html`.
+- [!] Vercel CLI:s projektinspektion skapade oavsiktligt en separat, tom
+  projektpost `provia-ai-staging-integration-20261024`
+  (`prj_Ga6vAF17JCW5wy6BROUcexJIfxUH`). Den har ingen deployment eller
+  miljövariabel. Ingen ytterligare åtgärd vidtas där i väntan på beslut om
+  borttagning.
+- [x] Inget ändrades i `main`, Vercel Production, Supabase, konton, kvoter
+  eller hemligheter.
 
-**PILOT NOT READY.** Nästa steg: checkpoint-commit/push enbart till den
-godkända feature-branchen och verifiering av en exakt READY Vercel Preview.
-Liveverifiering kräver ny kontroll av stagingkoppling, användarsession och
+**PILOT NOT READY.** Nästa steg: granska den READY Previewn med en aktiv
+staginginloggning. Liveverifiering kräver ny kontroll av stagingkoppling och
 kvarvarande kostnadsbudget; det tidigare öppna provet ska inte ändras.
