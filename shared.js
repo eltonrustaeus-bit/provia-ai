@@ -370,6 +370,7 @@
       page: context.page || 'app',
       course: context.course || '',
       level: context.level || '',
+      studyMaterial: context.studyMaterial || '',
       exam: activeExam ? {
         submissionId: exam.submissionId || '',
         questionProof: question.questionProof || '',

@@ -206,6 +206,38 @@ const preExamContext = await page.evaluate(() => {
 });
 ok("P.E.R får aktuellt studiematerial före provstart", /Cellandning sker i mitokondrien/.test(preExamContext.studyMaterial || ""));
 ok("P.E.R får elevens valda kurs i sidkontexten", preExamContext.course === "Biologi 1", JSON.stringify(preExamContext.course));
+
+// Material can change while P.E.R is replying in the study setup. A response
+// grounded in the previous source must not be rendered for the new source.
+holdNextExplainResponse = true;
+await page.evaluate(() => { window.PER.send("Hjälp mig förstå materialet"); });
+await waitForHeldExplainResponse();
+await page.evaluate(() => {
+  const original = window.__getPerStudyContext;
+  window.__originalMaterialContextForTest = original;
+  window.__getPerStudyContext = () => ({ ...original(), studyMaterial: original().studyMaterial + " Ny verifierbar detalj." });
+  const context = window.__perTestCtx();
+  window.PER.describe({ page: "app", focus: context.currentQuestion,
+    targets: context.targets, state: context.examState });
+});
+await releaseHeldExplainResponse?.();
+releaseHeldExplainResponse = null;
+await page.waitForFunction(() => document.getElementById("perMessages")?.innerText.includes("Studiekontexten ändrades"));
+const staleMaterialState = await page.evaluate(() => ({
+  text: document.getElementById("perMessages")?.innerText || "",
+  sendDisabled: document.getElementById("perSendBtn")?.disabled,
+}));
+ok("study material changes cancel an in-flight P.E.R answer and unlock retry",
+  staleMaterialState.text.includes("Studiekontexten ändrades") && staleMaterialState.sendDisabled === false,
+  JSON.stringify(staleMaterialState));
+ok("a late answer grounded in old study material is never rendered",
+  !(await page.locator("#perMessages").innerText()).includes("STALE_QUESTION_RESPONSE"));
+await page.evaluate(() => {
+  window.__getPerStudyContext = window.__originalMaterialContextForTest;
+  delete window.__originalMaterialContextForTest;
+  window.PER.describe({ page: "app" });
+});
+
 await page.click("#xf .xf-screen[data-screen='contract'] .xf-btn.primary");
 await page.waitForSelector(".xf-exam.on", { timeout: 10000 });
 await page.waitForTimeout(300);

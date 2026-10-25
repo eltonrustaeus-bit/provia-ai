@@ -1,5 +1,32 @@
 # 08 Current Status
 
+# P.E.R material change guard — 2026-10-25
+
+- [x] Independent security review found that the in-flight context key covered
+  page, course, level and exam question, but omitted study material that P.E.R
+  can use before an exam. A response grounded in old material could therefore
+  arrive after the student edited the source.
+- [x] The transient context key now includes the current page-scoped study
+  material. A delayed-response browser regression changes that material while
+  P.E.R is pending and asserts cancellation, retry availability and suppression
+  of the late answer. The exam answer/proof gates are unchanged.
+- [x] Improvement-coach instructions now match the facts actually supplied by
+  the server: concrete next steps map from the fixed error taxonomy, while
+  unsupported concepts and model-generated free-text tags cannot be presented
+  as verified weaknesses.
+- [x] Offline verification: `per-exam-context` 96/96, `per-page-targets` 64/64,
+  `per-manifest` 29/29, `per-context-pack`, `per-exam-review-handler` 71/71,
+  `pilot-session-recovery` 1/1, `per-pilot-smoke` and `account-storage-boundary`
+  exited successfully.
+- [!] Browser/API tests use synthetic fixtures and mocked requests; no live
+  model call or staging database write was made. The material mutation is
+  simulated at the page-context source, not entered through the production UI.
+- [x] Syntax and `git diff --check` pass; final independent review is in progress.
+- [ ] Feature checkpoint/Preview remains pending. The latest Preview is logged
+  in, but its account shows existing study history; no live model request was
+  sent because a synthetic-only context and current budget could not be
+  independently established without using personal study data.
+
 # P.E.R begränsad livekontroll — 2026-10-25
 
 - [x] Den inloggade staging-Previewn för kodcheckpoint `b8e38aa` öppnades i
