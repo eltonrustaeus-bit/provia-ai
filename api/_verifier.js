@@ -613,11 +613,11 @@ async function verifyQuestions(questions, opts) {
       const taskText = normalizeEvidenceText(expectedQuestion.question);
       const scoringEvidenceText = normalizeEvidenceText(difficultyEvidence?.scoring_evidence);
       const operationSignals = {
-        analyze: ["analysera", "undersok", "forklara hur", "forklara varfor", "analyze", "examine", "investigate", "explain how", "explain why"],
+        analyze: ["analysera", "undersok", "forklara hur", "forklara varfor", "analyze", "examine", "investigate", "explain how", "explain why", "discuss"],
         compare: ["jamfor", "skillnad mellan", "skillnader mellan", "skillnader finns", "skiljer sig", "hur skiljer", "compare", "differ", "difference between", "differences between", "similarities between", "contrast"],
-        infer: ["dra slutsats", "harled", "tolka", "infer", "derive", "interpret"],
-        evaluate: ["bedom", "vardera", "ta stallning", "utvardera", "evaluate", "assess", "justify", "weigh"],
-        synthesize: ["foresla", "kombinera", "utforma", "skapa", "syntetisera", "synthesize", "design", "combine", "propose"],
+        infer: ["dra slutsats", "harled", "tolka", "infer", "derive", "interpret", "draw a conclusion", "conclusion can we draw", "what can we conclude"],
+        evaluate: ["bedom", "vardera", "ta stallning", "utvardera", "evaluate", "assess", "justify", "weigh", "to what extent", "i vilken utstrackning", "i vilken grad"],
+        synthesize: ["foresla", "kombinera", "utforma", "skapa", "syntetisera", "synthesize", "design", "combine", "propose", "integrate", "bring together", "sammanfoga", "sammanstall"],
       };
       const containsAffirmedSignal = (text, signals) => signals.some((signal) => {
         let at = text.indexOf(signal);
@@ -634,14 +634,37 @@ async function verifyQuestions(questions, opts) {
           const continuationHasNegation = /\b(?:inte|ej|aldrig|not|never|no|without|needn['’]?t|don['’]?t|doesn['’]?t|didn['’]?t|cannot|can['’]?t|mustn['’]?t|shouldn['’]?t|won['’]?t|(?:am|is|are|was|were)n['’]?t|exempt(?:s|ed|ing)?|refus(?:e|es|ed|ing)|refrain(?:s|ed|ing)?|declin(?:e|es|ed|ing)|avoid(?:s|ed|ing)?|prohibit(?:s|ed|ing)?|disallow(?:s|ed|ing)?|forbid(?:s|den)?|ban(?:s|ned)?|bar(?:s|red|ring)?|preclude(?:s|d|ing)?|exclude(?:s|d|ing)?|prevent(?:s|ed|ing)?|not\s+allowed|not\s+permitted|not\s+supposed)\b/u.test(continuationText);
           const contrastiveContinuation = contrastivePair && !continuationHasNegation && !/\butan\s+att\b/u.test(before);
           const negatedBefore = !contrastiveBefore && !contrastiveContinuation && /\b(?:inte|ej|aldrig|utan(?:\s+att)?|without|needn['’]?t|never|not|don['’]?t|doesn['’]?t|didn['’]?t|cannot|can['’]?t|mustn['’]?t|shouldn['’]?t|won['’]?t|(?:am|is|are|was|were)n['’]?t|exempt(?:s|ed|ing)?|refus(?:e|es|ed|ing)|refrain(?:s|ed|ing)?|declin(?:e|es|ed|ing)|avoid(?:s|ed|ing)?|prohibit(?:s|ed|ing)?|disallow(?:s|ed|ing)?|forbid(?:s|den)?|ban(?:s|ned)?|bar(?:s|red|ring)?|preclude(?:s|d|ing)?|exclude(?:s|d|ing)?|prevent(?:s|ed|ing)?|not\s+allowed|not\s+permitted|not\s+supposed)\b(?:\s+\w+){0,4}\s*$/u.test(before);
-          const negatedAfter = !contrastiveAfter && /^\s*(?:\w+\s+){0,5}(?:inte|ej|aldrig|not|never|no|inga|ingen|inget)\b/u.test(after);
-          if (!negatedBefore && !negatedAfter) return true;
+          const negatedAfter = !contrastiveAfter && /^\s*(?:\w+\s+){0,5}(?:inte|ej|aldrig|not|never|no|inga|ingen|inget|(?:is|are|was|were)n['’]?t|doesn['’]?t|didn['’]?t|don['’]?t)\b/u.test(after);
+          const excludedAsAlternative = /\b(?:rather than|instead of)(?:\s+\w+){0,6}\s*$/u.test(before) ||
+            /\b(?:no\s+need\s+to|unnecessary\s+to)\s*$/u.test(before);
+          const optionalAfter = /\b(?:is|are|may be|can be|remains)\s+optional\b/u.test(after);
+          if (!negatedBefore && !negatedAfter && !excludedAsAlternative && !optionalAfter) return true;
           at = text.indexOf(signal, at + 1);
         }
         return false;
       });
-      const conclusionSignals = ["motivera", "dra slutsats", "resonera", "justify", "draw a conclusion", "reasoned conclusion"];
-      const rubricReasoningSignals = ["resonemang", "motiver", "jamfor", "skillnad mellan", "skillnader mellan", "skiljer sig", "analys", "underbygg", "reasoning", "justify", "compare", "differ", "difference between", "differences between", "similarities between", "contrast", "analysis", "evidence-based"];
+      const conclusionSignals = ["motivera", "dra slutsats", "resonera", "justify", "draw a conclusion", "conclusion can we draw", "what conclusion can we draw", "reasoned conclusion", "justified conclusion", "support your conclusion", "supports your conclusion", "supporting your conclusion", "support a conclusion", "supports a conclusion", "underbygg din slutsats", "stodja din slutsats", "stodjer din slutsats"];
+      const rubricReasoningSignals = ["resonemang", "motiver", "jamfor", "skillnad mellan", "skillnader mellan", "skillnaderna mellan", "skiljer sig", "analys", "underbygg", "reasoning", "justify", "justified", "evaluate", "evaluating", "evaluation", "assess", "assessment", "compare", "differ", "difference between", "differences between", "similarities between", "contrast", "analysis", "evidence-based"];
+      const operationRubricSignals = {
+        analyze: ["analys", "analyz", "reasoning", "resonemang"],
+        compare: ["jamfor", "skillnaderna mellan", "skillnader mellan", "skillnad mellan", "compare", "comparison", "comparing", "differ", "difference"],
+        infer: ["slutsats", "conclusion", "infer", "inference", "derive"],
+        evaluate: ["bedom", "varder", "evaluate", "evaluation", "evaluating", "assess", "assessment"],
+        synthesize: ["syntes", "synthesize", "synthesis", "synthesizing", "integrate", "integration", "combine", "combination", "sammanfoga", "sammanstall"],
+      };
+      const containsDisclaimedSignal = (text, signals) => signals.some((signal) => {
+        let at = text.indexOf(signal);
+        while (at >= 0) {
+          const before = text.slice(Math.max(0, at - 48), at);
+          const after = text.slice(at + signal.length, at + signal.length + 72);
+          const disclaimedBefore = /\b(?:no|without|not|neither|lack of|rather than|instead of)\s+(?:\w+\s+){0,3}$/u.test(before);
+          const noCreditBefore = /\bno\s+(?:marks|points|credit)\s+(?:(?:are|will be|would be|is)\s+)?(?:awarded|given|earned|granted)\s+(?:for|to|toward)\s+(?:\w+\s+){0,2}$/u.test(before);
+          const disclaimedAfter = /^\s*(?:(?:is|are|was|were|may be|can be|could be|might be|should be)\s+)?(?:optional|unnecessary|waived|excluded(?:\s+from(?:\s+scoring)?)?|omitted|skipped|not\s+(?:required|necessary|mandatory|scored|awarded|credited|counted|needed)|needn['’]?t(?:\s+be)?(?:\s+\w+){0,3}|(?:is|are|was|were)n['’]?t\s+(?:required|necessary|mandatory|scored|awarded|credited|counted|needed)|(?:shouldn['’]?t|mustn['’]?t|cannot|can['’]?t|must\s+not|cannot)\b|(?:doesn['’]?t|didn['’]?t)\s+(?:need\s+to\s+be\s+)?(?:count|score|award|credit|require)|(?:do|does|did)\s+not\s+(?:need\s+to\s+be\s+)?(?:count|score|award|credit|require)|(?:won['’]?t|wouldn['’]?t)\s+(?:count|score|award|credit)|(?:may|can|could)\s+be\s+(?:omitted|skipped|waived|excluded))\b/u.test(after);
+          if (disclaimedBefore || noCreditBefore || disclaimedAfter) return true;
+          at = text.indexOf(signal, at + 1);
+        }
+        return false;
+      });
       const difficultyEvidenceContractOk = targetLevel !== "A" || (
         difficultyEvidence && typeof difficultyEvidence === "object" &&
         typeof difficultyEvidence.task_evidence === "string" && difficultyEvidence.task_evidence.length >= 8 &&
@@ -658,6 +681,8 @@ async function verifyQuestions(questions, opts) {
         Number.isInteger(difficultyEvidence.distinct_source_facts) && difficultyEvidence.distinct_source_facts === new Set(citedSourceFacts.map((quote) => quote.trim())).size &&
         containsAffirmedSignal(taskText, operationSignals[difficultyEvidence.reasoning_operation] || []) &&
         difficultyEvidence.rubric_rewards_reasoning === true && containsAffirmedSignal(scoringEvidenceText, rubricReasoningSignals) &&
+        containsAffirmedSignal(scoringEvidenceText, operationRubricSignals[difficultyEvidence.reasoning_operation] || []) &&
+        !containsDisclaimedSignal(scoringEvidenceText, operationRubricSignals[difficultyEvidence.reasoning_operation] || []) &&
         difficultyEvidence.justified_conclusion_required === true && containsAffirmedSignal(taskText, conclusionSignals) &&
         containsAffirmedSignal(scoringEvidenceText, conclusionSignals)
       );

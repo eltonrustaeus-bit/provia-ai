@@ -203,6 +203,22 @@ for (const [questionText, rubricText, lang] of [
   assert.equal(decideApproval(decision), true, `affirmative comparison wording should pass A-level: ${questionText}`);
 }
 
+for (const [questionText, scoringText, lang, operation] of [
+  ["Discuss how photosynthesis and cellular respiration move carbon, and justify your conclusion using both source facts.",
+    "Credit for reasoning that supports your conclusion with evidence from both source facts.", "en", "analyze"],
+  ["What conclusion can we draw about carbon flow? Justify it using both source facts.",
+    "Credit for a justified conclusion based on both source facts.", "en", "infer"],
+  ["To what extent does photosynthesis bind carbon relative to cellular respiration? Draw a conclusion using both source facts.",
+    "Credit for evaluating the extent and supporting your conclusion with evidence from both source facts.", "en", "evaluate"],
+  ["Integrate both source facts into one model of carbon flow. Draw a conclusion from the model.",
+    "Credit for synthesis reasoning that supports a conclusion using both source facts.", "en", "synthesize"],
+  ["Analyze how the processes move carbon, and support your conclusion with evidence from both facts.",
+    "Credit for analysis and support your conclusion with evidence from both source facts.", "en", "analyze"],
+]) {
+  const decision = await reviewALevelQuestion(questionText, scoringText, lang, operation);
+  assert.equal(decideApproval(decision), true, `common affirmative ${operation} wording should pass A-level: ${questionText}`);
+}
+
 for (const [questionText, scoringText, lang] of [
   ["Beskriv vad fotosyntes binder och vad cellandning frigör. Jämför inte processerna eller motivera någon slutsats; återge bara faktan.", "Poäng ges för korrekt återgivning, inte för resonemang, jämförelse eller motiverad slutsats."],
   ["Beskriv vad fotosyntes binder och vad cellandning frigör. Analys och motiverad slutsats krävs inte; återge bara faktan.", "Resonemang ger inga poäng. Det krävs inte att eleven motiverar eller drar en slutsats."],
@@ -223,6 +239,48 @@ await assertARejected(
 await assertARejected(
   "Do not compare photosynthesis and cellular respiration, but justify a conclusion about carbon flow.",
   "Credit for comparison and a justified conclusion.", "en", "compare");
+await assertARejected(
+  "Do not discuss how photosynthesis and cellular respiration move carbon; just recall both facts.",
+  "Credit for recall only; reasoning and a justified conclusion are not required.", "en", "analyze");
+await assertARejected(
+  "Do not draw a conclusion about carbon flow; just recall both facts.",
+  "Credit for recall only; a justified conclusion is not required.", "en", "infer");
+await assertARejected(
+  "Rather than discuss how the processes move carbon, list the two source facts and draw a conclusion.",
+  "Credit for reasoning and a justified conclusion using both source facts.", "en", "analyze");
+await assertARejected(
+  "Rather than ask students to discuss how the processes move carbon, list the two source facts and draw a conclusion.",
+  "Credit for reasoning and a justified conclusion using both source facts.", "en", "analyze");
+await assertARejected(
+  "To what extent does photosynthesis bind carbon relative to cellular respiration? Draw a conclusion using both source facts.",
+  "Evaluation is optional; credit for reasoning and a justified conclusion using both source facts.", "en", "evaluate");
+await assertARejected(
+  "To what extent does photosynthesis bind carbon relative to cellular respiration? Draw a conclusion using both source facts.",
+  "Evaluation isn't required; credit for reasoning and a justified conclusion using both source facts.", "en", "evaluate");
+await assertARejected(
+  "To what extent does photosynthesis bind carbon relative to cellular respiration? Draw a conclusion using both source facts.",
+  "Evaluation didn't count toward the score; credit for reasoning and a justified conclusion using both source facts.", "en", "evaluate");
+for (const rubric of [
+  "Evaluation is unnecessary; credit for reasoning and a justified conclusion using both source facts.",
+  "Evaluation needn't be scored; credit for reasoning and a justified conclusion using both source facts.",
+  "Evaluation may be omitted; credit for reasoning and a justified conclusion using both source facts.",
+  "Evaluation shouldn't be required; credit for reasoning and a justified conclusion using both source facts.",
+  "Evaluation won't count toward the score; credit for reasoning and a justified conclusion using both source facts.",
+  "Evaluation is waived; credit for reasoning and a justified conclusion using both source facts.",
+  "Evaluation is excluded from scoring; credit for reasoning and a justified conclusion using both source facts.",
+  "Evaluation may be skipped; credit for reasoning and a justified conclusion using both source facts.",
+  "Evaluation cannot be required; credit for reasoning and a justified conclusion using both source facts.",
+  "Evaluation can't be required; credit for reasoning and a justified conclusion using both source facts.",
+  "Evaluation mustn't be required; credit for reasoning and a justified conclusion using both source facts.",
+  "Evaluation shouldn't count toward the grade; credit for reasoning and a justified conclusion using both source facts.",
+  "Evaluation mustn't count toward the grade; credit for reasoning and a justified conclusion using both source facts.",
+  "No marks are awarded for evaluation; credit for reasoning and a justified conclusion using both source facts.",
+  "No points will be awarded for evaluation; credit for reasoning and a justified conclusion using both source facts.",
+]) {
+  await assertARejected(
+    "To what extent does photosynthesis bind carbon relative to cellular respiration? Draw a conclusion using both source facts.",
+    rubric, "en", "evaluate");
+}
 
 const sameFactQuotes = await runWithResults(
   [aLevelReviewResult(validALevelEvidence, [
