@@ -1616,7 +1616,16 @@ function finalizeMsg(div, text) {
       function restoreFailedQuestion() {
         if (EXGEN_RUNTIME.environment === 'pilot' && currentPilotAccountId() !== requestAccountId) return false;
         if (EXGEN_RUNTIME.environment === 'pilot') savePilotPendingQuestion(q, requestAccountId, opts);
-        else savePerPendingQuestion(q, requestAccountId, pageAtRequest, opts);
+        else {
+          savePerPendingQuestion(q, requestAccountId, pageAtRequest, opts);
+          if (opts && opts.examProof) {
+            _restoredPerSend = {
+              question: q,
+              accountId: requestAccountId || null,
+              options: opts,
+            };
+          }
+        }
         if (input) input.value = q;
         return true;
       }
@@ -2435,9 +2444,9 @@ function finalizeMsg(div, text) {
         if (_perActiveRequest && _perActiveRequest.cancel) _perActiveRequest.cancel();
         localStorage.removeItem(PER_HIST_KEY);
         clearPerPendingQuestion();
+        _restoredPerSend = null;
         if (EXGEN_RUNTIME.environment === 'pilot') {
           try { sessionStorage.removeItem(PILOT_PENDING_QUESTION_KEY); } catch (_) {}
-          _restoredPerSend = null;
         }
         if (input) input.value = '';
         var sendBtn = document.getElementById('perSendBtn');

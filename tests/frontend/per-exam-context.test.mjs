@@ -33,6 +33,7 @@ const EXAM = {
 };
 
 let lastExplain = null;
+let failNextExplainWithUnavailable = false;
 let holdNextExplainResponse = false;
 let releaseHeldExplainResponse = null;
 async function waitForHeldExplainResponse() {
@@ -122,6 +123,11 @@ await mockApis(page, {
         return;
       }
       try { lastExplain = JSON.parse(r.request().postData() || "{}"); } catch (_) {}
+      if (failNextExplainWithUnavailable) {
+        failNextExplainWithUnavailable = false;
+        r.fulfill({ status: 503, json: { error: "EXAM_STATE_UNAVAILABLE" } });
+        return;
+      }
       if (holdNextExplainResponse) {
         holdNextExplainResponse = false;
         await new Promise(resolve => {
@@ -628,19 +634,44 @@ lastExplain = null;
 await page.evaluate(() => document.getElementById("langBtn")?.click());
 const englishReviewLabel = await page.locator("#xf .xf-screen[data-screen='result'] .xf-review-action").nth(1).textContent();
 ok("efterprovshjälpen följer valt engelskt språk", englishReviewLabel?.trim() === "✦ Explain my grading", englishReviewLabel || "saknas");
-await page.click("#xf .xf-screen[data-screen='result'] .xf-review-action >> nth=1");
-await page.waitForTimeout(350);
+failNextExplainWithUnavailable = true;
+await page.click("#xf .xf-screen[data-screen='result'] .xf-review-action >> nth=0");
+await page.locator("#perMessages .per-msg.teacher").filter({ hasText: "can’t verify the exam status" }).last().waitFor();
+ok("efterprovsknappens statusfel lämnar fråga 1 återförsökbar", await page.locator("#perInput").inputValue() === "Please explain my grading on question 1 step by step"
+  && await page.locator("#perSendBtn").isEnabled());
+lastExplain = null;
+const reviewRetry = page.waitForResponse(response => response.url().includes("/api/explain")
+  && response.request().method() === "POST");
+await page.click("#perSendBtn");
+await reviewRetry;
+await page.waitForTimeout(200);
 ok("T9e efterprovsknappen använder den verifierade förklaringsvägen",
-   lastExplain?.examReview === true && lastExplain?.examProof?.selectedQuestionId === "q2" &&
+   lastExplain?.examReview === true && lastExplain?.examProof?.selectedQuestionId === "q1" &&
    lastExplain?.examProof?.questions?.length === 4 && lastExplain?.examProof?.receipt === `v2.${"d".repeat(32)}.syntheticCompletionProof`,
    JSON.stringify(lastExplain?.examProof && { selectedQuestionId: lastExplain.examProof.selectedQuestionId, count: lastExplain.examProof.questions?.length }));
 ok("engelskt språk och engelskt önskemål följer med serveranropet",
-   lastExplain?.lang === "en" && lastExplain?.userQuestion === "Please explain my grading on question 2 step by step",
+   lastExplain?.lang === "en" && lastExplain?.userQuestion === "Please explain my grading on question 1 step by step",
    JSON.stringify({ lang: lastExplain?.lang, question: lastExplain?.userQuestion }));
 ok("T9f alla exakta elevsvar följer med i den verifierade provenheten",
    JSON.stringify(lastExplain?.examProof?.answers) === JSON.stringify([
      { id: "q1", answer: "B" }, { id: "q2", answer: "" }, { id: "q3", answer: "" }, { id: "q4", answer: "" }
    ]), JSON.stringify(lastExplain?.examProof?.answers));
+ok("T9g retry behåller samma signerade efter-rättningsbevis", lastExplain?.examProof?.receipt === `v2.${"d".repeat(32)}.syntheticCompletionProof`
+  && lastExplain?.examProof?.selectedQuestionId === "q1" && lastExplain?.examReview === true,
+  JSON.stringify(lastExplain?.examProof && { selectedQuestionId: lastExplain.examProof.selectedQuestionId, examReview: lastExplain.examReview }));
+failNextExplainWithUnavailable = true;
+await page.click("#xf .xf-screen[data-screen='result'] .xf-review-action >> nth=0");
+await page.locator("#perMessages .per-msg.teacher").filter({ hasText: "can’t verify the exam status" }).last().waitFor();
+page.once("dialog", d => d.accept().catch(() => {}));
+await page.click("#perClearBtn");
+await page.locator("#perInput").fill("Please explain my grading on question 1 step by step");
+lastExplain = null;
+const afterClearSend = page.waitForResponse(response => response.url().includes("/api/explain")
+  && response.request().method() === "POST");
+await page.click("#perSendBtn");
+await afterClearSend;
+ok("rensa tar bort återställt provbevis även vid identisk ny fråga", !lastExplain?.examProof && lastExplain?.examReview !== true,
+  JSON.stringify({ hasExamProof: !!lastExplain?.examProof, examReview: lastExplain?.examReview }));
 await page.evaluate(() => document.getElementById("langBtn")?.click());
 
 // Starting a new topic after a verified result must leave the exam context.

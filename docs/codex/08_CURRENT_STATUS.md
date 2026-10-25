@@ -4593,3 +4593,62 @@ enda 12-frågetest. Offline- och mocktester bevisar inte live-modellens
   senaste read-only-kontroll, men aktuell syntetisk inloggad testidentitet är
   inte fastställd. Inga användardata, prov, konton, kvoter, hemligheter,
   produktionsresurser eller databasscheman ändrades.
+
+### Kvalitetsmålet: verifiering efter Preview-push — 2026-10-25
+
+- [x] Commit `4442f085e8c2eebca9593c59d0954e9605339ef4` innehåller endast
+  denna statusdokumentation och är pushad till feature-branchen. Vercel Preview
+  `dpl_4mwaSCfbmRyqB6nbzSMEZHVHWXfD` är READY från exakt den committen;
+  applikationskoden är `66bc7c2716f98e3941fd1069f5d1cc24a66a271a`.
+- [x] Read-only Vercel-kontroll: Production är READY på `main` commit
+  `ad60a68316a1dfaedb54a508e5b063bd1cc24bf4` (merge av PR #124). Den aktuella
+  feature-Previewn och Production är alltså inte samma deployment/källrevision;
+  inga Promotion-, merge- eller produktionsåtgärder gjordes.
+- [x] Ny offline-regression på applikationskoden: pipeline 3/6/12, HTTP/retry/
+  partial delivery, verifierad felträning, quality-gold och P.E.R frontend-
+  kontext (`per-context-pack`, `per-page-targets`, `per-exam-context`) passerade.
+  Node summerade 51 tester utan fel; de egna kontextskripten rapporterade
+  96/96 provkontext- och 90/90 sidmålskontroller.
+- [x] Riktad P.E.R API-regression för aktivt prov, vanlig hjälp efter oavslutat
+  prov, verifierad coachhistorik och resultatsidans kontext passerade 4/4.
+  Syntaxkontroll för `generate-exam.js`, `_verifier.js` och
+  `_exam-generation-pipeline.cjs` passerade.
+- [!] Oberoende granskning fann inga nya blockerande käll-/fokusgrindar. Den
+  bekräftar att delprov kan levereras när deadline nås efter en uttrycklig
+  miniminivå; sådana svar är markerade och får inte kallas fullständiga. Live-
+  modellens relevans och fulla frågeantal på nuvarande revision är fortfarande
+  oprövade. P.E.R-risker som kräver separat bedömning: prompt-injektion via
+  markerat felinnehåll och nytt modellanrop vid en ny klientbegäran efter
+  förlorat svar.
+- [!] Fresh read-only stagingbudget står kvar på cap `$3.379071`, spent
+  `$2.225114`, reserved `$0.263628`, remaining `$0.890329` (`2026-10-25
+  19:35:40 UTC`). Den öppna inloggade Preview-sessionen visar befintlig
+  provhistorik; identiteten är inte verifierad som syntetisk. Inga liveprov
+  eller ytterligare betalda AI-anrop gjordes, och ingen existerande provdata
+  användes eller ändrades.
+- [!] Målet är inte klart: stagingverifiering av 3/6/12-frågegenerering,
+  verifierade misstag och P.E.R:s fyra sidlägen saknas på en bekräftat syntetisk
+  identitet. `main`, Production, Supabase och konton lämnades orörda.
+
+### Livekontroll och P.E.R-återförsök — 2026-10-25
+
+- [x] På den inloggade staging-Previewn skapades ett syntetiskt Biologi 1-prov
+  med tre frågor från syntetiskt material om fotosyntes/cellandning. Alla 3/3
+  frågor visades, besvarades och rättades; resultatet var 6/6. P.E.R gav en
+  ledtråd under aktivt prov utan att visa facit.
+- [!] Frågorna var relevanta för materialets ämne, men svaga för begärd A-nivå:
+  de var mest redogörande/förklarande trots märkningen `analysera`. Detta är en
+  konkret generator-/granskningslucka att åtgärda separat; observationen bevisar
+  inte att det visade 2/2-resultatet var fel enligt den aktuella rättningsrubriken.
+- [x] Efter rättning gav ett P.E.R-anrop tillfälligt status-/leasefel. Källspår
+  visade att en återförsökbar fråga kunde tappa sitt signerade efterrättningsbevis
+  på klientsidan. Återförsöket bevarar nu beviset, medan serverns verifiering
+  och aktiva provets facitfria grind är oförändrade. "Rensa" tar även bort det
+  återställda beviset så att en identisk ny fråga inte återanvänder gammal kontext.
+- [x] Offline-regression `tests/frontend/per-exam-context.test.mjs` passerade
+  99/99, inklusive statusfel → retry med samma signerade bevis och rensa →
+  identisk ny fråga utan gammalt bevis. Syntax- och diffkontroller passerade.
+- [!] Ingen ny betald AI-förfrågan gjordes efter denna verifiering. Liveprovet
+  visar en lyckad 3-frågekörning, inte tillförlitlig 6/12-generering eller att
+  P.E.R:s efterrättningsretry nu lyckas efter att status-/leasefelet återhämtat
+  sig. Budgeten ska läsas om innan eventuella fler AI-anrop.
