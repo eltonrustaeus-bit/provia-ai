@@ -4045,3 +4045,40 @@ garanteras för alla frågor; skolpilot behöver fortsatt observerad användning
   skickades, så den nya anonyma FAQ-svarsgrenen är fortsatt offlineverifierad,
   inte live-funktionsprovad.
 - [!] `main`, Production, Supabase, konton, kvoter och hemligheter är orörda.
+
+## P.E.R rättelsevisning och frågedubbletter — 2026-10-25
+
+- [x] Vanlig P.E.R-chatt ersätter nu ett allvarligt felaktigt svar i samma
+  meddelandebubbla med den korta rättelsen. Den interna kvalitetsgranskningen
+  fortsätter; självgranskningsmetadata exponeras inte i vanlig chatt.
+- [x] Korrigerat svar visas/synkas först efter att den uppdaterade
+  serversessionen sparats; ett misslyckat skriv får ett idempotent återförsök.
+  P.E.R:s separata provläge och hint-/facitgrindar ändrades inte.
+- [x] Dubblettkontrollen skyddar olika logiska strukturer och ordningskänsliga
+  symboliska villkor mot att slås ihop. Omformuleringar och symmetriska
+  jämförelsepar fortsätter dedupliceras. Testfixturen för aggregerad
+  solver-feedback behåller nu tre skilda lärandemål.
+- [x] Oberoende read-only granskning fann inga blockerare efter tester av
+  klient-/serverhistorik, misslyckat historikspar och symmetriska jämförelser.
+- [x] Offlineverifiering på slutdiff: P.E.R-/UI-/återställningspaket 23/23,
+  provpipeline 3/6/12 och retry 59/59, aktiva prov-/P.E.R-grindar 72/72;
+  P.E.R-granskarens fristående tester, syntaxkontroller och git diff --check
+  passerade.
+- [x] Commit 61e24430d8d63d49bc0b9f6dce775cfdcbb36ae4 är pushad till
+  codex/exgen-generation-quality-2026-10-20. PR #124 är fortfarande Draft.
+  Vercel Preview dpl_Do4YHdfQhZ1QRxT4Tp1u678H59RQ är READY för exakt commit
+  och branch-aliasen är provia-ai-git-codex-exgen-gener-b3c147-eltons-projects-4adfb1a3.vercel.app.
+- [!] Ingen live-AI-/Supabaseverifiering gjordes på exakt denna commit.
+  Föregående status anger cirka $0.94 kvar under stagingtaket; det är en
+  gammal budgetögonblicksbild, inte verifierad aktuell budget. Ingen elevdata
+  eller öppet prov användes.
+- [!] Produktionsmigrationen
+  20261024212500_tighten_pipeline_integrity_bounds.sql kan avvisas om
+  befintliga pipeline-rader bryter mot de nya count-gränserna. Hosted
+  migrationsledger och rader verifierades inte. Ingen migration tillämpades.
+  main, Production och exgen.se är oförändrade.
+
+**PILOT NOT READY.** Nästa säkra steg är en färsk read-only stagingbudget-,
+schema- och autentiseringskontroll utan AI-anrop. Liveanrop kräver bekräftad
+syntetisk kontosession och uttryckligt verifierad kostnadsram; Production kräver
+förkontroll av migrationsförutsättningarna och separat releasegodkännande.
