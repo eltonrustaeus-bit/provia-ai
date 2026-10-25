@@ -71,6 +71,117 @@ async function assertPageTopic(path, expectedPage) {
 await assertPageTopic("/index.html", "startsida");
 await assertPageTopic("/förbättring.html", "förbättring");
 
+// A coach answer is reusable only while its verified account history is the
+// same. A successful account sync that changes the result must trigger a new
+// recommendation the next time the student opens the coach.
+{
+  let rows = [{ id: "exam-1", created_at: "2026-10-20T10:00:00Z", course: "Biologi 1", level: "C", qtype: "mix", material: "", exam: {}, answers: {}, result: { total_points: 62, max_points: 100 } }];
+  let coachCalls = 0;
+  let evidenceFingerprint = "a".repeat(64);
+  let evidenceChecks = 0;
+  const { ctx, page } = await mk("/förbättring.html", {
+    additionalMocks: [
+      ["**/rest/v1/user_exams**", route => route.fulfill({ json: rows })],
+      ["**/api/explain", async route => {
+        const body = route.request().method() === "POST" ? route.request().postDataJSON() : null;
+        if (body?.topic === "studiecoach" && body.coachCacheCheck === true) {
+          evidenceChecks++;
+          await route.fulfill({ json: {
+            unchanged: body.knownCoachEvidenceFingerprint === evidenceFingerprint,
+            coachEvidenceFingerprint: evidenceFingerprint,
+          } });
+        } else if (body?.topic === "studiecoach") {
+          coachCalls++;
+          await route.fulfill({ json: {
+            answer: `COACH_DATA_VERSION_${coachCalls}`,
+            coachEvidenceFingerprint: evidenceFingerprint,
+          } });
+        } else await route.fulfill({ json: { ok: true, answer: "P.E.R svar" } });
+      }],
+    ],
+  });
+  await page.getByRole("button", { name: "Se dina prov" }).click();
+  await page.locator("#syncBtn").click();
+  await page.waitForFunction(() => document.getElementById("examList")?.textContent.includes("Biologi 1"), null, { timeout: 8000 });
+  await page.getByRole("button", { name: "← Tillbaka" }).click();
+  await page.getByRole("button", { name: "Fråga P.E.R vad du ska göra" }).click();
+  await page.getByText("COACH_DATA_VERSION_1").waitFor({ timeout: 5000 });
+  ok("coach recommendation stores its server evidence fingerprint", coachCalls === 1, String(coachCalls));
+
+  await page.getByRole("button", { name: "← Tillbaka" }).click();
+  await page.getByRole("button", { name: "Fråga P.E.R vad du ska göra" }).click();
+  await page.getByText("COACH_DATA_VERSION_1").waitFor({ timeout: 5000 });
+  ok("unchanged server-verified evidence reuses the recommendation without another model call",
+    coachCalls === 1 && evidenceChecks === 1, `${coachCalls} generation, ${evidenceChecks} evidence check`);
+
+  await page.getByRole("button", { name: "← Tillbaka" }).click();
+  evidenceFingerprint = "b".repeat(64);
+  await page.getByRole("button", { name: "Fråga P.E.R vad du ska göra" }).click();
+  await page.getByText("COACH_DATA_VERSION_2").waitFor({ timeout: 5000 });
+  ok("changed server evidence refreshes the recommendation even without a local-history change",
+    coachCalls === 2 && evidenceChecks === 2, `${coachCalls} generation, ${evidenceChecks} evidence checks`);
+
+  await page.getByRole("button", { name: "← Tillbaka" }).click();
+  await page.getByRole("button", { name: "Se dina prov" }).click();
+  rows = [{ id: "exam-2", created_at: "2026-10-24T10:00:00Z", course: "Fysik 1", level: "C", qtype: "mix", material: "", exam: {}, answers: {}, result: { total_points: 88, max_points: 100 } }];
+  await page.locator("#syncBtn").click();
+  await page.waitForFunction(() => document.getElementById("examList")?.textContent.includes("Fysik 1"), null, { timeout: 8000 });
+  await page.getByRole("button", { name: "← Tillbaka" }).click();
+  await page.getByRole("button", { name: "Fråga P.E.R vad du ska göra" }).click();
+  await page.getByText("COACH_DATA_VERSION_3").waitFor({ timeout: 5000 });
+  ok("changed synced history invalidates the cached recommendation", coachCalls === 3, String(coachCalls));
+  await ctx.close();
+}
+
+// If account history changes while a same-account coach answer is in flight,
+// discard that response and fetch against the newly synced data.
+{
+  let rows = [{ id: "exam-1", created_at: "2026-10-20T10:00:00Z", course: "Biologi 1", level: "C", qtype: "mix", material: "", exam: {}, answers: {}, result: { total_points: 62, max_points: 100 } }];
+  let startedResolve;
+  const firstStarted = new Promise(resolve => { startedResolve = resolve; });
+  let releaseOld;
+  const oldResponseGate = new Promise(resolve => { releaseOld = resolve; });
+  let coachCalls = 0;
+  const { ctx, page } = await mk("/förbättring.html", {
+    additionalMocks: [["**/rest/v1/user_exams**", route => route.fulfill({ json: rows })]],
+    explainHandler: async route => {
+      const body = route.request().method() === "POST" ? route.request().postDataJSON() : null;
+      if (body?.topic === "studiecoach") {
+        coachCalls++;
+        if (coachCalls === 1) {
+          startedResolve();
+          await oldResponseGate;
+          try { await route.fulfill({ json: { answer: "STALE_COACH_AFTER_SYNC", coachEvidenceFingerprint: "c".repeat(64) } }); } catch {}
+        } else {
+          await route.fulfill({ json: { answer: "FRESH_COACH_AFTER_SYNC", coachEvidenceFingerprint: "d".repeat(64) } });
+        }
+      } else await route.fulfill({ json: { ok: true } });
+    },
+  });
+  await page.getByRole("button", { name: "Fråga P.E.R vad du ska göra" }).click();
+  await Promise.race([
+    firstStarted,
+    new Promise((_, reject) => setTimeout(() => reject(new Error("first coach request did not start")), 5000)),
+  ]);
+  await page.getByRole("button", { name: "← Tillbaka" }).click();
+  await page.getByRole("button", { name: "Se dina prov" }).click();
+  rows = [{ id: "exam-2", created_at: "2026-10-24T10:00:00Z", course: "Fysik 1", level: "C", qtype: "mix", material: "", exam: {}, answers: {}, result: { total_points: 88, max_points: 100 } }];
+  await page.locator("#syncBtn").click();
+  await page.waitForFunction(() => document.getElementById("examList")?.textContent.includes("Fysik 1"), null, { timeout: 8000 });
+  await page.getByRole("button", { name: "← Tillbaka" }).click();
+  await page.getByRole("button", { name: "Fråga P.E.R vad du ska göra" }).click();
+  await page.getByText("FRESH_COACH_AFTER_SYNC").waitFor({ timeout: 5000 });
+  releaseOld();
+  await page.waitForTimeout(250);
+  const finalCoachState = await page.evaluate(() => ({
+    text: document.getElementById("coachText")?.textContent || "",
+    cache: localStorage.getItem("proviaai_per_coach_cache") || "",
+  }));
+  ok("sync during a coach request starts a fresh recommendation", coachCalls === 2 && finalCoachState.text.includes("FRESH_COACH_AFTER_SYNC"));
+  ok("late same-account coach response cannot overwrite the new answer or cache", !finalCoachState.text.includes("STALE_COACH_AFTER_SYNC") && !finalCoachState.cache.includes("STALE_COACH_AFTER_SYNC"), JSON.stringify(finalCoachState));
+  await ctx.close();
+}
+
 // A per-user answer lease can be busy because a request is still running in
 // another tab. Preserve the question and explain a safe manual retry in plain
 // language instead of exposing the backend code.
@@ -353,19 +464,24 @@ await assertPageTopic("/förbättring.html", "förbättring");
     explainHandler: async route => {
       const body = route.request().method() === "POST" ? route.request().postDataJSON() : null;
       if (body?.topic === "studiecoach") {
+        if (body.coachCacheCheck) {
+          await route.fulfill({ json: { unchanged: false, coachEvidenceFingerprint: "a".repeat(64) } });
+          return;
+        }
         coachCalls++;
         if (coachCalls === 1) {
           notifyStarted(body);
           await responseGate;
-          await route.fulfill({ json: { answer: "PRIVATE_OLD_ACCOUNT_COACH_MARKER" } });
+          await route.fulfill({ json: { answer: "PRIVATE_OLD_ACCOUNT_COACH_MARKER", coachEvidenceFingerprint: "a".repeat(64) } });
         } else {
-          await route.fulfill({ json: { answer: "PRIVATE_ACCOUNT_B_COACH_MARKER" } });
+          await route.fulfill({ json: { answer: "PRIVATE_ACCOUNT_B_COACH_MARKER", coachEvidenceFingerprint: "a".repeat(64) } });
         }
       } else {
         await route.fulfill({ json: { ok: true } });
       }
     },
   });
+  await page.getByRole("button", { name: "Fråga P.E.R vad du ska göra" }).click();
   const coachBody = await Promise.race([
     started,
     new Promise((_, reject) => setTimeout(() => reject(new Error("coach request did not start")), 5000)),

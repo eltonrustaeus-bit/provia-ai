@@ -1223,6 +1223,55 @@ test("improvement coach uses only the authenticated account's verified server re
   }
 });
 
+test("coach cache validation fingerprints only fresh verified evidence without quota or model calls", async () => {
+  const previous = { activeCount, issuanceState, latestSubmissionId, verifiedCoachRowsByUser };
+  try {
+    activeCount = 0;
+    issuanceState = "missing";
+    latestSubmissionId = null;
+    verifiedCoachRowsByUser = {
+      [userId]: [
+        { course: "Biologi 1", percent: 45, weak_concept_tags: ["untrusted tag is not in coach prompt"], error_tags: [], verified_at: "2026-10-20T10:00:00Z" },
+      ],
+      ["22222222-2222-4222-8222-222222222222"]: [
+        { course: "Fysik 1", percent: 12, weak_concept_tags: [], error_tags: [], verified_at: "2026-10-20T11:00:00Z" },
+      ],
+    };
+    calls.length = 0;
+    const first = await invoke({
+      topic: "studiecoach",
+      coachCacheCheck: true,
+      knownCoachEvidenceFingerprint: "0".repeat(64),
+    }, "POST", "application/json");
+    assert.equal(first.statusCode, 200, JSON.stringify(first.body));
+    assert.equal(first.body.unchanged, false);
+    assert.match(first.body.coachEvidenceFingerprint, /^[a-f0-9]{64}$/);
+    const resultsQuery = calls.find(({ url }) => url.includes("/rest/v1/mock_results"));
+    assert.ok(resultsQuery);
+    assert.equal(new URL(resultsQuery.url).searchParams.get("user_id"), `eq.${userId}`);
+    assert.equal(new URL(resultsQuery.url).searchParams.get("verified_at"), "not.is.null");
+    assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("reserve_per_chat_quota")
+      && !url.includes("commit_per_chat_quota")), "a cache validation does not spend model tokens or P.E.R quota");
+
+    calls.length = 0;
+    const same = await invoke({
+      topic: "studiecoach",
+      coachCacheCheck: true,
+      knownCoachEvidenceFingerprint: first.body.coachEvidenceFingerprint,
+    }, "POST", "application/json");
+    assert.equal(same.statusCode, 200, JSON.stringify(same.body));
+    assert.equal(same.body.unchanged, true, "only the same account's current verified prompt evidence validates a cached answer");
+    assert.equal(same.body.coachEvidenceFingerprint, first.body.coachEvidenceFingerprint);
+    assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("reserve_per_chat_quota")
+      && !url.includes("commit_per_chat_quota")));
+  } finally {
+    activeCount = previous.activeCount;
+    issuanceState = previous.issuanceState;
+    latestSubmissionId = previous.latestSubmissionId;
+    verifiedCoachRowsByUser = previous.verifiedCoachRowsByUser;
+  }
+});
+
 test("general study help with an unbound stale exam label follows inactive server state", async () => {
   const previous = { activeCount, issuanceState, latestSubmissionId, providerAnswer };
   try {

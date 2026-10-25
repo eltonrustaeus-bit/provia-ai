@@ -160,6 +160,61 @@ try {
     "the auth session remains present after same-origin navigation");
   await accountToApp.close();
 
+  const pilotRuntime = `window.ExGenRuntime=Object.freeze({environment:"pilot",projectRef:"synthetic-pilot",supabaseUrl:"https://synthetic-pilot.invalid",publishableKey:"sb_publishable_synthetic_frontend_test_key_only_000000",appOrigin:"${server.url}",authStorageKey:"${AUTH_KEY}"});`;
+  const pilotAccountToApp = await openPage(browser, `${server.url}/konto.html`, {
+    state: { signedIn: true, role: "gratis", user: { id: "pilot-u1", email: "pilot@example.test" } },
+    mocks: {
+      allow: true, role: "gratis", approved: true,
+      profiles: [{ id: "pilot-u1", approved: true, role: "gratis" }],
+      runtime: pilotRuntime,
+    },
+  });
+  const beforePilotNavigation = await pilotAccountToApp.page.evaluate(key => ({
+    environment: window.ExGenRuntime.environment,
+    projectRef: window.ExGenRuntime.projectRef,
+    storageKey: window.ExGenRuntime.authStorageKey,
+    userId: JSON.parse(localStorage.getItem(key) || "null")?.user?.id,
+  }), AUTH_KEY);
+  assert.deepEqual(beforePilotNavigation, {
+    environment: "pilot", projectRef: "synthetic-pilot", storageKey: AUTH_KEY, userId: "pilot-u1",
+  }, "the account page begins with the synthetic pilot runtime and its own session");
+  assert.equal(await pilotAccountToApp.page.locator("#kontoContent").isVisible(), true,
+    "the pilot account page must actually be authenticated before cross-page navigation is tested");
+  const pilotAuthResponses = [];
+  pilotAccountToApp.page.on("response", response => {
+    const url = response.url();
+    if (/\/auth\/v1\/user|\/rest\/v1\/profiles/.test(url)) {
+      pilotAuthResponses.push({ path: new URL(url).pathname, status: response.status() });
+    }
+  });
+  await pilotAccountToApp.page.getByRole("link", { name: "Mockprov" }).first().click();
+  await pilotAccountToApp.page.waitForURL(/\/app\.html$/);
+  try {
+    await pilotAccountToApp.page.waitForFunction(() => !document.body.classList.contains("app-locked"), null, { timeout: 6000 });
+  } catch {
+    const gateState = await pilotAccountToApp.page.evaluate(() => ({
+      environment: window.ExGenRuntime?.environment,
+      projectRef: window.ExGenRuntime?.projectRef,
+      locked: document.body.classList.contains("app-locked"),
+      storedUserId: JSON.parse(localStorage.getItem(window.ExGenRuntime.authStorageKey) || "null")?.user?.id,
+      gateTitle: document.getElementById("authGateTitle")?.textContent,
+      gateText: document.getElementById("authGateText")?.textContent,
+      toast: document.getElementById("toastRoot")?.innerText,
+    }));
+    assert.fail(`pilot account-to-app navigation remained locked: ${JSON.stringify({ gateState, responses: pilotAuthResponses })}`);
+  }
+  const afterPilotNavigation = await pilotAccountToApp.page.evaluate(key => ({
+    environment: window.ExGenRuntime.environment,
+    projectRef: window.ExGenRuntime.projectRef,
+    storageKey: window.ExGenRuntime.authStorageKey,
+    userId: JSON.parse(localStorage.getItem(key) || "null")?.user?.id,
+  }), AUTH_KEY);
+  assert.deepEqual(afterPilotNavigation, beforePilotNavigation,
+    "account-to-app navigation keeps the same pilot project and account session");
+  assert.equal(await pilotAccountToApp.page.locator("#xf").isVisible(), true,
+    "the verified pilot account reaches the exam wizard");
+  await pilotAccountToApp.close();
+
   let pendingApproved = false;
   const pending = await openPage(browser, `${server.url}/app.html`, {
     state: { signedIn: true, role: "gratis" },

@@ -147,7 +147,7 @@ export function buildLearningSignals({ weakAreas = [], recentMistakes = [], page
 
 // Exam-derived signals come only from server-verified grading; chat/session
 // signals below remain the student's unverified account of their learning.
-export async function enrichMemoryFromExamData(supabase, userId) {
+export async function enrichMemoryFromExamData(supabase, userId, { throwOnError = false } = {}) {
   try {
     const { data, error } = await supabase
       .from("mock_results")
@@ -179,6 +179,7 @@ export async function enrichMemoryFromExamData(supabase, userId) {
 
     return { mockRecentScores, mockWeakConcepts, felBankWeakConcepts, felBankErrorTypes, felBankCourses };
   } catch {
+    if (throwOnError) throw new Error("verified study evidence unavailable");
     return { mockRecentScores: [], mockWeakConcepts: [], felBankWeakConcepts: [], felBankErrorTypes: [], felBankCourses: [] };
   }
 }

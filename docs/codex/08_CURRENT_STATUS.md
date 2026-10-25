@@ -3345,3 +3345,45 @@ bekräftas utan att röra öppna prov.
 liveledtråd mot redan rättat syntetprov, om sådan verifikation fortfarande
 behövs. Startsida och förbättringssida måste också fortsatt kontrolleras i
 aktuell Preview; den här checkpointen avsåg aktiv provhjälp.
+
+## P.E.R coachens verifierade cache — 2026-10-25
+
+- [x] Coachrådets lokala cache valideras nu mot en HMAC-fingeravtrycksnyckel
+  från serverns faktiska, verifierade coachunderlag. Fingeravtrycket är bundet
+  till kontot och avslöjar inte resultatpoängen. En billig autentiserad kontroll
+  avgör om ett sparat råd fortfarande matchar; den använder varken modelltoken
+  eller P.E.R-kvot.
+- [x] Om serverns verifierade underlag ändrats hämtas ett nytt råd. Vid ändrad
+  kontosynkad historik ogiltigförklaras även pågående svar, så ett gammalt
+  svar kan inte återställa en föråldrad cache. Konto kontrolleras igen efter
+  asynkrona läsningar; vid misslyckad verifierad läsning återanvänds inte cache.
+- [x] Kvalitetsgräns bevarad: fria koncept- och feltypstaggar skickas inte in i
+  coachprompten. Bara serververifierade poäng och katalogvaliderade kursnamn
+  påverkar den. Att bredda detta kräver en säker kanonisk ämnestaxonomi.
+- [x] Regressioner: `per-page-targets` **50/50** (serverunderlag oförändrat,
+  underlag ändrat utan lokal synk, ändrad lokal synk, fördröjt svar under synk,
+  samt konto A/B-isolering); `forbattring-flow` **46/46**;
+  `per-exam-review-handler` riktade coachtester **2/2**;
+  `per-exam-memory-provenance` passerade. Tidigare i samma arbetsrunda:
+  pilotruntime konto→provnavigering **1/1**, pilot-session recovery **1/1**,
+  aktiv provkontext **88/88**, `per-manifest` **29/29** och
+  `per-context-pack` passerade. Syntax- och whitespace-kontroller passerade.
+- [x] Oberoende read-only review fann inga kvarvarande blockerande
+  säkerhetsproblem efter att serverkällans mismatch och sena svarsrace
+  hanterats.
+- [!] Ingen ny live-AI-förfrågan gjordes. Det enda uttryckligen godkända
+  stagingprovet i den här rundan har redan förbrukats. Den ändrade
+  coachcachekedjan är offline-testad; staging-Preview måste byggas från denna
+  checkpoint och livevalidering av svaret kräver separat budgetgodkännande.
+- [!] Kvarstående produktluckor: anonym startsida använder avsiktligt en fast
+  produktguide, inte fri ämnes-AI; förbättringscoachen är fortfarande
+  resultats-/kursbaserad snarare än begreppsspecifik; coachens pedagogiska
+  relevans är inte bevisad av mockade tester. Bevara dessa som nästa
+  avgränsade förbättringspunkter, utan att skicka obetrodda taggar till modellen.
+- [x] Inga ändringar i `main`, Production, Supabase-data/schema, konton,
+  roller, kvoter eller hemligheter.
+
+**PILOT NOT READY.** Nästa checkpoint ska pusha coachcachefixen och
+pilotnavigatorns regression till befintliga feature-branchen, kontrollera
+Previewns byggda commit och därefter fortsätta med säker, syntetisk
+P.E.R-verifiering endast inom kvarvarande uttryckligt godkänd budget.

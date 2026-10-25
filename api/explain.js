@@ -1,4 +1,4 @@
-﻿import { randomUUID } from "node:crypto";
+﻿import { createHmac, randomUUID } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 import { requireAuth } from "./_auth.js";
 import supabaseKeys from "./_supabase-server-key.cjs";
@@ -542,6 +542,17 @@ function buildVerifiedCoachEvidence(examData = {}) {
   if (scores.length) lines.push(`Senaste verifierade provresultat i tidsordning: ${scores.join("%, ")}%`);
   if (courses.length) lines.push(`Kurser med verifierade resultat under 70% i Skolverkets utbildningskatalog: ${JSON.stringify(courses)}`);
   return lines.length ? lines.join("\n") : "Inga verifierade provresultat finns ännu.";
+}
+
+function buildVerifiedCoachSnapshot(examData = {}, userId = "") {
+  const evidence = buildVerifiedCoachEvidence(examData);
+  const fingerprintKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+  return {
+    evidence,
+    fingerprint: fingerprintKey && userId
+      ? createHmac("sha256", fingerprintKey).update(`${userId}\0${evidence}`).digest("hex")
+      : null,
+  };
 }
 
 function sendActiveExamGuidance(req, res, body, issuanceState = "active", trustedQuestion = undefined) {
@@ -1279,6 +1290,26 @@ async function handleExplainRequest(req, res, perAnswerLease) {
   const leaseOutcome = await acquirePerAnswerLease(user, perAnswerLease);
   if (leaseOutcome !== "acquired") return rejectLeaseOutcome(req, res, body, leaseOutcome, { lease: perAnswerLease });
 
+  // A saved coach recommendation may only be reused after comparing its
+  // fingerprint with the same server-verified evidence the coach consumes.
+  // This check is authenticated, owner-scoped, answer-gated, and does not use
+  // AI quota or model tokens.
+  if (studyCoachRequest && body.coachCacheCheck === true) {
+    try {
+      const liveExamData = await enrichMemoryFromExamData(supabase, user.id, { throwOnError: true });
+      const snapshot = buildVerifiedCoachSnapshot(liveExamData, user.id);
+      const known = typeof body.knownCoachEvidenceFingerprint === "string"
+        ? body.knownCoachEvidenceFingerprint : "";
+      res.setHeader("Cache-Control", "private, no-store");
+      return res.json({
+        unchanged: /^[a-f0-9]{64}$/.test(known) && known === snapshot.fingerprint,
+        coachEvidenceFingerprint: snapshot.fingerprint,
+      });
+    } catch {
+      return res.status(503).json({ error: "Kunde inte kontrollera din verifierade provhistorik just nu." });
+    }
+  }
+
   // ── TIPS MODE — felbank tips (merged from former /api/smart-tips) ──
   if (body.tipsMode === true) return handleTipsMode(req, res, body, user);
 
@@ -1422,7 +1453,7 @@ async function handleExplainRequest(req, res, perAnswerLease) {
        personalisering som inte är utrullad. */
     const [{ summary: longMemory, structured: structuredMemory }, liveExamData, profileEnabled] = await Promise.all([
       studyCoachRequest ? Promise.resolve({ summary: "", structured: {} }) : loadLongMemory(supabase, user.id, perMemoryEpoch),
-      enrichMemoryFromExamData(supabase, user.id),
+      enrichMemoryFromExamData(supabase, user.id, { throwOnError: studyCoachRequest }),
       studyCoachRequest ? Promise.resolve(false) : flagsEnabled(supabase, ["per_learner_profile_enabled"], user.id),
     ]);
 
@@ -1445,8 +1476,9 @@ async function handleExplainRequest(req, res, perAnswerLease) {
     let learnerContext = '';
     let roleInstruction = '';
     let curriculumContext = '';
+    const coachSnapshot = studyCoachRequest ? buildVerifiedCoachSnapshot(liveExamData, user.id) : null;
     if (studyCoachRequest) {
-      learnerContext = buildVerifiedCoachEvidence(liveExamData);
+      learnerContext = coachSnapshot.evidence;
     } else try {
       const [profile, upRes] = await Promise.all([
         profileEnabled ? loadProfile(supabase, user.id) : Promise.resolve(null),
@@ -1781,7 +1813,8 @@ async function handleExplainRequest(req, res, perAnswerLease) {
                      preferens att mäta, och då ska ingenting sparas.
          badOmNivå är null tills eleven faktiskt tryckt på ett steg. */
       if (badOmNivå !== null && !studyCoachRequest) recordHelpPreference(supabase, user.id, badOmNivå, perMemoryEpoch);
-      return res.json({ answer, ...(historySaved ? { history: newHistory } : {}), helpCap, helpLevelUsed: helpLevel });
+      return res.json({ answer, ...(historySaved ? { history: newHistory } : {}), helpCap, helpLevelUsed: helpLevel,
+        ...(coachSnapshot ? { coachEvidenceFingerprint: coachSnapshot.fingerprint } : {}) });
     } catch {
       await settlePerChatQuota(user.id, quota, false);
       return res.status(500).json({ error: "P.E.R är tillfälligt otillgänglig. Försök igen senare." });

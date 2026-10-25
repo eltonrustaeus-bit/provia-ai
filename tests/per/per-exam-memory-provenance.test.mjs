@@ -50,5 +50,17 @@ const unavailable = await enrichMemoryFromExamData({
   },
 }, owner);
 assert.deepEqual(unavailable.mockRecentScores, [], "missing verified schema fails closed");
+await assert.rejects(
+  enrichMemoryFromExamData({
+    from() {
+      return {
+        select() { return this; }, eq() { return this; }, not() { return this; },
+        order() { return this; }, async limit() { return { data: null, error: new Error("offline") }; },
+      };
+    },
+  }, owner, { throwOnError: true }),
+  /verified study evidence unavailable/,
+  "cache validation must not treat a failed evidence read as an empty but unchanged history",
+);
 
 console.log("P.E.R memory: only verified grading contributes durable exam signals");

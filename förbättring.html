@@ -644,16 +644,32 @@
 
     /* ── PER COACH ── */
     const PER_COACH_TTL = 24 * 60 * 60 * 1000;
+    async function localCoachViewFingerprint(h,m){
+      const payload=JSON.stringify({
+        history:(Array.isArray(h)?h:[]).map(x=>[x.ts,x.course,x.level,x.percent,x.total_points,x.max_points]),
+        mistakes:(Array.isArray(m)?m:[]).map(x=>[
+          x.mistake_key,x.ts,x.course,x.level,x.question,x.user_answer,x.feedback,
+          x.model_answer,x.points,x.max_points,x.concept_tag,Array.isArray(x.error_tags)?x.error_tags:[]
+        ])
+      });
+      if(!globalThis.crypto?.subtle||typeof TextEncoder==='undefined')return null;
+      try{
+        const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(payload));
+        return [...new Uint8Array(digest)].map(value=>value.toString(16).padStart(2,'0')).join('');
+      }catch{return null;}
+    }
     function getCoachCache(ownerId=localStorage.getItem('exgen_local_data_owner')){
       const o=lsObj(LS_PER_COACH_CACHE);
       return o&&typeof o==='object'&&ownerId&&o.ownerId===ownerId?o:null;
     }
     function setCoachCache(data){lsSet(LS_PER_COACH_CACHE,data);}
-    function isCoachCacheFresh(c){return c&&c.text&&(Date.now()-(c.ts||0))<PER_COACH_TTL;}
+    function isCoachCacheFresh(c){
+      return Boolean(c&&c.text&&/^[a-f0-9]{64}$/.test(c.dataFingerprint||'')&&(Date.now()-(c.ts||0))<PER_COACH_TTL);
+    }
 
     let coachRequestSequence=0;
     let coachPending=null;
-    async function fetchPERCoach(ownerId){
+    async function fetchPERCoach(ownerId,knownFingerprint=null){
       if(!db) return null;
       const{data:sd}=await db.auth.getSession();
       const token=sd?.session?.access_token||'';
@@ -665,14 +681,15 @@
         body:JSON.stringify({
           topic:'studiecoach',
           pageContext:{page:'förbättring'},
-          userQuestion:'Analysera min provhistorik och ge mig en personlig rekommendation för att förbättra mina resultat.'
+          userQuestion:'Analysera min provhistorik och ge mig en personlig rekommendation för att förbättra mina resultat.',
+          ...(knownFingerprint?{coachCacheCheck:true,knownCoachEvidenceFingerprint:knownFingerprint}:{})
         })
       });
       const data=await r.json();
       if(!r.ok)throw new Error(data?.error||'failed');
       const{data:after}=await db.auth.getSession();
       if(after?.session?.user?.id!==ownerId) return null;
-      return data?.answer||null;
+      return data;
     }
 
     /* ── SMART TIPS ── */
@@ -1116,12 +1133,26 @@
         const hasScore=(typeof totalRaw==='number'||typeof totalRaw==='string')&&!(typeof totalRaw==='string'&&totalRaw.trim()==='')&&(typeof maxRaw==='number'||typeof maxRaw==='string')&&!(typeof maxRaw==='string'&&maxRaw.trim()==='')&&Number.isFinite(total)&&Number.isFinite(maximum)&&maximum>0&&total>=0&&total<=maximum;
         return {ts:Date.parse(row.created_at)||Date.now(),course:row.course||'',level:row.level||'C',qType:row.qtype||'mix',total_points:hasScore?total:null,max_points:hasScore?maximum:null,percent:hasScore?Math.round((total/maximum)*100):null};
       });
+      const previousFingerprint=await localCoachViewFingerprint(lsArr(LS_HISTORY),lsArr(LS_MISTAKES));
+      const nextMistakes=mergeMistakes(rows);
+      const nextFingerprint=await localCoachViewFingerprint(h,nextMistakes);
+      if(!r.userId||r.userId!==await getUserId()){
+        if(st){st.textContent='Kontot ändrades under synkroniseringen. Uppdatera sidan för att läsa rätt data.';st.className='statusText warn';}
+        if(syncBtn)syncBtn.removeAttribute('disabled');
+        return;
+      }
       lsSet(LS_HISTORY,h);
       const last2=rows.length?rows[rows.length-1]:null;
       if(last2){lsSet(LS_LAST,{ts:Date.parse(last2.created_at)||Date.now(),attempt:h[h.length-1],exam:last2.exam,result:last2.result});if(typeof last2.material==='string')localStorage.setItem(LS_MATERIAL,last2.material);}
       else localStorage.removeItem(LS_LAST);
-      const oldMistakes=lsArr(LS_MISTAKES),newMistakes=mergeMistakes(rows);
+      const oldMistakes=lsArr(LS_MISTAKES),newMistakes=nextMistakes;
       migrateTrainingPick(oldMistakes,newMistakes);lsSet(LS_MISTAKES,newMistakes);
+      if(!previousFingerprint||!nextFingerprint||previousFingerprint!==nextFingerprint){
+        localStorage.removeItem(LS_PER_COACH_CACHE);
+        coachRequestSequence++;
+        coachPending=null;
+        flow.busy('coach',false);
+      }
       if(st){st.textContent='Synkat';st.className='statusText ok';}
       if(syncBtn)syncBtn.removeAttribute('disabled');
       renderAll();
@@ -1259,6 +1290,7 @@
       const mostC=mostMistakeCourse(m);
       const lastP=h.length?chartPercent(h[h.length-1].percent):null;
       const cache=getCoachCache();
+      const hasRecentCoachCache=cache?.text&&(Date.now()-(cache.ts||0))<PER_COACH_TTL;
 
       [
         { go:'felbank', label:'Träna det du missat',
@@ -1268,7 +1300,7 @@
           small:h.length?`${h.length} prov · senaste ${lastP===null?'resultat saknas':`${lastP} %`}`:'Inga prov ännu',
           av:!h.length },
         { go:'coach', label:'Fråga P.E.R vad du ska göra',
-          small:isCoachCacheFresh(cache)?'analys från senaste dygnet':'ny analys av din historik',
+          small:hasRecentCoachCache?'öppna sparad rekommendation':'ny analys av din historik',
           av:!h.length },
         { go:'rapport', label:'Skapa övningsrapport',
           small:'minst 3 verifierat rättade prov',
@@ -1424,7 +1456,7 @@
         $('focusText').textContent=topC?`${mc.course} › ${topC[0]} (${topC[1]})`:`${mc.course} (${mc.n})`;
       }else $('focusText').textContent='Markera 5 misstag';
 
-      loadCoach(h,m);
+      if(flow.current()==='coach')loadCoach(h,m);
     }
 
     async function loadCoach(h,m){
@@ -1435,17 +1467,31 @@
       const ownerId=sessionData?.session?.user?.id||'';
       if(!ownerId){box.textContent='Logga in för att få en personlig analys.';return;}
       const cache=getCoachCache(ownerId);
-      if(isCoachCacheFresh(cache)){box.textContent=cache.text;return;}
       if(coachPending?.ownerId===ownerId)return;
       box.textContent='P.E.R läser…';
       flow.busy('coach',true);
       const requestId=++coachRequestSequence;
       coachPending={ownerId,requestId};
       try{
-        const text=await fetchPERCoach(ownerId);
+        let result=null;
+        if(isCoachCacheFresh(cache)){
+          result=await fetchPERCoach(ownerId,cache.dataFingerprint);
+          const{data:checked}=await db.auth.getSession();
+          if(requestId!==coachRequestSequence||checked?.session?.user?.id!==ownerId)return;
+          if(result?.unchanged===true&&result.coachEvidenceFingerprint===cache.dataFingerprint){
+            box.textContent=cache.text;
+            return;
+          }
+        }
+        box.textContent='P.E.R läser…';
+        result=await fetchPERCoach(ownerId);
         const{data:current}=await db.auth.getSession();
         if(requestId!==coachRequestSequence||current?.session?.user?.id!==ownerId)return;
-        if(text){box.textContent=text;setCoachCache({ownerId,ts:Date.now(),text});}
+        if(result?.answer){
+          box.textContent=result.answer;
+          if(/^[a-f0-9]{64}$/.test(result.coachEvidenceFingerprint||''))
+            setCoachCache({ownerId,dataFingerprint:result.coachEvidenceFingerprint,ts:Date.now(),text:result.answer});
+        }
         else coachError(box);
       }catch(_){
         if(requestId===coachRequestSequence)coachError(box);
