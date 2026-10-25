@@ -4745,3 +4745,37 @@ enda 12-frågetest. Offline- och mocktester bevisar inte live-modellens
 - [!] Fortsatt kvarstår att mockade tester inte bevisar verklig modellsemantik
   eller relevans hos AI-genererade frågor. Liveverifiering kräver först färsk
   kontroll av rätt stagingmiljö, syntetisk identitet och budget.
+
+### A-nivåns språk- och bedömningssignaler — 2026-10-25
+
+- [x] Oberoende granskning reproducerade att vanliga giltiga uppgiftsfraser
+  ("discuss how", "what conclusion can we draw", "to what extent" och
+  "integrate") kunde underkännas trots källstöd. Verifieraren känner nu igen
+  dessa som uttryck för respektive högre resonemangsoperation.
+- [x] A-nivåns rubrikbevis måste nu uttryckligen stödja den deklarerade
+  operationen. Generiska resonemangs-/slutsatsord ersätter inte en operation
+  som rubriken säger är valfri, onödig, utesluten, utelämnad eller inte
+  poängsatt. Negerade och alternativa uppgiftsfraser fortsätter att stänga
+  grinden.
+- [x] Regressioner täcker engelska och svenska jämförelsefraser, fem vanliga
+  positiva operationer, negationer/alternativ samt optional/unnecessary,
+  shouldn't/mustn't/can't, waived/excluded/skipped och saknade poäng för
+  operationen.
+- [x] Oberoende read-only adversarial review fann inga blockerare i de senast
+  kontrollerade disclaimer-formerna. Offlinekontroller passerade:
+  verifierar-output-kontrakt, verifierarbeslut, quality-gold och
+  prov-/felträningsflöden 55/55. `per-page-targets` 95/95 och
+  `per-exam-context` 102/102 passerade tidigare i samma QA-omgång.
+- [!] `tests/per/per-brain.test.mjs` har en separat befintlig inkonsistens:
+  genererad modulgraf har 73 kanter medan källan har 75. Denna ändring berör
+  inte grafkällor eller genererad fil; felet lämnas utanför checkpointen.
+- [!] Alla granskningar och modellstubbar är offlinebevis. Ingen autentiserad
+  live-Preview eller AI-generering har verifierats i detta steg; senaste
+  Preview-sessionen visar fortfarande skolpilotens inloggningsgrind.
+- [x] Kodcheckpoint `79ec4a3936ea619e68668cdf9290f5e0db9069bc` är pushad till
+  `codex/exgen-generation-quality-2026-10-20`. Vercel Preview
+  `dpl_8JFuqVGp6WoejrLW8QBWppK85Auf` är `READY` från exakt SHA på
+  `https://provia-p9wj9ygfe-eltons-projects-4adfb1a3.vercel.app/app.html`.
+- [!] Preview-autentisering krävs fortfarande för användarflöde eller
+  live-modellverifiering. `main`, Production, databasen, hemligheter, konton
+  och kvoter har inte ändrats i detta steg.
