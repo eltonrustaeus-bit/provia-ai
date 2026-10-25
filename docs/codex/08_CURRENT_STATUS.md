@@ -4712,8 +4712,8 @@ enda 12-frågetest. Offline- och mocktester bevisar inte live-modellens
 - [!] Utan extern livekontroll kvarstår tidigare noterad lucka: provmekanik och
   felbankens provenance är testade, men semantisk relevans hos verkligt
   genererade frågor är inte bevisad av offline-testerna.
-- [x] `shared.js`-ändringen är oberoende granskad utan blockerande fynd. En
-  liten testlucka kvarstår för exakt gränsfall kring 15-minutersutgång.
+- [x] `shared.js`-ändringen är oberoende granskad utan blockerande fynd. Den
+  först noterade testluckan för 15-minutersgränsen täcks i avsnittet nedan.
 - [x] Kodcheckpoint `e1a64fabd4f403dda7578a1fded0ca025ba3a440` är pushad till
   `codex/exgen-generation-quality-2026-10-20`. Vercel Preview
   `dpl_DwH5xFHup1XPP6yMfuWaAe68gDzr` blev `READY` från exakt SHA med URL
@@ -4736,9 +4736,12 @@ enda 12-frågetest. Offline- och mocktester bevisar inte live-modellens
   verifierarbeslut passerar; P.E.R-sidtester 95/95; provkontext 102/102.
   Provpipeline och HTTP-flöden 30/30; felträningskälla, proveniens, kontext
   och urvalsidentitet passerar sammantaget 55/55 i riktade testfiler.
-- [!] Dessa nya granskningskorrigeringar finns i den lokala diffen men är ännu
-  inte pushade eller deployade. Previewn ovan motsvarar föregående kodcheckpoint
-  `e1a64fa`, inte dessa fynd.
+- [x] Kodcheckpoint `b0653206e5de5305d33a15b31055178e9acc98db` är pushad till
+  `codex/exgen-generation-quality-2026-10-20`. Vercel Preview
+  `dpl_H7BGL1HV3kS7m1vaRWm1wTsk9m8A` är `READY` från exakt SHA med URL
+  `https://provia-dokqtib67-eltons-projects-4adfb1a3.vercel.app`.
+- [!] Deployment och commit är verifierade; inget autentiserat app-/live-AI-test
+  gjordes. Previewn ovan ersätter den tidigare kodcheckpointen `e1a64fa`.
 - [!] Fortsatt kvarstår att mockade tester inte bevisar verklig modellsemantik
   eller relevans hos AI-genererade frågor. Liveverifiering kräver först färsk
   kontroll av rätt stagingmiljö, syntetisk identitet och budget.
