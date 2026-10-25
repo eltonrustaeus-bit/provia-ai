@@ -3716,3 +3716,43 @@ P.E.R-verifiering endast inom kvarvarande uttryckligt godkänd budget.
 **PILOT NOT READY.** Nästa steg: pushad feature-Preview verifieras mot exakt
 commit. Ingen betald livekontroll görs utan verifierad kvarvarande budget och
 nytt uttryckligt godkännande.
+
+## P.E.R startsida: livekontroll och lokaldata-gräns — 2026-10-25
+
+- [x] I den inloggade staging-Previewn gick P.E.R att öppna från startsidan.
+  Ett enda generellt, syntetiskt test fick svaret att vanliga ämnesfrågor kan
+  ställas direkt utan att skapa prov. Inget prov skapades eller ändrades.
+- [!] Svaret var funktionellt korrekt men kort; detta verifierar startsidans
+  routing och att den inte kräver ett prov, inte bred svarskvalitet.
+- [x] En färsk budgetläsning före anropet visade `$0.972991` kvar av den
+  aktiverade capen `$3.379071`; efter anropet visade den `$0.972151` kvar
+  (`spent_usd` ökade `$0.000840`). Ingen cap, kvot eller roll ändrades.
+- [x] Efter livekontrollen stängdes en integritetslucka i klienten: startsidan
+  utelämnar nu lokalt snitt, svaghets-/kurs-/material-/provkontext och läser
+  varken lokal resultat- eller felbankshistorik. API-serverns tidigare
+  startsidesgräns som rensar kontext före modellprompten är oförändrad.
+- [x] Oberoende read-only-granskare bekräftade att startsidesgränsen stänger
+  fyndet; inga blockerande fynd kvarstod. Testet seedar gamla privata markörer,
+  granskar fångad request och kontrollerar att båda lokala lagringsnycklarna
+  inte läses av P.E.R-anropet.
+- [x] Offline: `per-page-targets` **69/69**, `anon-per` **21/21**,
+  `per-manifest` **29/29**, riktade API-tester för startsida, coach och
+  aktivt prov **4/4**; syntax- och diffkontroller passerade.
+- [!] Ett bredare seriellt API-testförsök nådde 58 godkända test utan
+  assertionsfel men nådde test-runnerns 300-sekundersgräns innan hela filen
+  slutfördes. Det räknas inte som en passerad fullständig svit.
+- [x] Kodcheckpoint `70eca8c0bde90eeaf7bef105871a346c5b66115d` är pushad till
+  `codex/exgen-generation-quality-2026-10-20`. Vercel Preview
+  `dpl_2ZiLusWxUDGsodMZaYuiFzSwuCZn` är `READY` från exakt SHA på
+  `https://provia-omsuzko1j-eltons-projects-4adfb1a3.vercel.app/`.
+- [!] Den livefrågan kördes före klientgränsändringen, på den dåvarande
+  Previewn. Den nya gränsen är verifierad offline och byggd i den READY
+  Previewn, men inte separat liveinspekterad. Ingen ny fråga har skickats efter
+  ändringen. Aktivt prov och coachsvar har inte live-testats på grund av
+  befintlig prov-/historikdata i tillgängliga konton.
+- [x] `main`, Production, Supabase-schema/data, konton, roller, kvoter och
+  hemligheter lämnades orörda.
+
+**PILOT NOT READY.** Nästa steg är att få en separat staging-session utan
+personlig eller pågående provdata för livekontroll av aktiv provledtråd och
+förbättringscoach. Startsidan behöver inget ytterligare betalt test nu.
