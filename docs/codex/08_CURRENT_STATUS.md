@@ -398,6 +398,31 @@ urval/rättning utan att sänka kvalitetsgrindarna och låta oberoende granskare
 kontrollera diffen. Gör inte ett nytt betalt liveprov förrän den ändringen är
 redo och budgeten lästs om. Ingen production/main-ändring.
 
+## Aktiva provledtrådar: jämförelse och orsak–verkan — 2026-10-25
+
+- [x] `api/explain.js` ger verifierade, aktiva kortsvarsfrågor tydligare
+  stegvisa stöd när frågan uttryckligen ber om jämförelse eller orsak–verkan.
+  Frågorna ska matcha endast en struktur; blandade/otydliga formuleringar går
+  vidare till den generella ledtråden.
+- [x] De nya texterna ber eleven själv hitta källbelägg och bygga resonemanget.
+  De innehåller varken modellfacit eller inskickade svar. De nya trapporna
+  påverkas inte av klientens osignerade `answered`-flagga; aktiv provhjälp är
+  fortsatt deterministisk och gör inga modell- eller kvotanrop.
+- [x] Riktade tester täcker tre hjälpnivåer för båda strukturerna, säkerhet mot
+  facittext, blandad struktur, osignerat svarstillstånd och generisk fallback
+  när frågeproof saknas.
+- [x] Full `tests/api/per-exam-review-handler.test.mjs`: **67/67**. Samlad
+  P.E.R stream-/sid-/kontokontext-, manifest-, landningssida- och
+  förbättringssidetestkörning passerade. JS-syntax och `git diff --check`
+  passerade. Oberoende säkerhetsgranskning fann inga blockerare.
+- [x] Färsk skrivskyddad stagingkontroll för testkontot fann cap `$3.379071`,
+  spenderat `$2.090394`, reserverat `$0.263628` och **$1.025049 kvar**;
+  inget aktivt orättat prov hittades för kontot. Inga stagingdata ändrades.
+- [!] Ändringen är ännu inte pushad och därför inte verifierad i en ny Preview.
+  Det enda godkända syntetiska 3-frågeprovet och en ledtråd ska köras först när
+  den exakta Previewn är `READY` och branch/stagingkopplingen är verifierad.
+  Det äldre visade provet och den oskickade P.E.R-frågan ska lämnas orörda.
+
 ## Uppföljning utan extra liveförbrukning — 2026-10-24 21:04 UTC
 
 - [x] Behöll en och samma befintliga Preview-flik. Inga nya flikar, provstarter,

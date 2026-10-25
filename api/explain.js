@@ -703,6 +703,8 @@ function sendActiveExamGuidance(req, res, body, issuanceState = "active", truste
   const ladder = hasDraft ? draftChecks : hints;
   const normalizedQuestion = questionText.toLocaleLowerCase(en ? "en-US" : "sv-SE");
   let contextualSequence = null;
+  const comparisonQuestion = /\b(compare|compared|comparison|contrast|difference|differences|jämför|jämföra|jämförelse|skillnad|skillnader)\b/i.test(normalizedQuestion);
+  const causeEffectQuestion = /\b(why|cause|causes|caused|reason|reasons|because|varför|orsak|orsaker|orsaken|beror|leder till)\b/i.test(normalizedQuestion);
   if (/fotosyntes|photosynthesis/.test(normalizedQuestion)) {
     contextualSequence = hasDraft
       ? (en ? [
@@ -743,6 +745,26 @@ function sendActiveExamGuidance(req, res, body, issuanceState = "active", truste
         "Leta upp en beskrivning av båda processerna under samma rubrik. Vilken skillnad stöds av materialet, inte bara minnet?",
         "Gör en tabell med syfte och resultat som rubriker. Fyll rutorna från materialet och formulera sedan skillnaden med egna ord.",
       ]);
+  } else if (comparisonQuestion && !causeEffectQuestion) {
+    contextualSequence = en ? [
+        "Choose one shared comparison point. What does your material say about each item under that same point?",
+        "Find evidence about both items under the same heading. What contrast does that evidence support?",
+        "Make a two-column note using the shared comparison point, fill it from your material, then explain the contrast in your own words.",
+      ] : [
+        "Välj en gemensam jämförelsepunkt. Vad säger materialet om vart och ett utifrån just den punkten?",
+        "Hitta belägg om båda i samma del av materialet. Vilken skillnad stöder de beläggen?",
+        "Gör två kolumner med samma jämförelsepunkt, fyll dem från materialet och förklara sedan skillnaden med egna ord.",
+      ];
+  } else if (causeEffectQuestion && !comparisonQuestion) {
+    contextualSequence = en ? [
+        "Identify what the question says changes. Where in your material is a possible cause or mechanism described?",
+        "Trace the process in order: what happens first, and what follows? Which source detail connects the steps?",
+        "Build a short cause-and-effect chain from your material and check that each link is supported, not just assumed.",
+      ] : [
+        "Identifiera vad frågan säger förändras. Var i materialet beskrivs en möjlig orsak eller mekanism?",
+        "Följ processen i ordning: vad händer först och vad följer? Vilken detalj i materialet binder ihop stegen?",
+        "Bygg en kort orsakskedja från materialet och kontrollera att varje led har stöd, inte bara antas.",
+      ];
   }
   const sequence = contextualSequence || (type === "graph"
     ? (graphMode === "line" || graphMode === "scatter" ? ladder[graphMode] : ladder.genericGraph)
