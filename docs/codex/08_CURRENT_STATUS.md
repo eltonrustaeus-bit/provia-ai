@@ -1,5 +1,25 @@
 # 08 Current Status
 
+# P.E.R begränsad livekontroll — 2026-10-25
+
+- [x] Den inloggade staging-Previewn för kodcheckpoint `b8e38aa` öppnades i
+  samma webbläsarsession. Startsidan laddade och en enda allmän, syntetisk
+  P.E.R-fråga fick ett faktiskt svar med relevant vägledning till Mockprov.
+  Inget prov skapades.
+- [x] Utvecklingssidan laddade i samma session och visade serverhämtad
+  studiehistorik. En skrivskyddad stagingfråga visade noll aktiva, orättade
+  prov och noll köade/körande genereringsjobb.
+- [!] Ingen AI-fråga skickades från utvecklingssidan eftersom kontots
+  studiehistorik inte kunde verifieras som syntetisk. Inget aktivt prov fanns
+  att testa säkert; vi skapade därför inte ett nytt prov bara för att få ett
+  live-test av provledtråden. Aktivt provläge verifieras här endast offline.
+- [!] Före startsidans livefråga var stagingens lästa återstående gräns
+  `$0.974381`; en efterkontroll visade `$0.972991`. Dessa värden är från den
+  lästa budgettabellen, inte en garanti för framtida kostnadsutrymme.
+- [!] Den inaktuella-frågeledtråden-korrigeringen förblir på feature Preview;
+  `main` och Production har inte ändrats. Full liveverifiering av alla tre
+  lägen är därmed inte klar.
+
 # P.E.R avbryter inaktuella provledtrådar — 2026-10-25
 
 - [x] Oberoende granskning hittade att ett fördröjt P.E.R-svar kunde visas
