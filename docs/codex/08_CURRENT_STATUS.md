@@ -17,16 +17,16 @@
   `git diff --check` pass.
 - [x] Independent read-only review found no blocker in answer gating, proof
   binding, intent classification, or model/quota avoidance.
-- [!] No live model call or hosted database operation was made. The signed-in
-  browser's available Preview still shows the login gate; the open exam was
-  preserved untouched.
+- [!] No live model call or hosted database operation was made. The reused
+  Preview tab is authenticated and shows ExGen with saved exam history; no
+  active exam is visible on that page. The history was left untouched.
 - [x] Feature checkpoint `cfdbbaa` is pushed to
   `codex/exgen-generation-quality-2026-10-20`; Vercel deployment
   `dpl_5VtdWjfNZe8Kh3EN2ysurBeTSUNA` is READY at
   `provia-ai-git-codex-gener-b3c147-eltons-projects-4adfb1a3.vercel.app`.
-- [!] Hosted interaction was not live-tested: the available browser state was
-  at the authentication gate, and no new AI request or open-exam action was
-  made.
+- [!] End-to-end P.E.R interaction was not live-tested: the remaining staging
+  AI budget could not be freshly verified, so no paid request or exam action
+  was made.
 
 # P.E.R coach cache and verified-history access — 2026-10-25
 
