@@ -3522,8 +3522,13 @@ P.E.R-verifiering endast inom kvarvarande uttryckligt godkänd budget.
   passerade.
 - [!] Ingen ny live-AI-förfrågan gjordes. Den tidigare uttryckligt godkända
   stagingförbrukningen är redan använd; ändringarna är offlineverifierade.
-  Push skapar nästa Preview-checkpoint, vars exakta SHA/READY-status ska
-  verifieras efter publicering. Ingen `main`, Vercel Production,
+  Feature-checkpoint `a3e91f2a8098a0368424ba3875152263e6f3cb99` är pushad till
+  `codex/exgen-generation-quality-2026-10-20`; deployment
+  `dpl_3WWwxS63tJ5uQsBgCvmopp6GokVc` i befintliga `provia-ai`-projektet är
+  `READY` från exakt SHA. Preview:
+  `https://provia-r548p6quq-eltons-projects-4adfb1a3.vercel.app/app.html`.
+  HTTP-kontrollen får `302` till Vercel SSO, så appinnehållet efter
+  autentisering är inte visuellt verifierat. Ingen `main`, Vercel Production,
   produktionsdatabas, konto, kvot eller hemlighet ändras.
 
 **PILOT NOT READY.** Nästa steg: pushad feature-Preview verifieras mot exakt
