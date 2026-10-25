@@ -614,7 +614,7 @@ async function verifyQuestions(questions, opts) {
       const scoringEvidenceText = normalizeEvidenceText(difficultyEvidence?.scoring_evidence);
       const operationSignals = {
         analyze: ["analysera", "undersok", "forklara hur", "forklara varfor", "analyze", "examine", "investigate", "explain how", "explain why"],
-        compare: ["jamfor", "compare"],
+        compare: ["jamfor", "skillnad mellan", "skillnader mellan", "skillnader finns", "skiljer sig", "hur skiljer", "compare", "differ", "difference between", "differences between", "similarities between", "contrast"],
         infer: ["dra slutsats", "harled", "tolka", "infer", "derive", "interpret"],
         evaluate: ["bedom", "vardera", "ta stallning", "utvardera", "evaluate", "assess", "justify", "weigh"],
         synthesize: ["foresla", "kombinera", "utforma", "skapa", "syntetisera", "synthesize", "design", "combine", "propose"],
@@ -641,7 +641,7 @@ async function verifyQuestions(questions, opts) {
         return false;
       });
       const conclusionSignals = ["motivera", "dra slutsats", "resonera", "justify", "draw a conclusion", "reasoned conclusion"];
-      const rubricReasoningSignals = ["resonemang", "motiver", "jamfor", "analys", "underbygg", "reasoning", "justify", "compare", "analysis", "evidence-based"];
+      const rubricReasoningSignals = ["resonemang", "motiver", "jamfor", "skillnad mellan", "skillnader mellan", "skiljer sig", "analys", "underbygg", "reasoning", "justify", "compare", "differ", "difference between", "differences between", "similarities between", "contrast", "analysis", "evidence-based"];
       const difficultyEvidenceContractOk = targetLevel !== "A" || (
         difficultyEvidence && typeof difficultyEvidence === "object" &&
         typeof difficultyEvidence.task_evidence === "string" && difficultyEvidence.task_evidence.length >= 8 &&

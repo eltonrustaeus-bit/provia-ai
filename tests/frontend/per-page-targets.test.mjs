@@ -299,6 +299,39 @@ await assertPageTopic("/förbättring.html", "förbättring");
   await page.reload({ waitUntil: "networkidle" });
   ok("a pending question from another account is not restored", await page.locator("#perInput").inputValue() === "");
   ok("an account-mismatched draft is discarded", await page.evaluate(() => sessionStorage.getItem("exgen_per_pending_question")) === null);
+
+  await page.addInitScript(() => {
+    const fixedNow = Number(sessionStorage.getItem("per_pending_test_now"));
+    if (Number.isFinite(fixedNow) && fixedNow > 0) Date.now = () => fixedNow;
+  });
+  const fixedNow = await page.evaluate(() => Date.now());
+  await page.evaluate(now => {
+    sessionStorage.setItem("per_pending_test_now", String(now));
+    Date.now = () => now;
+    sessionStorage.setItem("exgen_per_pending_question", JSON.stringify({
+      question: "Draft at the retry boundary", savedAt: now - 15 * 60 * 1000,
+      accountId: "u1", page: "förbättring",
+    }));
+  }, fixedNow);
+  await page.reload({ waitUntil: "networkidle" });
+  await page.locator("#perMessages").getByText("Din fråga är återställd. Tryck Skicka när du vill fortsätta.").waitFor({ state: "attached", timeout: 5000 });
+  ok("a pending question exactly 15 minutes old remains manually retryable", await page.locator("#perInput").inputValue() === "Draft at the retry boundary");
+
+  for (const [label, savedAt, includeTimestamp] of [
+    ["older than the retry window", fixedNow - 15 * 60 * 1000 - 1, true],
+    ["from the future", fixedNow + 1, true],
+    ["with an invalid timestamp", "not-a-timestamp", true],
+    ["with no timestamp", undefined, false],
+  ]) {
+    await page.evaluate(({ savedAt, includeTimestamp }) => {
+      const draft = { question: `Draft ${String(savedAt)}`, accountId: "u1", page: "förbättring" };
+      if (includeTimestamp) draft.savedAt = savedAt;
+      sessionStorage.setItem("exgen_per_pending_question", JSON.stringify(draft));
+    }, { savedAt, includeTimestamp });
+    await page.reload({ waitUntil: "networkidle" });
+    ok(`a pending question ${label} is discarded`,
+      await page.evaluate(() => sessionStorage.getItem("exgen_per_pending_question")) === null);
+  }
   await ctx.close();
 }
 

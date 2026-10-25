@@ -2737,7 +2737,8 @@ function finalizeMsg(div, text) {
               sessionStorage.removeItem(PER_PENDING_QUESTION_KEY);
               return;
             }
-            if (typeof perPending.question !== 'string' || !perPending.question
+            if (!Number.isFinite(perPending.savedAt)
+                || typeof perPending.question !== 'string' || !perPending.question
                 || perPending.question.length > 2000 || perPendingAge < 0
                 || perPendingAge > 15 * 60 * 1000) {
               sessionStorage.removeItem(PER_PENDING_QUESTION_KEY);

@@ -120,7 +120,7 @@ const aLevelReviewResult = (difficulty_evidence, evidenceQuotes = [
   },
   duplicate_of: "", issues: [], required_changes: [], difficulty_evidence,
 });
-async function assertARejected(questionText, scoringText, lang = "sv", reasoningOperation = "analyze") {
+async function reviewALevelQuestion(questionText, scoringText, lang = "sv", reasoningOperation = "compare") {
   const candidate = {
     ...aLevelQuestion,
     question: questionText,
@@ -134,7 +134,10 @@ async function assertARejected(questionText, scoringText, lang = "sv", reasoning
       task_evidence: questionText,
       scoring_evidence: scoringText,
     })], [candidate], aLevelMaterial, undefined, "A", undefined, lang);
-  const decision = review.outcome.perQuestion.get("a-compare");
+  return review.outcome.perQuestion.get("a-compare");
+}
+async function assertARejected(questionText, scoringText, lang = "sv", reasoningOperation = "analyze") {
+  const decision = await reviewALevelQuestion(questionText, scoringText, lang, reasoningOperation);
   assert.equal(decideApproval(decision), false, `recall-only wording must not pass A-level: ${questionText}`);
   return decision;
 }
@@ -190,6 +193,16 @@ const contrastiveReview = await runWithResults(
 assert.equal(decideApproval(contrastiveReview.outcome.perQuestion.get("a-compare")), true,
   "a reasoning operation after 'inte bara ..., utan ... också' remains affirmative");
 
+for (const [questionText, rubricText, lang] of [
+  ["Vilka skillnader finns mellan fotosyntes och cellandning när kolet flyttas mellan luft och glukos, och vilken slutsats kan du motivera?",
+    "Poäng för att förklara skillnaderna mellan processerna och motivera slutsatsen med båda källfakta."],
+  ["How do photosynthesis and cellular respiration differ in moving carbon between air and glucose, and what conclusion can you justify?",
+    "Credit for explaining the differences between the processes and justifying the conclusion with both source facts.", "en"],
+]) {
+  const decision = await reviewALevelQuestion(questionText, rubricText, lang);
+  assert.equal(decideApproval(decision), true, `affirmative comparison wording should pass A-level: ${questionText}`);
+}
+
 for (const [questionText, scoringText, lang] of [
   ["Beskriv vad fotosyntes binder och vad cellandning frigör. Jämför inte processerna eller motivera någon slutsats; återge bara faktan.", "Poäng ges för korrekt återgivning, inte för resonemang, jämförelse eller motiverad slutsats."],
   ["Beskriv vad fotosyntes binder och vad cellandning frigör. Analys och motiverad slutsats krävs inte; återge bara faktan.", "Resonemang ger inga poäng. Det krävs inte att eleven motiverar eller drar en slutsats."],
@@ -204,6 +217,12 @@ for (const [questionText, scoringText, lang] of [
 ]) {
   await assertARejected(questionText, scoringText, lang);
 }
+await assertARejected(
+  "Jämför inte fotosyntes och cellandning, men motivera en slutsats om kolflödet.",
+  "Poäng för jämförelse och motiverad slutsats.", "sv", "compare");
+await assertARejected(
+  "Do not compare photosynthesis and cellular respiration, but justify a conclusion about carbon flow.",
+  "Credit for comparison and a justified conclusion.", "en", "compare");
 
 const sameFactQuotes = await runWithResults(
   [aLevelReviewResult(validALevelEvidence, [

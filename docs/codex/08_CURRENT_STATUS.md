@@ -4720,3 +4720,25 @@ enda 12-frågetest. Offline- och mocktester bevisar inte live-modellens
   `https://provia-mno8zy0ep-eltons-projects-4adfb1a3.vercel.app`.
 - [!] Deployment is verified, but no authenticated app/session or live-model
   check was performed. No Production, `main`, or database change was made.
+
+### Granskningsfynd efter Preview-checkpointen — 2026-10-25
+
+- [x] Oberoende adversarial granskning fann att jämförelsefrågor formulerade
+  som "vilka skillnader finns" eller "how do ... differ" inte uppfyllde
+  A-nivåns verbgrind. `api/_verifier.js` känner nu igen dessa vanliga svenska
+  och engelska jämförelseverb/-fraser. Positiva regressionstester lades till;
+  befintliga negationsfall förblir underkända.
+- [x] Oberoende P.E.R-granskning fann att `savedAt` som saknas eller inte är
+  numerisk ger åldern `NaN`, vilken kunde passera `< 0`/`> 15 min`-kontrollerna.
+  `shared.js` kräver nu en ändlig numerisk tidsstämpel. Testerna täcker exakt
+  15 minuter, strax över gränsen, framtida tid, saknad och ogiltig tidsstämpel.
+- [x] Uppdaterat riktat testresultat: A-nivåns outputkontrakt och
+  verifierarbeslut passerar; P.E.R-sidtester 95/95; provkontext 102/102.
+  Provpipeline och HTTP-flöden 30/30; felträningskälla, proveniens, kontext
+  och urvalsidentitet passerar sammantaget 55/55 i riktade testfiler.
+- [!] Dessa nya granskningskorrigeringar finns i den lokala diffen men är ännu
+  inte pushade eller deployade. Previewn ovan motsvarar föregående kodcheckpoint
+  `e1a64fa`, inte dessa fynd.
+- [!] Fortsatt kvarstår att mockade tester inte bevisar verklig modellsemantik
+  eller relevans hos AI-genererade frågor. Liveverifiering kräver först färsk
+  kontroll av rätt stagingmiljö, syntetisk identitet och budget.
