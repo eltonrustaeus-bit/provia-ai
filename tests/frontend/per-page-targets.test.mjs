@@ -167,6 +167,32 @@ await assertPageTopic("/förbättring.html", "förbättring");
   await ctx.close();
 }
 
+// Local exam history can be absent or unsynced while the authenticated server
+// still has verified results. Let the server decide whether coaching evidence
+// exists instead of blocking the request from the local cache.
+{
+  let coachRequest = false;
+  const { ctx, page } = await mk("/förbättring.html", {
+    additionalMocks: [["**/rest/v1/user_exams**", route => route.fulfill({ json: [] })]],
+    explainHandler: async route => {
+      if (route.request().method() === "GET") await route.fulfill({ json: { ok: true, history: [] } });
+      else {
+        const body = route.request().postDataJSON();
+        if (body?.topic === "studiecoach") coachRequest = true;
+        await route.fulfill({ json: {
+          answer: "SERVER_VERIFIED_COACH_WITH_EMPTY_LOCAL_HISTORY",
+          coachEvidenceFingerprint: "e".repeat(64),
+        } });
+      }
+    },
+  });
+  await page.getByRole("button", { name: "Fråga P.E.R vad du ska göra" }).click();
+  await page.getByText("SERVER_VERIFIED_COACH_WITH_EMPTY_LOCAL_HISTORY").waitFor({ timeout: 5000 });
+  ok("server coach is reachable even when local exam history is empty", coachRequest,
+    await page.locator("#coachText").innerText());
+  await ctx.close();
+}
+
 // A coach answer is reusable only while its verified account history is the
 // same. A successful account sync that changes the result must trigger a new
 // recommendation the next time the student opens the coach.

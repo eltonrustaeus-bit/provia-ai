@@ -43,6 +43,9 @@ const FRUSTRATION_REGEX = /fattar inte|förstår inte|helt lost|ger upp|hopplös
 const FEYNMAN_REGEX     = /förklara för dig|jag förklarar|testa om jag|feynman|förklara det för mig som/i;
 const QUIZ_REGEX        = /quizza mig|quiz mig|ställ.*fråga.*mig|testa mig.*fråga|välj.*fråga.*ställ/i;
 const SUCCESS_REGEX     = /klarade|godkänt|100 ?%|alla rätt|noll fel|klarat provet|lyckades|fick rätt på alla/i;
+// Bump when the verified coaching prompt or its evidence contract changes so
+// browser-cached advice cannot outlive the instructions that produced it.
+const PER_COACH_PROMPT_REVISION = "2026-10-25-verified-coach-v2";
 
 const supabase = createSupabaseServerClient(
   getSupabaseUrl(),
@@ -568,7 +571,7 @@ function buildVerifiedCoachSnapshot(examData = {}, userId = "") {
   return {
     evidence,
     fingerprint: fingerprintKey && userId
-      ? createHmac("sha256", fingerprintKey).update(`${userId}\0${evidence}`).digest("hex")
+      ? createHmac("sha256", fingerprintKey).update(`${userId}\0${PER_COACH_PROMPT_REVISION}\0${evidence}`).digest("hex")
       : null,
   };
 }

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHmac } from "node:crypto";
 import { createRequire } from "node:module";
 import { test } from "node:test";
 
@@ -1119,23 +1120,37 @@ test("authenticated homepage study help answers without requiring an exam or tre
     activeCount = 0;
     issuanceState = "missing";
     latestSubmissionId = null;
-    providerAnswer = "Klistra in dina anteckningar och skapa ett övningsprov på just det materialet.";
-    calls.length = 0;
+    const examples = [
+      {
+        question: "Vilken funktion använder jag för att träna på mina anteckningar?",
+        answer: "Klistra in dina anteckningar och skapa ett övningsprov på just det materialet.",
+        expected: /anteckningar/i,
+      },
+      {
+        question: "Vilka ämnen använder växten vid fotosyntesen?",
+        answer: "Börja med att skilja mellan det processen tar in och det den bildar.",
+        expected: /processen tar in/i,
+      },
+    ];
+    for (const example of examples) {
+      providerAnswer = example.answer;
+      calls.length = 0;
+      const response = await invoke({
+        topic: "",
+        userQuestion: example.question,
+        pageContext: { page: "startsida" },
+      }, "POST", "application/json");
 
-    const response = await invoke({
-      topic: "",
-      userQuestion: "Vilken funktion använder jag för att träna på mina anteckningar?",
-      pageContext: { page: "startsida" },
-    }, "POST", "application/json");
-
-    assert.equal(response.statusCode, 200, JSON.stringify(response.body));
-    assert.match(response.body.answer, /anteckningar/i);
-    const provider = calls.find(({ url }) => url === "https://api.openai.com/v1/responses");
-    assert.ok(provider, "authenticated homepage help reaches the ordinary study model");
-    assert.match(provider.body, /Aktiv sida: startsida/);
-    assert.doesNotMatch(provider.body, /Aktuellt ämne: startsida/);
-    assert.ok(calls.some(({ url }) => url.includes("/rpc/acquire_per_answer_lease")));
-    assert.ok(calls.some(({ url }) => url.includes("/rpc/commit_per_chat_quota")));
+      assert.equal(response.statusCode, 200, JSON.stringify(response.body));
+      assert.match(response.body.answer, example.expected);
+      const provider = calls.find(({ url }) => url === "https://api.openai.com/v1/responses");
+      assert.ok(provider, "authenticated homepage help reaches the ordinary study model");
+      assert.match(provider.body, /Aktiv sida: startsida/);
+      assert.doesNotMatch(provider.body, /Aktuellt ämne: startsida/);
+      assert.match(provider.body, new RegExp(example.question.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+      assert.ok(calls.some(({ url }) => url.includes("/rpc/acquire_per_answer_lease")));
+      assert.ok(calls.some(({ url }) => url.includes("/rpc/commit_per_chat_quota")));
+    }
   } finally {
     activeCount = previous.activeCount;
     issuanceState = previous.issuanceState;
@@ -1281,6 +1296,15 @@ test("coach cache validation fingerprints only fresh verified evidence without q
     assert.equal(first.statusCode, 200, JSON.stringify(first.body));
     assert.equal(first.body.unchanged, false);
     assert.match(first.body.coachEvidenceFingerprint, /^[a-f0-9]{64}$/);
+    const priorPromptFingerprint = createHmac("sha256", process.env.SUPABASE_SECRET_KEY)
+      .update(`${userId}\0Senaste verifierade provresultat i tidsordning: 45%\nKurser med verifierade resultat under 70% i Skolverkets utbildningskatalog: [\"Biologi 1\"]`)
+      .digest("hex");
+    const stalePrompt = await invoke({
+      topic: "studiecoach",
+      coachCacheCheck: true,
+      knownCoachEvidenceFingerprint: priorPromptFingerprint,
+    }, "POST", "application/json");
+    assert.equal(stalePrompt.body.unchanged, false, "a fingerprint from the earlier coach prompt cannot reuse cached advice");
     const resultsQuery = calls.find(({ url }) => url.includes("/rest/v1/mock_results"));
     assert.ok(resultsQuery);
     assert.equal(new URL(resultsQuery.url).searchParams.get("user_id"), `eq.${userId}`);

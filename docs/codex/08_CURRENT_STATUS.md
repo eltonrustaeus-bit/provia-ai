@@ -1,5 +1,33 @@
 # 08 Current Status
 
+# P.E.R coach cache and verified-history access — 2026-10-25
+
+- [x] Independent review found two improvement-coach gaps: old cached advice
+  could survive prompt changes, and empty local `user_exams` history blocked
+  the UI even when the authenticated server could access verified results.
+- [x] Server coach fingerprints now include an explicit prompt/evidence
+  revision. A browser cache from the prior revision fails validation and is
+  regenerated from current authenticated, verified evidence.
+- [x] The improvement page keeps the coach entry available without local exam
+  history. The API remains the source of truth for authenticated verified
+  results and provides neutral guidance when those results are absent.
+- [x] Added regression coverage for a stale prompt fingerprint, server coach
+  access with empty local history, and ordinary school-subject help from the
+  authenticated homepage.
+- [x] Offline verification: `per-exam-review-handler` 71/71; focused API
+  homepage/cache tests 2/2; `per-page-targets` 65/65; changed JavaScript syntax
+  checks and `git diff --check` pass.
+- [!] Review and tests are source/harness evidence only. No staging model call,
+  real learner history, active exam, or hosted database was used.
+- [!] Existing active exam in the signed-in browser remains untouched. No
+  production, main, database, account, quota, or secret changes were made.
+- [x] Independent read-only review found no blocker in cache revisioning,
+  account ownership, or empty-local-history access. It confirmed cache
+  validation follows the authenticated active-exam gate.
+- [!] The frontend test mocks the coach response; authenticated server evidence
+  is covered separately by API tests rather than one hosted end-to-end test.
+- [!] Feature checkpoint push and Preview creation are still pending.
+
 # P.E.R material change guard — 2026-10-25
 
 - [x] Independent security review found that the in-flight context key covered

@@ -1300,8 +1300,8 @@
           small:h.length?`${h.length} prov · senaste ${lastP===null?'resultat saknas':`${lastP} %`}`:'Inga prov ännu',
           av:!h.length },
         { go:'coach', label:'Fråga P.E.R vad du ska göra',
-          small:hasRecentCoachCache?'öppna sparad rekommendation':'ny analys av din historik',
-          av:!h.length },
+          small:hasRecentCoachCache?'öppna sparad rekommendation':'personlig vägledning från verifierat underlag',
+          av:false },
         { go:'rapport', label:'Skapa övningsrapport',
           small:'minst 3 verifierat rättade prov',
           av:false }
@@ -1462,7 +1462,6 @@
     async function loadCoach(h,m){
       const box=$('coachText');
       if(!box)return;
-      if(!h.length){box.textContent='Ingen provdata än. Gör ett prov i appen och tryck Rätta prov.';return;}
       const{data:sessionData}=db?await db.auth.getSession():{data:null};
       const ownerId=sessionData?.session?.user?.id||'';
       if(!ownerId){box.textContent='Logga in för att få en personlig analys.';return;}
