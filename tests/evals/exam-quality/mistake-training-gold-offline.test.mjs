@@ -50,6 +50,29 @@ test("a two-direction mistake focus requires candidates to practice both sides o
   "a question about products alone does not remediate a verified input-versus-product confusion");
 });
 
+test("a one-sided linear-function question cannot satisfy a slope-versus-intercept focus", () => {
+  const fixture = gold.cases.find((item) => item.id === "math-linear-function-parameters");
+  const candidate = (question, answer) => ({
+    question,
+    model_answer: answer,
+    concept_tag: fixture.focus.concept,
+    source_references: fixture.focus.sourceEvidence,
+  });
+  assert.deepEqual(pipeline.supportedTrainingFocusMatches(candidate(
+    "Vilket tal är lutningen i y=4x+2?", "4 är lutningen."),
+    [fixture.focus.focusId], [fixture.focus]), [],
+  "an algebraically related question must still practise the complete recorded contrast");
+  assert.deepEqual(pipeline.supportedTrainingFocusMatches(candidate(
+    "Vilket värde är lutningen och vilket är y-interceptet i y=4x+2?",
+    "Lutningen är 4 och y-interceptet är 2."),
+    [fixture.focus.focusId], [fixture.focus]), [fixture.focus.focusId],
+  "a familiar synonym for the y-axis intersection must satisfy the second side of the contrast");
+  assert.deepEqual(pipeline.supportedTrainingFocusMatches(candidate(
+    "Vilket tal är lutningen i y=4x+2? Hur interceptar målvakten bollen i fotboll?",
+    "Lutningen är 4."), [fixture.focus.focusId], [fixture.focus]), [],
+  "ordinary football usage of intercept must not count as the mathematical y-intercept");
+});
+
 test("a comparative tense focus accepts either named frame while rejecting an unrelated one", () => {
   const focus = {
     focusId: "focus-tense-compare",

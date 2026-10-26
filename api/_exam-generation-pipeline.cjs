@@ -166,12 +166,13 @@ function supportedTrainingFocusMatches(question, matches, trainingFocus, sourceM
       question?.concept_tag, question?.topic].filter((value) => typeof value === "string").join(" ");
     const conceptTerms = trainingTerms(focus.concept);
     const specificContext = [focus.skill, focus.sourceQuestion]
-      .filter((value) => typeof value === "string").join(" ");
+      .filter((value) => typeof value === "string").join("\n");
     const specificTerms = [...trainingTerms(specificContext)]
       .filter((term) => ![...conceptTerms].some((conceptTerm) => sameTrainingTerm(term, conceptTerm)));
     const candidateQuestion = typeof question?.question === "string" ? question.question : "";
     const candidateTaskText = candidateQuestion;
     if (specificTerms.length === 0 || !hasTrainingTermOverlap(candidateTaskText, specificTerms.join(" "))) return false;
+    if (!coversTrainingContrasts(specificContext, candidateTaskText)) return false;
     const hasTenseFocus = trainingTenseFrames(specificContext).size > 0;
     const focusDirections = trainingActionDirections(specificContext);
     const candidateDirections = trainingActionDirections(candidateTaskText);
@@ -187,6 +188,32 @@ function supportedTrainingFocusMatches(question, matches, trainingFocus, sourceM
       sharesTrainingEvidence(candidateText, evidence) &&
       sharesTrainingEvidence(candidateQuestion, evidence));
   });
+}
+
+function coversTrainingContrasts(focusText, candidateQuestion) {
+  const clauses = String(focusText || "").normalize("NFKC").toLocaleLowerCase("sv-SE")
+    .split(/[\n.!?;,]+/u).map((clause) => clause.trim()).filter(Boolean);
+  const patterns = [
+    /\b(?:skilja|skiljer|distinguish)\s+(.+?)\s+(?:från|from)\s+(.+)$/u,
+    /\b(?:skilja|skiljer|distinguish)\s+(?:mellan|between)\s+(.+?)\s+(?:och|and)\s+(.+)$/u,
+    /\b(?:jämför|jämföra|compare)\s+(.+?)\s+(?:med|och|with|and)\s+(.+)$/u,
+  ];
+  for (const clause of clauses) {
+    for (const pattern of patterns) {
+      const match = clause.match(pattern);
+      if (!match) continue;
+      const leftTerms = [...trainingTerms(match[1])];
+      const rightTerms = [...trainingTerms(match[2])];
+      const leftDistinct = leftTerms.filter((term) =>
+        !rightTerms.some((other) => sameTrainingTerm(term, other)));
+      const rightDistinct = rightTerms.filter((term) =>
+        !leftTerms.some((other) => sameTrainingTerm(term, other)));
+      if (leftDistinct.length && rightDistinct.length &&
+          (!hasTrainingTermOverlap(candidateQuestion, leftDistinct.join(" ")) ||
+           !hasTrainingTermOverlap(candidateQuestion, rightDistinct.join(" ")))) return false;
+    }
+  }
+  return true;
 }
 
 function contradictsTrainingTenseFrame(focusText, candidateQuestion) {
@@ -305,9 +332,11 @@ function sharesTrainingEvidence(candidateText, evidence) {
 function trainingTerms(value) {
   return new Set(String(value || "").normalize("NFKC").toLocaleLowerCase("sv-SE")
     .replace(/\bk[\s-]*(?:värde(?:t|n)?|value)\b/gu, " lutning ")
+    .replace(/\by[\s-]*intercept(?:et)?\b/gu, " skärning ")
     .match(/[\p{L}\p{N}]+/gu)?.filter((term) => TRAINING_EVIDENCE_SHORT_ANCHORS.has(term) ||
       (!TRAINING_EVIDENCE_STOP_WORDS.has(term) && term.length >= 3))
-    .map((term) => /^(lutning|riktningskoefficient|slope)/u.test(term) ? "lutning" : term) || []);
+    .map((term) => /^(lutning|riktningskoefficient|slope)/u.test(term) ? "lutning"
+      : /^skärning/u.test(term) ? "skärning" : term) || []);
 }
 
 function sameTrainingTerm(left, right) {
