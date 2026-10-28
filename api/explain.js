@@ -792,6 +792,26 @@ function sendActiveExamGuidance(req, res, body, issuanceState = "active", truste
         "Leta upp en beskrivning av båda processerna under samma rubrik. Vilken skillnad stöds av materialet, inte bara minnet?",
         "Gör en tabell med syfte och resultat som rubriker. Fyll rutorna från materialet och formulera sedan skillnaden med egna ord.",
       ]);
+  } else if (type === "mc" &&
+      /^\s*(?:vilken\s+(?:typ\s+av\s+transport|transporttyp)|(?:which|what)\s+(?:type|kind)\s+of\s+transport)\b/i.test(normalizedQuestion) &&
+      /transport|rör\s+sig|sprids|movement|moves?|moving|spread/i.test(normalizedQuestion) &&
+      /membran|membrane/i.test(normalizedQuestion)) {
+    // Only transport-type identification: calculation and open-response
+    // questions retain their own guidance. Use clues in the signed question.
+    // Never name a transport type, select an option or supply its definition.
+    contextualSequence = en ? [
+      hasDraft
+        ? "If you have chosen an option, compare it with the clues in the question: what moves, what does it pass through, and which direction is stated? Do not assume your choice is correct."
+        : "Start with the clues in the question: what moves, what does it pass through, and which direction is stated? Write them down before choosing a concept.",
+      "Make a small comparison using your material. For each transport type, note what moves, what boundary is crossed and the direction of movement. Which details agree with the question?",
+      "Check your list against the descriptions in your material, one feature at a time. Which option conflicts with a clue, and which remains after you have checked every clue yourself?",
+    ] : [
+      hasDraft
+        ? "Om du har valt ett alternativ, jämför det med ledtrådarna i frågan: vad rör sig, vad passerar det och vilken riktning anges? Utgå inte från att ditt val är rätt."
+        : "Utgå från ledtrådarna i frågan: vad rör sig, vad passerar det och vilken riktning anges? Skriv upp dem innan du väljer begrepp.",
+      "Gör en liten jämförelse med hjälp av materialet. För varje transporttyp: vad transporteras, vilken gräns passeras och i vilken riktning sker rörelsen? Vilka detaljer stämmer med frågan?",
+      "Kontrollera din lista mot beskrivningarna i materialet, en egenskap i taget. Vilket alternativ motsägs av en ledtråd, och vilket återstår när du själv har kontrollerat alla ledtrådar?",
+    ];
   } else if (type !== "graph" && (
     /\b(beräkna|räkna ut|calculate|compute)\b/i.test(normalizedQuestion) ||
     (/\b(lös|solve|bestäm|determine)\b/i.test(normalizedQuestion) &&

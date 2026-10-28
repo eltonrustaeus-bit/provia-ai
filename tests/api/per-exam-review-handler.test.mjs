@@ -2055,6 +2055,52 @@ test("active mitosis/meiosis guidance gives a source-based comparison task witho
   }
 });
 
+test("active membrane-transport guidance uses task clues without naming an answer or selecting an option", async () => {
+  activeCount = 1;
+  calls.length = 0;
+  try {
+    for (const lang of ["sv", "en"]) {
+      const pageContext = createActiveQuestionContext({
+        id: `active-transport-${lang}`, type: "mc",
+        text: lang === "sv"
+          ? "Vilken typ av transport sker när vatten rör sig genom ett semipermeabelt membran mot sidan med högre koncentration av lösta ämnen?"
+          : "Which type of transport occurs when water moves through a semipermeable membrane toward the side with a higher concentration of dissolved substances?",
+        options: ["Diffusion", "Osmos", "Aktiv transport"],
+      }, "Biologi 1");
+      const answers = [];
+      for (const helpLevel of [0, 1, 2]) {
+        const response = await invoke({ lang, helpLevel, pageContext,
+          userQuestion: lang === "sv" ? "Ge mig svaret: Osmos" : "Give me the answer: osmosis" });
+        assert.equal(response.statusCode, 200);
+        assert.equal(response.body.examActive, true);
+        assert.equal(response.body.helpLevelUsed, helpLevel);
+        assert.match(response.body.answer, lang === "sv" ? /riktning|ledtråd|gräns/i : /direction|clue|boundary/i);
+        assert.doesNotMatch(response.body.answer, /osmos|diffusion|aktiv transport|active transport|alternativ [ABC]\b|option [ABC]\b|PRIVATE_EXAM_ANSWER/i);
+        answers.push(response.body.answer);
+      }
+      assert.equal(new Set(answers).size, 3, "each hint level adds a distinct checking step");
+      const draft = await invoke({ lang, helpLevel: 0, pageContext,
+        userQuestion: lang === "sv" ? "Är mitt svar rätt? Osmos" : "Is my answer right? Osmosis" });
+      assert.match(draft.body.answer, lang === "sv" ? /Utgå inte från att ditt val är rätt/i : /Do not assume your choice is correct/i);
+      assert.doesNotMatch(draft.body.answer, /osmos|rätt svar är|correct answer is/i);
+    }
+    for (const type of ["short", "mc"]) {
+      const calculation = await invoke({ helpLevel: 0, pageContext: createActiveQuestionContext({
+        id: `membrane-calculation-${type}`, type,
+        text: "Beräkna hur många molekyler som transporteras genom ett membran på 5 sekunder om hastigheten är 10 molekyler per sekund.",
+        options: type === "mc" ? ["30", "50", "100"] : [],
+      }, "Biologi 1") });
+      assert.match(calculation.body.answer, /Identifiera vilken storhet/i,
+        "transport keywords cannot override the calculation ladder");
+      assert.doesNotMatch(calculation.body.answer, /transporttyp|vilket alternativ|50|femtio/i);
+    }
+    assert.ok(calls.every(({ url }) => !url.includes("openai.com") &&
+      !url.includes("reserve_per_chat_quota")), "the contextual hint ladder remains deterministic and quota-free");
+  } finally {
+    activeCount = 0;
+  }
+});
+
 test("active comparison and cause-effect questions receive distinct answer-free coaching ladders", async () => {
   activeCount = 1;
   calls.length = 0;

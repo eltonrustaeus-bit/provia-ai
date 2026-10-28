@@ -1,5 +1,61 @@
 # 08 Current Status
 
+## Targeted duplicate and active-hint follow-up — 2026-10-28
+
+- Type-schema checkpoint `1492347c456289cee180a5d9cc99ea1d735021e7` is pushed;
+  `dpl_CuV53pLmDVSs7Ew8RneEjeGpnm79` is READY on the same stable Preview
+  alias. No new exam was created after the completed 12-question test.
+- One post-grade P.E.R explanation of the defective question 7 correctly
+  distinguished its stored glucose key from the source: glucose is used in
+  respiration and energy becomes available as ATP; ATP is missing from the
+  options. P.E.R explicitly attributed the problem to the question rather
+  than the learner. This is a successful critical post-grade explanation,
+  not a fix for the earlier reviewer/solver semantic miss.
+- Read-only metadata confirms q2/q8 share concept `Ribosomer`, identical
+  objective and the same source sentence. q4/q12 likewise share their
+  photosynthesis-input objective, and q5/q10 share their temperature-effects
+  objective. Independent local probes reproduced all three duplicate misses.
+  They also found a false positive: high- versus low-temperature conditions
+  could be collapsed by broad word overlap. Lowering global thresholds is
+  therefore not an acceptable fix.
+- Local assessment patch narrowly recognizes equivalent Swedish function
+  tasks: `Vad gör X ...?` and `Vad är X:s främsta funktion ...?`. It requires
+  the same entity/context, concept, exact objective, explicit source anchor
+  and substantial answer overlap. This resolves the observed ribosome pair
+  across MC/short formats without globally reducing token thresholds. A
+  separate condition guard preserves high/low temperature differences.
+  Photosynthesis and enzyme duplicate misses remain unresolved.
+- Local P.E.R patch replaces generic advice for verified MC transport-type
+  identification with a fixed three-level clue-comparison ladder: what moves,
+  what boundary is crossed and what direction the question states. It names
+  no transport type, gives no answer and confirms no student choice. An
+  independent finding that the first draft captured short calculations was
+  fixed by restricting dispatch to MC identification stems; signed short and
+  MC membrane calculations retain their calculation guidance.
+- Offline evidence: factual-duplicate tests 3/3; final seven-file assessment/
+  generation/HTTP/gold/mistake-training regression 48/48; focused active-exam P.E.R
+  regression 20/20. Syntax/diff checks passed. The first full P.E.R suite was
+  stopped after a focused new-test run found an overbroad test regex (`option
+  c` also matched `option conflicts`); the regex was corrected and the 20
+  relevant active-state tests passed. No full 77-test pass is claimed here.
+- Budget guard after the critical P.E.R explanation: spent 2.745255 USD,
+  reserved 0.263628, available 0.370188. The completed exam had 9 generator,
+  4 repair, 11 reviewer and 5 blind-solver provider stages, all 4o-mini; these
+  29 stages belong to one exam. No account, quota or configuration was changed.
+- Independent review found that the first temperature guard bypassed existing
+  quadratic dedupe when temperature was incidental context. The guard was
+  moved after quadratic/logical safeguards and the existing mathematical
+  positive match; the exact counterexample now has a bidirectional regression.
+  Final recheck confirmed that P2 resolved with no additional findings in the
+  reviewed precedence fix. The corrected hint dispatch had no further findings.
+  The existing reviewer was reused; the other historical agent remained at
+  model capacity, so no additional agents were created.
+- The reviewed assessment/hint follow-up is ready for the approved feature
+  checkpoint; its hosted hint behavior has not been retested in an active exam.
+  Goal remains incomplete: issued semantic
+  correctness, remaining duplicate targets, general active-hint usefulness,
+  six-question and mistake-training live journeys still need evidence.
+
 ## Complete delivery exposed remaining semantic defects — 2026-10-28
 
 - Reviewed checkpoint `55d638e196d62db0d2d9b7063056eced9e5a57d4` is pushed;

@@ -787,6 +787,42 @@ function repeatsSameObjectiveAndAnswer(left, right) {
   return leftAnswer.split(" ").filter(Boolean).length >= 4 && leftAnswer === rightAnswer;
 }
 
+function functionTaskSignature(question) {
+  const text = String(question?.question || "").normalize("NFKC").toLowerCase()
+    .replace(/[?.!]+$/u, "").replace(/\s+/gu, " ").trim();
+  const action = text.match(/^vad gör (.+?)(?: i (.+))?$/u);
+  const functionName = text.match(/^vad är (.+?)(?::s|s) (?:främsta |huvudsakliga )?funktion(?: i (.+))?$/u);
+  const match = action || functionName;
+  return match ? JSON.stringify([match[1], match[2] || ""]) : "";
+}
+
+function repeatsAnchoredFunctionTask(left, right) {
+  const concept = semanticConceptTag(left);
+  const objective = exactComparisonTokens(left?.learning_objective).join(" ");
+  const target = functionTaskSignature(left);
+  if (!concept || concept !== semanticConceptTag(right) || !objective ||
+      objective !== exactComparisonTokens(right?.learning_objective).join(" ") ||
+      !target || target !== functionTaskSignature(right)) return false;
+  const normalizeQuote = (value) => typeof value === "string"
+    ? value.normalize("NFKC").replace(/\s+/gu, " ").trim().toLowerCase() : "";
+  const leftQuotes = new Set((Array.isArray(left?.source_references) ? left.source_references : [])
+    .map(normalizeQuote).filter((quote) => quote.length >= 16));
+  if (!(Array.isArray(right?.source_references) ? right.source_references : [])
+    .some((quote) => leftQuotes.has(normalizeQuote(quote)))) return false;
+  const leftAnswer = semanticQuestionTokens({ question: left?.model_answer || "" });
+  const rightAnswer = semanticQuestionTokens({ question: right?.model_answer || "" });
+  const shared = [...leftAnswer].filter((token) => rightAnswer.has(token)).length;
+  return leftAnswer.size >= 4 && rightAnswer.size >= 4 &&
+    shared / Math.min(leftAnswer.size, rightAnswer.size) >= 0.9;
+}
+
+function temperatureCondition(question) {
+  const text = String(question?.question || "").normalize("NFKC").toLowerCase();
+  const high = /\b(?:hög|höga|high)\s+temperatur(?:en|er|erna|e|es)?\b/u.test(text);
+  const low = /\b(?:låg|låga|low)\s+temperatur(?:en|er|erna|e|es)?\b/u.test(text);
+  return high !== low ? (high ? "high" : "low") : null;
+}
+
 function questionIntents(question) {
   const text = String(question?.question || "").normalize("NFKC").toLowerCase();
   return new Set(QUESTION_INTENT_PATTERNS.filter(([, pattern]) => pattern.test(text)).map(([intent]) => intent));
@@ -1121,11 +1157,22 @@ function isDuplicateQuestion(left, right) {
       (leftLogicalStructure.length !== rightLogicalStructure.length ||
         leftLogicalStructure.some((token, index) => token !== rightLogicalStructure[index]))) return false;
 
+  // Incidental factual context must not override an existing mathematical
+  // match for the same expression and assessed skill.
+  const leftIntent = mathQuestionIntent(left);
+  const expression = mathQuestionExpression(left);
+  if (leftIntent && expression && leftIntent === mathQuestionIntent(right) &&
+      expression === mathQuestionExpression(right)) return true;
+  const leftTemperature = temperatureCondition(left);
+  const rightTemperature = temperatureCondition(right);
+  if (leftTemperature && rightTemperature && leftTemperature !== rightTemperature) return false;
+
   // Question-stem overlap misses paraphrased factual questions. Treat a very
   // close repeated full-score answer as the same target, while requiring a
   // substantial token floor so short shared answers (for example "ATP") do
   // not collapse distinct questions.
-  if (repeatsNearIdenticalQuestionStem(left, right) || repeatsSameObjectiveAndAnswer(left, right)) return true;
+  if (repeatsNearIdenticalQuestionStem(left, right) || repeatsSameObjectiveAndAnswer(left, right) ||
+      repeatsAnchoredFunctionTask(left, right)) return true;
   if (repeatsHighConfidenceAnswerTarget(left, right)) return true;
 
   const signature = questionDedupeSignature(left);
@@ -1137,11 +1184,7 @@ function isDuplicateQuestion(left, right) {
         leftStructure.every((token, index) => token === rightStructure[index])) return true;
   }
   if (semanticDuplicateQuestion(left, right)) return true;
-  const leftIntent = mathQuestionIntent(left);
-  const expression = mathQuestionExpression(left);
-  return Boolean(leftIntent && expression
-    && leftIntent === mathQuestionIntent(right)
-    && expression === mathQuestionExpression(right));
+  return false;
 }
 // Non-blocking issues are flagged (soft warnings) but the question is kept —
 // they describe a weak or suspicious question, not an unanswerable one, and
