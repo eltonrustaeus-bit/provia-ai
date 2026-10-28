@@ -198,6 +198,12 @@ const liveRibosomePair = [
     "Ribosomer bygger proteiner med information från RNA.", "Ribosomer"),
     learning_objective: "Beskriv ribosomernas funktion." },
 ];
+// Explicit synthetic requirements make the equality shortcut's assessed
+// scope observable; generic "correct answer" rubrics cannot establish it.
+liveRibosomePair.forEach((question) => {
+  const fact = "Ribosomer bygger proteiner med information från RNA.";
+  question.scoring_rubric = { parts: [{ description: fact, points: 1 }], full_score_requirements: fact };
+});
 const liveRibosomeGate = A.gateExam({ questions: liveRibosomePair }, { profile: "natural_sciences" });
 check("drops live ribosome paraphrase with the same concept, objective, and answer",
   liveRibosomeGate.questions.length === 1 && liveRibosomeGate.questions[0].id === "ribosome-function");

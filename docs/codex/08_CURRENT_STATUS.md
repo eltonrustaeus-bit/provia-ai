@@ -1,5 +1,31 @@
 # 08 Current Status
 
+## Scored-fact diversity checkpoint — 2026-10-28
+
+- Source-answer audit checkpoint `45631477bdc969d38ab8cdbbbbabbe1f8b71fdd0`
+  is pushed and READY as `dpl_DpW6ihCA2z2RYrmWRveZx8fU3yjF` on the same
+  feature alias. It has not yet received a new paid/live exam.
+- Assessment now compares explicit scored factual requirements before a
+  bounded source-anchored input/effect task match. Equal requirements and
+  complete shared source sentences can establish the same assessed fact
+  across short/MC wording; literal answer equality alone no longer suffices.
+  Raw additional requirements, input/output conflicts and unknown extra task
+  demands veto the factual shortcuts. Mathematical/logical precedence remains.
+- Independent review supplied counterexamples for unclassified extra skills,
+  high/low and mixed conditions, extra entities, appended demands, decimals and
+  wrapped source lines. They have regression controls. Source segmentation
+  preserves decimals and sentence-internal wrapping. No global similarity
+  threshold was reduced; missing/generic scoring scope cannot enable the new match.
+- Offline assessment/pipeline/HTTP/gold/mistake-training group passed 54/54.
+  Independent final recheck found no actionable issue in the last input-suffix
+  fix; its gate test retained the additional task and still removed the clean
+  duplicate. Syntax/diff checks passed.
+- Rubrics in the older issued public response were stripped and private job
+  payloads scrubbed. The new scoring fixtures are explicitly synthetic; this
+  checkpoint does not prove that every historical duplicate would be removed.
+  Unknown factual grammars/paraphrased scoring requirements remain conservative
+  false negatives for this added path. No new live exam or hosted data mutation.
+
 ## Independent source-answer audit — 2026-10-28
 
 - New goal authorizes reviewed feature checkpoints and a main/Production release

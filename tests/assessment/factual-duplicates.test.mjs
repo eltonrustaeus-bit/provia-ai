@@ -3,7 +3,7 @@ import { createRequire } from "node:module";
 import { test } from "node:test";
 
 const require = createRequire(import.meta.url);
-const { isDuplicateQuestion } = require("../../api/_assessment.js");
+const { isDuplicateQuestion, gateExam } = require("../../api/_assessment.js");
 const source = "Ribosomerna bygger proteiner av aminosyror.";
 const first = {
   type: "short", question: "Vad gör ribosomerna i en cell?",
@@ -56,4 +56,113 @@ test("opposite stated temperature conditions stay distinct despite shared words 
   });
   expectDuplicate(calculation("hög"), calculation("låg"), true,
     "incidental temperature wording cannot bypass the existing quadratic duplicate check");
+});
+
+// Scoring requirements below are explicit SYNTHETIC fixtures. The historical
+// issued rubrics were scrubbed/encrypted and are not inferred from the stems.
+const inputFact = "Fotosyntesen använder koldioxid och vatten samt ljusenergi.";
+const outputFact = "Fotosyntesen bildar glukos och syre.";
+const rubric = (...facts) => ({ parts: facts.map((description) => ({ description, points: 1 })),
+  full_score_requirements: facts.length === 1 ? facts[0] : "" });
+const photo = {
+  type: "short", question: "Vad är fotosyntes och vilka ämnen används i processen?",
+  concept_tag: "Fotosyntes", learning_objective: "Förklara fotosyntesens ingående ämnen",
+  model_answer: inputFact, source_references: [inputFact], scoring_rubric: rubric(inputFact),
+};
+const photoRepeated = { ...photo, question: "Vad är fotosyntesen och vad ingår i processen?",
+  model_answer: `${inputFact} ${outputFact}`, source_references: [`${inputFact} ${outputFact}`] };
+
+test("explicit equal source facts identify paraphrased input tasks without broad similarity changes", () => {
+  expectDuplicate(photo, photoRepeated, true, "same explicit scored input fact, unscored output extension");
+  const fact = "Förbränningen använder bränsle och syre i reaktionen.";
+  const other = { ...photo, concept_tag: "Förbränning", learning_objective: "Ange förbränningens ingående ämnen",
+    question: "Vad är förbränning och vilka ämnen används i processen?", model_answer: fact,
+    source_references: [fact], scoring_rubric: rubric(fact) };
+  expectDuplicate(other, { ...other, question: "Vad är förbränningen och vad ingår i processen?" }, true,
+    "the rule uses scoring scope and grammatical task shape, not a photosynthesis constant");
+});
+
+test("additional scored facts, role reversal and uncertain scope stay distinct", () => {
+  for (const change of [
+    { scoring_rubric: rubric(inputFact, outputFact) },
+    { scoring_rubric: rubric(inputFact, "Ljusenergi omvandlas till kemiskt bunden energi i glukos.") },
+    { question: "Vilka ämnen bildas vid fotosyntesen?", model_answer: `${inputFact} ${outputFact}` },
+    { question: "Vad är fotosyntesen och vad ingår i processen? Motivera.", model_answer: inputFact },
+  ]) expectDuplicate(photo, { ...photoRepeated, ...change }, false, JSON.stringify(change));
+  expectDuplicate({ ...photo, model_answer: `${inputFact} ${outputFact}` },
+    { ...photo, question: "Vilka ämnen bildas vid fotosyntesen?", model_answer: `${inputFact} ${outputFact}` }, false,
+    "identical metadata and full answers do not bypass an input/output conflict");
+  for (const scoring_rubric of [undefined, rubric("Sakligt korrekt svar")]) {
+    expectDuplicate({ ...photo, scoring_rubric }, { ...photoRepeated, scoring_rubric }, false,
+      "missing or generic scoring scope cannot enable the relaxed matcher");
+  }
+  expectDuplicate(photo, { ...photoRepeated, source_references: [outputFact] }, false,
+    "same objective and rubric without the common source fact is insufficient");
+});
+
+test("a general effect and explicit condition match only with the same source-backed scored fact", () => {
+  const fact = "Mycket hög temperatur kan förändra enzymets form så att funktionen försämras.";
+  const general = { type: "short", question: "Hur påverkar temperatur enzymers funktion?", concept_tag: "Enzymer",
+    learning_objective: "Förklara temperaturens påverkan på enzymer", model_answer: fact,
+    source_references: [fact], scoring_rubric: rubric(fact) };
+  const specific = { ...general, type: "mc", question: "Hur påverkas enzymers aktivitet vid mycket hög temperatur?",
+    model_answer: "Vid mycket hög temperatur kan enzymers aktivitet minska eftersom deras form kan förändras." };
+  expectDuplicate(general, specific, true, "explicit equal scoring requirements establish the same condition and fact");
+  expectDuplicate(general, { ...specific, question: "Hur påverkas enzymers aktivitet vid mycket låg temperatur?" }, false,
+    "a conflicting stated condition cannot use the relaxed match");
+  expectDuplicate({ ...general, scoring_rubric: rubric(fact, "Låg temperatur påverkar enzymers aktivitet.") }, specific, false,
+    "a general task additionally assessing low temperature is distinct");
+  expectDuplicate(general, { ...specific, scoring_rubric: rubric(fact, "Enzymet förändrar reaktionens aktiveringsenergi.") }, false,
+    "an additional catalytic fact stays distinct");
+  expectDuplicate(general, { ...specific, question: specific.question.replace("?", " och varför?") }, false,
+    "an unrecognized extra demand cannot enable a relaxed match");
+});
+
+test("the real exam gate removes an equal scored target and preserves an additional scored fact", () => {
+  const candidate = (question, id) => ({ ...question, id,
+    points: question.scoring_rubric.parts.length, options: [], correct_index: -1,
+    rubric: question.scoring_rubric.parts.map((part) => part.description).join(" "),
+    accepted_answers: [], cognitive_level: "förstå", estimated_answer_length: "short" });
+  const first = candidate(photo, "kept-input");
+  const repeated = candidate(photoRepeated, "duplicate-input");
+  const duplicate = gateExam({ questions: [first, repeated] }, { profile: "natural_sciences" });
+  assert.deepEqual(duplicate.questions.map((question) => question.id), [first.id]);
+  assert.ok(duplicate.dropped.some((question) => question.id === repeated.id && question.issues.includes("duplicate_question")));
+  const expanded = candidate({ ...photoRepeated, scoring_rubric: rubric(inputFact, outputFact) }, "distinct-products");
+  const distinct = gateExam({ questions: [first, expanded] }, { profile: "natural_sciences" });
+  assert.equal(distinct.questions.length, 2, JSON.stringify(distinct.dropped));
+  const extraDemand = candidate({ ...photoRepeated, question: photoRepeated.question + " Motivera.", model_answer: inputFact }, "extra-demand");
+  const extra = gateExam({ questions: [first, extraDemand] }, { profile: "natural_sciences" });
+  assert.equal(extra.questions.length, 2, "unconsumed task demands cannot use the answer-equality shortcut");
+});
+
+test("extra unclassified requirements and unknown temperature clauses cannot bypass scoped conflicts", () => {
+  const fact = "Mycket hög temperatur kan förändra enzymets form så att funktionen försämras.";
+  const base = { type: "short", question: "Hur påverkar temperatur enzymers funktion?", concept_tag: "Enzymer",
+    learning_objective: "Förklara temperaturens påverkan på enzymer", model_answer: fact,
+    source_references: [fact], scoring_rubric: rubric(fact) };
+  for (const question of [
+    "Hur påverkas enzymers aktivitet vid mycket hög temperatur och varför?",
+    "Hur påverkas enzymers aktivitet vid mycket låg temperatur?",
+    "Hur påverkas enzymers aktivitet vid mycket hög temperatur när pH är lågt?",
+    "Hur påverkas enzymers aktivitet vid låg temperatur och enzymers aktivitet vid mycket hög temperatur?",
+    "Hur påverkas enzymers aktivitet och cellmembranets aktivitet vid mycket hög temperatur?",
+  ]) expectDuplicate(base, { ...base, question }, false, question);
+  const extra = "Det aktiva sätet är den del av enzymet där substratet binder.";
+  const specific = { ...base, question: "Hur påverkas enzymers aktivitet vid mycket hög temperatur?" };
+  expectDuplicate(specific, { ...specific, question: specific.question + " Motivera.",
+    scoring_rubric: rubric(fact, extra), model_answer: `${fact} ${extra}`, source_references: [`${fact} ${extra}`] }, false,
+    "an additional requirement outside the classifier still vetoes near-identical stems");
+});
+
+test("decimal points and line wrapping cannot manufacture a complete shared source fact", () => {
+  const fact = "Processen använder ämnet under en reaktion vid pH 7";
+  const base = { type: "short", question: "Vad är processen och vilka ämnen används i processen?", concept_tag: "Process",
+    learning_objective: "Beskriva reaktionens ingående ämnen", model_answer: fact, scoring_rubric: rubric(fact) };
+  for (const [leftSource, rightSource] of [
+    [`${fact}.4.`, `${fact}.8.`],
+    [`Om temperaturen är låg\n${fact}.`, `${fact}.`],
+  ]) expectDuplicate({ ...base, source_references: [leftSource] }, { ...base, type: "mc",
+    question: "Vad är processen och vad ingår i processen?", source_references: [rightSource] }, false,
+    "only actual complete source sentences can establish scoped equality");
 });

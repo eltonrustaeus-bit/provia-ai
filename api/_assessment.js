@@ -782,9 +782,113 @@ function repeatsSameObjectiveAndAnswer(left, right) {
   const leftObjective = exactComparisonTokens(left?.learning_objective).join(" ");
   const rightObjective = exactComparisonTokens(right?.learning_objective).join(" ");
   if (!leftObjective || leftObjective !== rightObjective) return false;
+  const leftScope = explicitScoringScope(left);
+  const rightScope = explicitScoringScope(right);
+  if (!leftScope || !rightScope || leftScope.key !== rightScope.key) return false;
   const leftAnswer = exactComparisonTokens(left?.model_answer).join(" ");
   const rightAnswer = exactComparisonTokens(right?.model_answer).join(" ");
   return leftAnswer.split(" ").filter(Boolean).length >= 4 && leftAnswer === rightAnswer;
+}
+
+function factualText(value) {
+  return String(value || "").normalize("NFKC").toLowerCase().replace(/\s+/gu, " ").replace(/[.!?]+$/u, "").trim();
+}
+
+// Only explicit factual requirements qualify for the relaxed matching path.
+// Unknown or paraphrased rubrics abstain; they are not treated as equivalent.
+function explicitScoringScope(question) {
+  const rubric = question?.scoring_rubric;
+  if (!rubric || !Array.isArray(rubric.parts) || rubric.parts.length === 0) return null;
+  const raw = rubric.parts.map((part) => part?.description);
+  if (typeof rubric.full_score_requirements === "string" && rubric.full_score_requirements.trim()) raw.push(rubric.full_score_requirements);
+  const requirements = [];
+  for (const value of raw) {
+    if (typeof value !== "string") return null;
+    const text = factualText(value);
+    const prefix = text.match(/^(ange|beskriv|förklara|state|describe|explain) (?:att |that )(.+)$/u);
+    const fact = prefix ? prefix[2] : text;
+    if (fact.split(" ").length < 4 || !/\b(?:använder|används|bildar|bildas|omvandlar|omvandlas|förändrar|förändra|påverkar|bygger|uses?|produces?|converts?|changes?|builds?)\b/u.test(fact)) return null;
+    const action = prefix ? prefix[1] : "state";
+    const requirement = { action, fact };
+    if (!requirements.some((entry) => entry.action === action && entry.fact === fact)) requirements.push(requirement);
+  }
+  return requirements.length ? { key: JSON.stringify(requirements), facts: requirements.map((entry) => entry.fact) } : null;
+}
+
+function factualDirections(text) {
+  const directions = [];
+  if (/\b(?:använder|används|reaktanter|ingångsämnen|uses?|inputs?|reactants?)\b/u.test(text)) directions.push("input");
+  if (/\b(?:bildar|bildas|producerar|produceras|produkter|produces?|outputs?|products?)\b/u.test(text)) directions.push("output");
+  return directions;
+}
+
+function compareAnchoredScoredFacts(left, right) {
+  const concept = semanticConceptTag(left);
+  const objective = exactComparisonTokens(left?.learning_objective).join(" ");
+  if (!concept || concept !== semanticConceptTag(right) || !objective ||
+      objective !== exactComparisonTokens(right?.learning_objective).join(" ") ||
+      ![left?.type, right?.type].every((type) => type === "short" || type === "mc")) return "unknown";
+  const leftText = factualText(left.question);
+  const rightText = factualText(right.question);
+  const leftDirections = factualDirections(leftText);
+  const rightDirections = factualDirections(rightText);
+  if (leftDirections.length === 1 && rightDirections.length === 1 && leftDirections[0] !== rightDirections[0]) return "conflict";
+  const rawRequirements = (question) => {
+    const rubric = question?.scoring_rubric;
+    if (!Array.isArray(rubric?.parts) || rubric.parts.length === 0) return null;
+    const values = rubric.parts.map((part) => part?.description);
+    if (typeof rubric.full_score_requirements === "string" && rubric.full_score_requirements.trim()) values.push(rubric.full_score_requirements);
+    return JSON.stringify(values.map(factualText));
+  };
+  const leftRaw = rawRequirements(left);
+  const rightRaw = rawRequirements(right);
+  // Preserve every scored requirement, including ones the bounded classifier
+  // cannot understand. Unknown additional skills must not fall through to a
+  // broad stem/answer shortcut.
+  if (leftRaw !== rightRaw && (leftRaw || rightRaw)) return "conflict";
+  const leftScope = explicitScoringScope(left);
+  const rightScope = explicitScoringScope(right);
+  if (!leftScope || !rightScope) return "unknown";
+  if (leftScope.key !== rightScope.key) return "conflict";
+  const direction = factualDirections(leftScope.facts.join(" "));
+  if ([leftDirections, rightDirections].some((directions) => directions.some((item) => !direction.includes(item)))) return "conflict";
+
+  const inputTask = (text) => {
+    const match = text.match(/^vad är ([\p{L} -]+) och (?:vilka ämnen används|vad ingår) i processen$/u);
+    return match && [concept, concept + "en", concept + "et"].includes(match[1]);
+  };
+  const inputFamily = [leftText, rightText].some((text) => /^vad är .+ och (?:vilka ämnen används|vad ingår) i processen(?:[.!?]|$)/u.test(text));
+  if (inputFamily && (!inputTask(leftText) || !inputTask(rightText))) return "conflict";
+  const temperatureTask = (text) => {
+    const match = text.match(/^hur påverkar temperatur ([\p{L}-]+(?: [\p{L}-]+){0,2}) funktion$/u) ||
+      text.match(/^hur påverkas ([\p{L}-]+(?: [\p{L}-]+){0,2}) aktivitet vid (?:mycket )?(?:hög|låg) temperatur$/u);
+    return match && !/\b(?:och|samt|and|när|vid|under|inte)\b/u.test(match[1]) ? match[1] : null;
+  };
+  const leftTemperatureTask = temperatureTask(leftText);
+  const rightTemperatureTask = temperatureTask(rightText);
+  const temperaturePair = /temperatur/u.test(leftText) || /temperatur/u.test(rightText);
+  if (temperaturePair && leftText !== rightText && (!leftTemperatureTask || !rightTemperatureTask ||
+      leftTemperatureTask !== rightTemperatureTask)) return "conflict";
+  if (temperaturePair && [left, right].some((question) => temperatureCondition(question) &&
+      !leftScope.facts.every((fact) => temperatureCondition({ question: fact }) === temperatureCondition(question)))) return "conflict";
+  const sameInputTask = direction.length === 1 && direction[0] === "input" && inputTask(leftText) && inputTask(rightText);
+  const sameTemperatureTask = leftTemperatureTask && leftTemperatureTask === rightTemperatureTask &&
+    leftScope.facts.every((fact) => /temperatur/u.test(fact)) &&
+    [left, right].every((question) => !temperatureCondition(question) ||
+      leftScope.facts.every((fact) => temperatureCondition({ question: fact }) === temperatureCondition(question)));
+  if (!sameInputTask && !sameTemperatureTask) return "unknown";
+  const segmenter = new Intl.Segmenter("sv", { granularity: "sentence" });
+  const sentences = (question) => (Array.isArray(question.source_references) ? question.source_references : [])
+    .flatMap((quote) => [...segmenter.segment(String(quote).replace(/\s+/gu, " ").trim())]
+      .map((entry) => entry.segment.trim()).filter((sentence) => /[.!?]$/u.test(sentence)))
+    .map(factualText).filter((sentence) => sentence.length >= 20);
+  const shared = sentences(left).filter((sentence) => sentences(right).includes(sentence));
+  const answers = [factualText(left.model_answer), factualText(right.model_answer)];
+  // Required source facts define the assessed target even when the exemplar
+  // paraphrases them. Factual correctness of either exemplar remains the
+  // independent reviewer's responsibility, not a lexical similarity claim.
+  return answers.every((answer) => answer.length >= 4) &&
+    leftScope.facts.every((fact) => shared.includes(fact)) ? "equal" : "unknown";
 }
 
 function functionTaskSignature(question) {
@@ -1166,6 +1270,9 @@ function isDuplicateQuestion(left, right) {
   const leftTemperature = temperatureCondition(left);
   const rightTemperature = temperatureCondition(right);
   if (leftTemperature && rightTemperature && leftTemperature !== rightTemperature) return false;
+  const factualScope = compareAnchoredScoredFacts(left, right);
+  if (factualScope === "conflict") return false;
+  if (factualScope === "equal") return true;
 
   // Question-stem overlap misses paraphrased factual questions. Treat a very
   // close repeated full-score answer as the same target, while requiring a
