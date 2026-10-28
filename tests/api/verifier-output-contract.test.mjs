@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
+const Ajv = require("ajv");
 const { verifyQuestions, buildVerifierSchema, buildVerifierPrompt, decideApproval, classifyReviewFindings } = require("../../api/_verifier.js");
 
 const question = (id) => ({ id, type: "short_answer", question: `Question ${id}` });
@@ -571,6 +572,65 @@ assert.equal(decideApproval(topicalButUnsupportedReview.outcome.perQuestion.get(
 assert.deepEqual(topicalButUnsupportedReview.sourceContractEvents, [{
   event: "exam_verifier_source_contract", evaluated: 1, failures: { unsupported_verdict: 1 },
 }], "semantic unsupported verdicts are distinguishable without logging their source or reviewer text");
+
+// The provider schema must express the exact lengths already required at
+// runtime, including empty MC parts and heterogeneous short-answer rubrics.
+const cardinalQuote = "Enzymer påskyndar kemiska reaktioner utan att själva förbrukas.";
+const cardinalQuestions = [0, 1, 2].map((index) => ({
+  id: `cardinality-${index}`, type: index === 1 ? "short" : "mc",
+  question: `Syntetisk strukturfråga ${index}`, model_answer: cardinalQuote, rubric: cardinalQuote,
+  options: index === 1 ? [] : ["A", "B", "C"], correct_index: index === 1 ? -1 : 0,
+  scoring_rubric: { parts: index === 1 ? [{ description: "Första delen", points: 1 }, { description: "Andra delen", points: 1 }] : [] },
+  accepted_answers: index === 1 ? ["Alternativ ett", "Alternativ två"] : [],
+  source_references: [cardinalQuote],
+}));
+const cardinalResults = cardinalQuestions.map((item) => ({
+  ...result(item.id, true), factual_accuracy: 1, ambiguity_score: 0, difficulty_match: 1,
+  source_alignment: 1, scoring_quality: 1, language_quality: 1, duplicate_of: "", issues: [], required_changes: [],
+  option_quality: item.options.map(() => true),
+  source_support: sourceSupport(cardinalQuote, item.scoring_rubric.parts.length, item.accepted_answers.length),
+}));
+const cardinalReview = await runWithResults(cardinalResults, cardinalQuestions, cardinalQuote);
+assert.ok(cardinalQuestions.every((item) => decideApproval(cardinalReview.outcome.perQuestion.get(item.id))));
+const cardinalSchema = cardinalReview.requestBody.text.format.schema;
+assert.equal(cardinalSchema.properties.results.items.anyOf.length, 2,
+  "equal array shapes share a branch rather than repeating the whole schema per question");
+const validateCardinality = new Ajv({ strict: true }).compile(cardinalSchema);
+assert.equal(validateCardinality({ results: cardinalResults }), true, JSON.stringify(validateCardinality.errors));
+assert.equal(validateCardinality({ results: [...cardinalResults].reverse() }), true,
+  "correct result order is not forced; runtime binds by question ID");
+for (const [index, field, value] of [
+  [0, "rubric_parts", [true]], [0, "rubric_part_evidence", [[0]]],
+  [0, "accepted_answers", [true]], [0, "accepted_answer_evidence", [[0]]],
+  [1, "rubric_parts", [true]], [1, "rubric_part_evidence", [[0]]],
+  [1, "accepted_answers", [true, true, true]], [1, "accepted_answer_evidence", [[0], [0], [0]]],
+]) {
+  const malformed = structuredClone(cardinalResults);
+  malformed[index].source_support[field] = value;
+  assert.equal(validateCardinality({ results: malformed }), false,
+    `the emitted schema rejects ${field} with the wrong length for ${malformed[index].id}`);
+  const ignoredSchema = await runWithResults(malformed, cardinalQuestions, cardinalQuote);
+  assert.equal(decideApproval(ignoredSchema.outcome.perQuestion.get(malformed[index].id)), false,
+    "the unchanged runtime check rejects bad part mapping even if a provider ignores the schema");
+}
+const wrongOptionShape = structuredClone(cardinalResults);
+wrongOptionShape[0].option_quality.pop();
+assert.equal(validateCardinality({ results: wrongOptionShape }), false);
+const unknownCardinalId = structuredClone(cardinalResults);
+unknownCardinalId[0].id = "foreign-question";
+assert.equal(validateCardinality({ results: unknownCardinalId }), false);
+const unsupportedCardinalAnswer = structuredClone(cardinalResults);
+unsupportedCardinalAnswer[1].source_support.answer = false;
+assert.equal(validateCardinality({ results: unsupportedCardinalAnswer }), true,
+  "the shape schema still permits a negative reviewer verdict");
+const negativeCardinalReview = await runWithResults(unsupportedCardinalAnswer, cardinalQuestions, cardinalQuote);
+assert.equal(decideApproval(negativeCardinalReview.outcome.perQuestion.get(cardinalQuestions[1].id)), false,
+  "schema alignment does not turn an unsupported answer into an approved one");
+const oversizedParts = await runWithResults([], [{ ...cardinalQuestions[1],
+  scoring_rubric: { parts: Array.from({ length: 21 }, () => ({ description: "Del", points: 1 })) },
+}], cardinalQuote);
+assert.equal(oversizedParts.fetchCalls, 0, "rubrics exceeding the existing 20-part contract are rejected before paid review");
+assert.equal(oversizedParts.outcome.failureReason, "invalid_review_input");
 
 // Source paragraph numbers must not be confused with positions in the reviewer's
 // per-question evidence array. This occurs even when the source fact is valid.

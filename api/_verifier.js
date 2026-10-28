@@ -8,7 +8,7 @@
 const { MAX_MC_OPTIONS } = require("./_assessment.js");
 const { filterSourceReferences } = require("./_source-references.cjs");
 
-function buildVerifierSchema(questionCount, requireTrainingFocus = false, requireMistakeEvidence = false, targetLevel = null) {
+function buildVerifierSchema(questionCount, requireTrainingFocus = false, requireMistakeEvidence = false, targetLevel = null, questions = null) {
   const required = [
     "id", "approved", "factual_accuracy", "ambiguity_score",
     "difficulty_match", "source_alignment", "scoring_quality",
@@ -91,6 +91,39 @@ function buildVerifierSchema(questionCount, requireTrainingFocus = false, requir
       };
     }
   }
+  const baseItem = { type: "object", additionalProperties: false, required, properties };
+  let resultItem = baseItem;
+  if (Array.isArray(questions) && questions.length > 0 && questions.length === questionCount) {
+    // Bind output cardinality to the submitted question, rather than asking
+    // the reviewer to infer empty/variable arrays from a batch-wide max of 20.
+    // Equal shapes share a branch; heterogeneous questions keep their own ID
+    // group so one question's rubric cannot supply another's array lengths.
+    const groups = new Map();
+    for (const question of questions) {
+      const shape = [
+        Array.isArray(question.options) ? question.options.length : 0,
+        Array.isArray(question.scoring_rubric?.parts) ? question.scoring_rubric.parts.length : 0,
+        Array.isArray(question.accepted_answers) ? question.accepted_answers.length : 0,
+      ];
+      const key = shape.join(":");
+      if (!groups.has(key)) groups.set(key, { shape, ids: [] });
+      groups.get(key).ids.push(question.id);
+    }
+    const branches = [...groups.values()].map(({ shape: [options, parts, answers], ids }) => {
+      const supportProperties = { ...properties.source_support.properties };
+      for (const [field, count] of [["rubric_parts", parts], ["rubric_part_evidence", parts],
+        ["accepted_answers", answers], ["accepted_answer_evidence", answers]]) {
+        supportProperties[field] = { ...supportProperties[field], minItems: count, maxItems: count };
+      }
+      return { ...baseItem, properties: {
+        ...properties,
+        id: { ...properties.id, enum: ids },
+        option_quality: { ...properties.option_quality, minItems: options, maxItems: options },
+        source_support: { ...properties.source_support, properties: supportProperties },
+      } };
+    });
+    resultItem = branches.length === 1 ? branches[0] : { anyOf: branches };
+  }
   return {
     type: "json_schema",
     name: "exam_verifier_schema",
@@ -105,12 +138,7 @@ function buildVerifierSchema(questionCount, requireTrainingFocus = false, requir
           ...(Number.isInteger(questionCount) && questionCount > 0
             ? { minItems: questionCount, maxItems: questionCount }
             : {}),
-          items: {
-            type: "object",
-            additionalProperties: false,
-            required,
-            properties
-          }
+          items: resultItem
         }
       }
     }
@@ -194,7 +222,9 @@ function reviewInputWithinLimits(input) {
           question.accepted_answers.some((answer) => typeof answer !== "string" || answer.length > 1000))) return false;
     if (Array.isArray(question.options) && (question.options.length > MAX_MC_OPTIONS || question.options.some(option => typeof option === "string" && option.length > 1000))) return false;
     if (Array.isArray(question.source_references) && (question.source_references.length > 5 || question.source_references.some(reference => typeof reference === "string" && reference.length > 1000))) return false;
-    if (question.scoring_rubric !== undefined && JSON.stringify(question.scoring_rubric).length > 6000) return false;
+    if (question.scoring_rubric !== undefined &&
+        (JSON.stringify(question.scoring_rubric).length > 6000 ||
+          (Array.isArray(question.scoring_rubric?.parts) && question.scoring_rubric.parts.length > 20))) return false;
     size += JSON.stringify(question).length;
     if (size > REVIEW_PAYLOAD_CHAR_CAP) return false;
   }
@@ -510,7 +540,7 @@ async function verifyQuestions(questions, opts) {
           { role: "system", content: buildVerifierPrompt(lang, subjectProfile, items.length, targetLevel, requiresTrainingFocus) },
           { role: "user", content: reviewPayload }
         ],
-        text: { format: buildVerifierSchema(items.length, requiresTrainingFocus, requiresMistakeEvidence, targetLevel) }
+        text: { format: buildVerifierSchema(items.length, requiresTrainingFocus, requiresMistakeEvidence, targetLevel, items) }
       }),
       signal: AbortSignal.timeout(requestTimeoutMs)
     }, { userId });

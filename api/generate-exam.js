@@ -1432,6 +1432,19 @@ const SAFE_REPAIR_SOLVER_FAILURE_CODES = new Set([
   "solver_no_single_answer", "solver_index_verdict_mismatch", "solver_disagrees_on_key",
   "solver_low_confidence",
 ]);
+const SAFE_REPAIR_STRUCTURAL_SOURCE_CODES = new Set([
+  "source_answer_not_extractable", "source_reference_missing",
+]);
+
+function structuralSourceFailureCounts(gate) {
+  const counts = {};
+  for (const item of gate.dropped) {
+    for (const code of new Set(item.issues || [])) {
+      if (SAFE_REPAIR_STRUCTURAL_SOURCE_CODES.has(code)) counts[code] = Math.min(20, (counts[code] || 0) + 1);
+    }
+  }
+  return counts;
+}
 
 function normalizeRepairFeedback(value) {
   const counts = (input, allowed) => Object.fromEntries(Object.entries(
@@ -1461,7 +1474,7 @@ function alignRepairPromptQuestionCount(input, lang, numQuestions, repairCount, 
   return { input: alignedInput, aligned: true };
 }
 
-function buildRepairPayload(payload, { lang, numQuestions, existingQuestions = [], priorQuestions = [], comparisonQuestions = [], candidateCount, reviewFailureCodes = [], reviewFailureCounts = {}, solverFailureCounts = {}, requireExtractiveAnswers = false, qType, missingTypes = null, questionCountOffset }) {
+function buildRepairPayload(payload, { lang, numQuestions, existingQuestions = [], priorQuestions = [], comparisonQuestions = [], candidateCount, reviewFailureCodes = [], reviewFailureCounts = {}, solverFailureCounts = {}, structuralIssueCounts = {}, requireExtractiveAnswers = false, qType, missingTypes = null, questionCountOffset }) {
   const repairFactualAnswerInstruction = requireExtractiveAnswers
     ? (lang === "en"
       ? "For factual short answers, use the shortest exact source excerpt that fully answers the question while preserving necessary conditions, negations, units, and causal relations; keep more context when needed."
@@ -1514,6 +1527,18 @@ function buildRepairPayload(payload, { lang, numQuestions, existingQuestions = [
     .sort(([left], [right]) => left.localeCompare(right))
     .map(([code, count]) => [code, Math.min(20, count)]));
   const solverFailures = new Set(Object.keys(safeSolverFailureCounts));
+  // Transient feedback for this request only; keep the persisted checkpoint
+  // contract unchanged and exclude candidate text, IDs and arbitrary keys.
+  const safeStructuralIssueCounts = Object.fromEntries(Object.entries(
+    structuralIssueCounts && typeof structuralIssueCounts === "object" && !Array.isArray(structuralIssueCounts)
+      ? structuralIssueCounts : {},
+  ).filter(([code, count]) => SAFE_REPAIR_STRUCTURAL_SOURCE_CODES.has(code) && Number.isInteger(count) && count > 0)
+    .map(([code, count]) => [code, Math.min(20, count)]));
+  const structuralSourceGuidance = Object.keys(safeStructuralIssueCounts).length
+    ? (lang === "en"
+      ? `Earlier candidates failed deterministic source checks: ${JSON.stringify(safeStructuralIssueCounts)}. ${safeStructuralIssueCounts.source_answer_not_extractable ? "A required short answer was not an exact contiguous source excerpt. Select the exact answer excerpt before writing the task; preserve its conditions and meaning, and do not paraphrase it. " : ""}${safeStructuralIssueCounts.source_reference_missing ? "No usable source excerpt remained for a candidate. Choose a task with an actual supporting excerpt and copy it verbatim into source_references; do not invent a citation. " : ""}`
+      : `Tidigare kandidater föll i den strukturella källkontrollen: ${JSON.stringify(safeStructuralIssueCounts)}. ${safeStructuralIssueCounts.source_answer_not_extractable ? "Ett kortsvar som krävde källutdrag var inte ett exakt sammanhängande utdrag. Välj det exakta svarutdraget innan du skriver uppgiften; behåll villkor och betydelse och parafrasera inte svaret. " : ""}${safeStructuralIssueCounts.source_reference_missing ? "Inget användbart källutdrag återstod för en kandidat. Välj en uppgift med ett verkligt stödjande utdrag och kopiera det ordagrant till source_references; hitta inte på ett citat. " : ""}`)
+    : "";
   const reviewFailureSummary = lang === "en"
     ? `Bounded review failure counts for the previous candidates (fixed categories only; not answer keys): ${JSON.stringify(safeReviewFailureCounts)}.`
     : `Summerat granskningsutfall för föregående kandidater (endast fasta kategorier, inga facit): ${JSON.stringify(safeReviewFailureCounts)}.`;
@@ -1631,7 +1656,7 @@ function buildRepairPayload(payload, { lang, numQuestions, existingQuestions = [
     text: { ...payload.text, format: buildMockExamSchema(repairCount) },
     input: [
       ...repairInput,
-      { role: "user", content: `${instruction}\n\n${repairFactualAnswerInstruction} ${repairSourceReferenceInstruction}` },
+      { role: "user", content: `${instruction}\n\n${structuralSourceGuidance}${repairFactualAnswerInstruction} ${repairSourceReferenceInstruction}` },
     ],
   };
 }
@@ -2132,6 +2157,7 @@ module.exports = async function handler(req, res, internalContext = null) {
         const repairCount = repairCandidateCountFor(repairSlots, missingTypes);
         const repairPayload = buildRepairPayload(payload, {
           lang, numQuestions, existingQuestions: exam.questions, candidateCount: repairCount, qType, missingTypes,
+          structuralIssueCounts: structuralSourceFailureCounts(gate),
           requireExtractiveAnswers: subjectProfile === "natural_sciences" && qType !== "mc" && qType !== "graph",
           priorQuestions,
           comparisonQuestions,
@@ -2402,6 +2428,7 @@ module.exports = async function handler(req, res, internalContext = null) {
             );
             const repairPayload = buildRepairPayload(payload, {
               lang, numQuestions, existingQuestions: round1ApprovedQuestions, candidateCount: repairCount,
+              structuralIssueCounts: structuralSourceFailureCounts(gate),
               requireExtractiveAnswers: subjectProfile === "natural_sciences" && qType !== "mc" && qType !== "graph",
               priorQuestions,
               comparisonQuestions,

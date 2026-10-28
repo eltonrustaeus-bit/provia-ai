@@ -1,5 +1,64 @@
 # 08 Current Status
 
+## Source-review cardinality and immediate repair follow-up — 2026-10-28
+
+- The user approved reviewed checkpoints on the existing feature Preview for
+  the remainder of this goal, using the same tab/session and one synthetic
+  exam at a time within the remaining budget. Main/Production, migrations,
+  secrets, accounts and quota settings remain excluded.
+- Source-index checkpoint `c4846538fc5268f0690688ebf2ad230fcadad508` is pushed;
+  deployment `dpl_9TQXfRUtGyAdcj1X3zohtahpNDza` is READY on the existing stable
+  branch alias. Read-only checks confirmed the exact branch, staging URL,
+  pilot mode and lower budget cap. The same browser session restored itself
+  after reload; no new tab, account or login was needed.
+- One comparison used the exact prior synthetic Biologi 1 material, level C,
+  12 mixed questions and no focus chips. It terminated with 6/12 approved,
+  `STAGE_RETRY_LIMIT`, about 301 seconds after the recorded UI start. No exam
+  was issued; the visible message correctly stated 6/12. Readback confirmed
+  zero active exams and zero queued/running pipeline jobs. The previous run
+  had 3/12; two stochastic runs do not establish a reliable yield improvement.
+- New content-free diagnostics recorded 12 `invalid_part_mapping` findings
+  and 7 `unsupported_verdict` findings across 10 reviewer events. These are
+  candidate-stage counts, not distinct exams or independent truth judgments.
+  No invalid-index finding was recorded. This establishes repeated reviewer
+  array-shape failures, while semantic source rejections also remain.
+- Local fix: the emitted reviewer schema now binds option verdict counts,
+  rubric-part verdict/evidence counts and accepted-answer verdict/evidence
+  counts to the actual submitted question. Equal shapes share an ID-bound
+  branch; heterogeneous shapes use nested `anyOf`, supported by the official
+  Structured Outputs guide linked below. Negative verdicts remain valid
+  schema output and are still rejected by the unchanged runtime gates.
+  Oversized rubrics exceeding the existing 20-part contract stop before the
+  paid reviewer call. General schema-inspection calls retain their old shape.
+- Independent source inspection also confirmed that deterministic source
+  failures were absent from immediate repair prompts. A separate transient
+  count argument now carries only `source_answer_not_extractable` and
+  `source_reference_missing`, capped at 20, into both zero-survivor and
+  post-review repairs. No candidate text or IDs are copied into that feedback.
+  Persisted feedback and the database contract are unchanged; cross-request
+  structural-feedback loss remains outside this patch.
+- Offline: the seven-file generation/HTTP/verifier/source/gold/decision
+  regression passed 43/43. New controls compile the emitted schema with Ajv,
+  reject wrong per-ID array sizes and unknown IDs, permit reordered results
+  and negative semantic verdicts, and verify runtime rejection when a provider
+  ignores the schema. Real-handler mocked-provider fixtures verify both
+  immediate repair paths, unchanged source, one repair and continued exclusion
+  of non-extractive candidates. These are offline controls, not live yield.
+- Guard accounting after the comparison: spent 2.577031 USD, reserved
+  0.263628, available 0.538412 under cap 3.379071. The comparison consumed
+  0.147952 in guard accounting; this is not an OpenAI invoice measurement.
+- Independent final review found no actionable defect in either code change.
+  The reviewer counted at most 20 schema branches and 741 declared properties
+  with A-level and training fields; these stay below the fetched provider's
+  5,000-property limit, with `anyOf` nested under results and the object root
+  unchanged. Runtime duplicate/missing-ID checks remain essential. Hosted
+  acceptance of the complete new schema still needs the controlled live run.
+  Syntax and diff checks passed.
+- These follow-up code changes are ready for the next approved feature
+  checkpoint. No additional paid retry has run.
+  Goal remains incomplete until current-version delivery, active-exam P.E.R,
+  six-question and mistake-training journeys have sufficient live evidence.
+
 ## Current Preview live evidence and source-index follow-up — 2026-10-28
 
 - Deployed Preview is `be5eff97331b9bff1d91ac23cfa4673a0096f837`, deployment
@@ -56,7 +115,9 @@
   claim rejections remain. The focused four-file regression passed 39/39;
   syntax and diff checks passed. Independent final follow-up found no remaining
   findings in the reviewed prompt/schema/diagnostic scope.
-  This fix is not deployed; its effect on live yield is unproven.
+  This fix was subsequently deployed as `c484653`; the single comparison and
+  more specific findings are recorded in the section above. Its independent
+  effect on live yield remains unproven.
 - Goal remains incomplete: current 12-question live yield failed; 6-question
   delivery, new mistake-training generation and active-exam P.E.R still need
   current-version live evidence. Do not retry paid tests without an actionable

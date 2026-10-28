@@ -642,6 +642,37 @@ const unsupportedAnswerGate = assessment.gateExam({ questions: [{
 assert.equal(unsupportedAnswerGate.questions.length, 0,
   "a source quote cannot license an unsupported addition to the full-score answer");
 assert.deepEqual(unsupportedAnswerGate.dropped[0].issues, ["source_answer_not_extractable"]);
+for (const lang of ["sv", "en"]) {
+  const source = "Vid cellandning bryts glukos ned. Koldioxid och vatten bildas.";
+  const base = generateExam.buildExamPrompts({
+    lang, level: "C", course: "Biologi 1", qType: "short", numQuestions: 3,
+    pastedText: source, isMath: false, requireExtractiveAnswers: true,
+  });
+  const payload = {
+    model: "synthetic", input: [{ role: "system", content: base.systemPrompt }, { role: "user", content: base.userPrompt }],
+    text: { format: generateExam.buildMockExamSchema(3) },
+  };
+  const repaired = generateExam.buildRepairPayload(payload, {
+    lang, numQuestions: 3, candidateCount: 4, qType: "short", requireExtractiveAnswers: true,
+    questionCountOffset: base.questionCountOffset,
+    structuralIssueCounts: {
+      source_answer_not_extractable: 999, source_reference_missing: 2,
+      private_candidate_text: 1, source_references_missing: 1, duplicate_question: 4,
+    },
+  });
+  const guidance = repaired.input.at(-1).content;
+  assert.match(guidance, /"source_answer_not_extractable":20/);
+  assert.match(guidance, /"source_reference_missing":2/);
+  assert.doesNotMatch(guidance, /private_candidate_text|source_references_missing|duplicate_question/);
+  assert.match(guidance, lang === "sv"
+    ? /Välj det exakta svarutdraget innan du skriver uppgiften/
+    : /Select the exact answer excerpt before writing the task/);
+  assert.match(guidance, lang === "sv"
+    ? /Inget användbart källutdrag återstod/
+    : /No usable source excerpt remained/);
+  assert.equal(repaired.input[0].content, payload.input[0].content);
+  assert.ok(repaired.input[1].content.endsWith(source), "structural feedback preserves the exact source material");
+}
 const contradictorySymbolGate = assessment.gateExam({ questions: [{
   ...extractiveAnswer, model_answer: "pH > 7 är surt.",
 }] }, {
@@ -1630,6 +1661,49 @@ try {
   "biology question references are grounded in the submitted source material");
   assert.ok(verifierInputs.at(-1).source_material.includes("Fotosyntes sker i kloroplasterna"),
     "the independent reviewer receives the synthetic biology source material");
+
+  const extractionMaterial = "Cellmembranet reglerar ämnestransport. Mitokondrierna gör energi användbar. Ribosomer bygger proteiner.";
+  const extractionQuestions = [
+    ["Vad reglerar cellmembranet?", "ämnestransport", "Vilken transport cellmembranet reglerar"],
+    ["Vad gör mitokondrierna med energin?", "gör energi användbar", "Mitokondriernas roll för energin"],
+    ["Vad bygger ribosomer?", "proteiner", "Vad ribosomer bygger"],
+  ].map(([question, answer, target], index) => ({
+    ...questions[index], id: `extract-valid-${index}`, type: "short", question,
+    options: [], correct_index: -1, model_answer: answer, points: 1,
+    concept_tag: ["Cellmembran", "Mitokondrier", "Ribosomer"][index],
+    learning_objective: target, rubric: `Ange ${answer}.`, accepted_answers: [],
+    scoring_rubric: { parts: [{ description: `Ange ${answer}.`, points: 1 }],
+      full_score_requirements: `Ange ${answer}.`, partial_credit_notes: "" },
+    source_references: [extractionMaterial],
+  }));
+  for (const invalidCount of [3, 1]) {
+    activeQuestions = extractionQuestions.map((question, index) => index < invalidCount
+      ? { ...question, id: `extract-invalid-${index}`, model_answer: "Omskrivet svar som saknas i materialet." }
+      : question);
+    regenerationQuestions = extractionQuestions;
+    calls.length = 0;
+    const reviewStart = verifierInputs.length;
+    const recovered = await invoke(generateExam, {
+      lang: "sv", level: "C", course: biologyCourse, pastedText: extractionMaterial, qType: "short", numQuestions: 3,
+    });
+    assert.equal(recovered.status, 200, JSON.stringify(recovered.body));
+    assert.equal(recovered.body.exam.questions.length, 3);
+    const repairCall = calls.find((call) => call.url === "https://api.openai.com/v1/responses"
+      && call.body.input?.at(-1)?.content?.includes("KVALITETSREPARATION"));
+    assert.ok(repairCall, `${invalidCount} structural failures trigger exactly one bounded repair`);
+    assert.match(repairCall.body.input.at(-1).content,
+      new RegExp(`"source_answer_not_extractable":${invalidCount}`));
+    assert.ok(repairCall.body.input[1].content.endsWith(extractionMaterial));
+    assert.ok(verifierInputs.slice(reviewStart).every((review) =>
+      review.questions.every((question) => !question.id.startsWith("extract-invalid-"))),
+    "non-extractive candidates stay rejected before the independent reviewer");
+    assert.ok(recovered.body.exam.questions.every((question) => !question.id.startsWith("extract-invalid-")),
+      "structural feedback never restores rejected candidates just to reach the requested count");
+    assert.equal(calls.filter((call) => call.url === "https://api.openai.com/v1/responses"
+      && call.body.input?.at(-1)?.content?.includes("KVALITETSREPARATION")).length, 1);
+  }
+  regenerationQuestions = null;
+  activeQuestions = biologyQuestions;
 
   activeQuestions = biologyQuestions.map((question) => question.id === "biology-2"
     ? { ...question, source_references: ["Parafras som inte finns ordagrant i materialet"] }
