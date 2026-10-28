@@ -338,6 +338,7 @@
   var PER_STEP_LABELS = [null, 'Förklara begreppet', 'Visa metoden', 'Ge mig svaret'];
   var _perHelpLevel = 1;
   var _perHelpCap = null;
+  var _perHelpIntent = null;
   var _perFocusKey = null;
   var _perAskInFlight = '';
   var _perActiveRequest = null;
@@ -514,6 +515,7 @@
     var context = getPageContext();
     _perHelpLevel = context.currentQuestion || context.examState && context.examState.phase === 'exam' ? 0 : 1;
     _perHelpCap = null;
+    _perHelpIntent = null;
     /* En redan ritad rad bär förra frågans tak. Att låta den ligga kvar är
        värre än att inte rita någon alls — den påstår något om en fråga som
        inte längre står på skärmen. */
@@ -907,12 +909,15 @@
     function focusPerLauncherOrOrigin() {
       var bubble = document.getElementById('perBubble');
       var isVisible = function (element) {
-        return !!(element && element.getClientRects().length && getComputedStyle(element).visibility !== 'hidden');
+        return !!(element && element.getClientRects().length && !element.closest('[inert]') && getComputedStyle(element).visibility !== 'hidden');
       };
       if (isVisible(bubble)) bubble.focus();
       else if (isVisible(_perFocusOrigin)) _perFocusOrigin.focus();
       else {
-        var fallback = document.querySelector('.xg-menu-btn');
+        // The original answer control may have been replaced by a language
+        // rerender. Restore a live control in the current modal, not its inert background.
+        var fallback = document.querySelector('.xf-exam.on .xf-answer') ||
+          document.querySelector('.xf-exam.on .xf-ask') || document.querySelector('.xg-menu-btn');
         if (isVisible(fallback)) fallback.focus();
       }
     }
@@ -1550,7 +1555,7 @@ function finalizeMsg(div, text) {
             btn.disabled = true;
             btn.title = 'Öppnas när du lämnat in provet — annars mäter provet inte dig.';
           } else {
-            btn.onclick = function () { row.remove(); send(PER_STEP_LABELS[n], { helpLevel: n }); };
+            btn.onclick = function () { row.remove(); send(PER_STEP_LABELS[n], { helpLevel: n, helpIntent: _perHelpIntent }); };
           }
           return btn;
         })(lvl));
@@ -1835,6 +1840,9 @@ function finalizeMsg(div, text) {
         var token = await Promise.race([getToken(), requestDeadline]);
         if (!requestStillOwned()) return;
         if (requestTimedOut) throw new Error('P.E.R request timed out');
+        // Flush the exam's debounced draft before taking the request snapshot.
+        var snapshotContext = getPageContext();
+        window.dispatchEvent(new CustomEvent('exgen:per-snapshot', { detail: { page: snapshotContext.page } }));
         var pageCtx = getPageContext();
         var pageTopic = pageCtx && (pageCtx.course || pageCtx.topic)
           ? (pageCtx.course || pageCtx.topic)
@@ -1913,6 +1921,7 @@ function finalizeMsg(div, text) {
         } catch (_) {}
 
         var fetchBodyObj = { userQuestion: q, history: hist, topic: pageTopic, pageContext: pageCtx, recentMistakes: recentMistakes, weakAreas: weakAreas, helpLevel: askLevel, clarifyReply: clarifyReply, lang: perHistoryUsesEnglish() ? 'en' : 'sv' };
+        if (opts && opts.helpIntent === 'self-check') fetchBodyObj.helpIntent = 'self-check';
         if (opts && opts.examProof) {
           fetchBodyObj.examReview = true;
           fetchBodyObj.examProof = opts.examProof;
@@ -2090,6 +2099,7 @@ function finalizeMsg(div, text) {
                 requestState.answerCommitted = true;
                 clearPendingQuestion();
                 if (typeof data.helpCap === 'number') _perHelpCap = data.helpCap;
+                _perHelpIntent = data.helpIntent === 'self-check' ? 'self-check' : null;
                 finalizeMsg(typing, data.answer);
                 if (data.history) perSaveHist(data.history);
                 if (isLandingMode) addAnswerCTA(typing);
@@ -2126,8 +2136,9 @@ function finalizeMsg(div, text) {
       _open = !_open;
       var focusAfterOpen = document.activeElement;
       var menuWasOpen = !!document.querySelector('.xg-menu.on');
-      var restoreLauncherFocus = !_open && panel.contains(document.activeElement);
       var bubble = document.getElementById('perBubble');
+      var restoreLauncherFocus = !_open && (panel.contains(document.activeElement) ||
+        document.activeElement === document.body || document.activeElement === bubble);
       if (_open) _perFocusOrigin = focusAfterOpen && focusAfterOpen !== bubble && !panel.contains(focusAfterOpen) ? focusAfterOpen : null;
       if (!_open && _pendingInputFocusHandoff) clearInputFocusHandoff(_pendingInputFocusHandoff);
       if (_open && window.XgShell && typeof window.XgShell.closeMenu === 'function') {
@@ -2139,6 +2150,7 @@ function finalizeMsg(div, text) {
         bubble.classList.toggle('per-open', _open);
         bubble.setAttribute('aria-expanded', _open ? 'true' : 'false');
       }
+      window.dispatchEvent(new CustomEvent('exgen:per-visibility', { detail: { open: _open } }));
       if (document.body && document.body.classList.contains('xf-result')) {
         document.body.classList.toggle('xf-result-per-open', _open);
       }
@@ -2819,13 +2831,12 @@ function finalizeMsg(div, text) {
       /* Alt+P keyboard shortcut */
       document.addEventListener('keydown', function(e) {
         var target = e.target;
-        var isEditable = target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName));
         if (e.key === 'Escape' && _open && !document.querySelector('.xg-menu.on')) {
           e.preventDefault();
           toggle();
           return;
         }
-        if (document.getElementById('perBubble') && e.altKey && (e.key === 'p' || e.key === 'P') && !isEditable) {
+        if (document.getElementById('perBubble') && e.altKey && (e.key === 'p' || e.key === 'P')) {
           e.preventDefault();
           toggle();
         }

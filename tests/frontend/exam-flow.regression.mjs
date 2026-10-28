@@ -1015,8 +1015,8 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
     const perBoundary = await page.evaluate(() => {
       const selector = 'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
       const visible = node => node.getClientRects().length > 0 && !node.closest('[inert]');
-      const firstPerStop = [...document.querySelectorAll("#perWidget " + selector)].find(visible);
-      const examStops = [...document.querySelectorAll(".xf-exam " + selector)].filter(visible);
+      const firstPerStop = [...document.getElementById("perWidget").querySelectorAll(selector)].find(visible);
+      const examStops = [...document.querySelector(".xf-exam").querySelectorAll(selector)].filter(node => visible(node) && !document.getElementById("perWidget").contains(node));
       window.__perFirstTabStop = firstPerStop || null;
       window.__examLastTabStop = examStops[examStops.length - 1] || null;
       return !!firstPerStop && examStops.length > 0;
@@ -1042,7 +1042,7 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
     const inlineStops = await page.evaluate(() => {
       const selector = 'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
       const visible = node => node.getClientRects().length > 0 && !node.closest('[inert]');
-      const stops = [...document.querySelectorAll(".xf-exam " + selector)].filter(visible);
+      const stops = [...document.querySelector(".xf-exam").querySelectorAll(selector)].filter(visible);
       const per = document.getElementById("perWidget");
       const firstPer = stops.find(node => per.contains(node));
       const previous = firstPer && stops[stops.indexOf(firstPer) - 1];

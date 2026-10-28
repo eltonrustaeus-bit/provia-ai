@@ -2103,6 +2103,8 @@
   }
 
   function closeExam(restoreFocus) {
+    closePerPanel();
+    restorePerWidget();
     UI.exam.classList.remove("on");
     UI.exam.setAttribute("aria-hidden", "true");
     UI.exam.removeAttribute("aria-modal");
@@ -2425,7 +2427,7 @@
     // P.E.R:s svar gällde föregående fråga. Stäng bara vid frågebyte; en
     // språkväxling renderar om samma fråga och ska behålla den öppna hjälpen.
     if (!preservePerPanel) closePerPanel();
-    else restorePerWidget();
+    else restorePerWidget(true);
 
     // Prickraden: hela provets form på en gång, och en genväg till varje fråga.
     UI.dots.innerHTML = "";
@@ -2616,15 +2618,14 @@
   }
 
   function movePerWidgetIntoSheet() {
-    if (window.innerWidth > 600) return;
     var widget = document.getElementById("perWidget");
-    var dock = document.querySelector(".xf-exam.on .xf-per-dock");
+    var mobile = window.innerWidth <= 600;
+    var dock = mobile ? document.querySelector(".xf-exam.on .xf-per-dock") : examPerHost();
     if (!widget || !dock || dock.contains(widget)) return;
     perWidgetHome = perWidgetHome || { parent: widget.parentNode, next: widget.nextSibling };
-    widget.classList.add("xf-per-inline");
-    dock.appendChild(widget);
-    fitPerWidgetAboveExamNav(widget);
-    if (window.MutationObserver && !perMessageObserver) {
+    placePerWidget(widget, dock, mobile);
+    if (mobile) fitPerWidgetAboveExamNav(widget);
+    if (mobile && window.MutationObserver && !perMessageObserver) {
       perMessageObserver = new MutationObserver(function () {
         if (widget.isConnected && widget.classList.contains("xf-per-inline")) {
           requestAnimationFrame(function () { fitPerWidgetAboveExamNav(widget); });
@@ -2642,35 +2643,77 @@
     if (overflow > 0) wrap.scrollTop += overflow;
   }
 
-  function restorePerWidget() {
+  function examPerHost() {
+    var host = UI.exam.querySelector(".xf-per-host");
+    if (!host) { host = el("div", "xf-per-host"); UI.exam.appendChild(host); }
+    return host;
+  }
+
+  function placePerWidget(widget, parent, inline, next) {
+    var focused = document.activeElement;
+    var restoreFocus = widget.contains(focused);
+    var selection = restoreFocus && typeof focused.selectionStart === "number"
+      ? [focused.selectionStart, focused.selectionEnd, focused.selectionDirection] : null;
+    widget.classList.toggle("xf-per-inline", inline);
+    if (widget.parentNode !== parent) parent.insertBefore(widget, next && next.parentNode === parent ? next : null);
+    if (restoreFocus && focused.isConnected && document.activeElement !== focused) {
+      focused.focus({ preventScroll: true });
+      if (selection) focused.setSelectionRange(selection[0], selection[1], selection[2]);
+    }
+  }
+
+  function restorePerWidget(stayInExam) {
     var widget = document.getElementById("perWidget");
     if (!widget || !perWidgetHome) return;
     var home = perWidgetHome;
-    perWidgetHome = null;
     if (perMessageObserver) {
       perMessageObserver.disconnect();
       perMessageObserver = null;
     }
-    widget.classList.remove("xf-per-inline");
+    if (stayInExam) { placePerWidget(widget, examPerHost(), false); return; }
+    perWidgetHome = null;
     if (home.parent && home.parent.isConnected) {
-      home.parent.insertBefore(widget, home.next && home.next.parentNode === home.parent ? home.next : null);
+      placePerWidget(widget, home.parent, false, home.next);
     } else {
-      document.body.appendChild(widget);
+      placePerWidget(widget, document.body, false);
     }
   }
 
   window.addEventListener("resize", function () {
     var bubble = document.getElementById("perBubble");
     if (!bubble || !bubble.classList.contains("per-open") || !document.body.classList.contains("xf-in-exam")) return;
-    if (window.innerWidth <= 600) movePerWidgetIntoSheet();
-    else restorePerWidget();
+    movePerWidgetIntoSheet();
+  });
+
+  window.addEventListener("exgen:per-snapshot", function (event) {
+    if (event.detail && event.detail.page === "prov" && UI.exam && UI.exam.classList.contains("on")) {
+      clearTimeout(publishTimer); publish();
+    }
+  });
+
+  window.addEventListener("exgen:per-visibility", function (event) {
+    if (!UI.exam || !UI.exam.classList.contains("on")) return;
+    var open = event.detail && event.detail.open === true;
+    document.body.classList.toggle("xf-per-open", open);
+    if (open) {
+      clearTimeout(publishTimer);
+      publish();
+      movePerWidgetIntoSheet();
+      var q = S.exam && S.exam.questions[S.idx];
+      if (q) {
+        S.helped[qid(q, S.idx)] = true;
+        var ask = UI.exam.querySelector(".xf-ask");
+        if (ask) { ask.className = "xf-ask used"; ask.textContent = tx("✦ P.E.R öppnades här", "✦ P.E.R opened here"); }
+        saveDraft();
+      }
+    }
   });
 
   function closePerPanel() {
     var bubble = document.getElementById("perBubble");
     if (bubble && bubble.classList.contains("per-open")) bubble.click();
     document.body.classList.remove("xf-per-open");
-    restorePerWidget();
+    restorePerWidget(UI.exam && UI.exam.classList.contains("on"));
   }
 
   function next(focusQuestion) {

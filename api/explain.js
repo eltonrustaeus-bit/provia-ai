@@ -533,6 +533,8 @@ function verifiedActiveQuestion(body, user, submissionId) {
     type: question.type,
     text: String(question.question ?? question.text ?? "").slice(0, 4000),
     graphMode: question.type === "graph" ? question.graphMode : undefined,
+    // Learner data is never part of the signed question or correctness evidence.
+    learnerDraft: typeof question.answer === "string" ? question.answer.slice(0, 200) : "",
   };
 }
 
@@ -623,8 +625,8 @@ function sendActiveExamGuidance(req, res, body, issuanceState = "active", truste
   const requestIsEnglish = body.lang === "en" || /^en\b/i.test(String(req.headers?.["accept-language"] || ""));
   const helpRequest = String(body.userQuestion || "").trim().slice(0, 300).toLocaleLowerCase(requestIsEnglish ? "en-US" : "sv-SE");
   const answerRequest = /\b(give me (the )?answer|what is the answer|correct answer|correct option|answer key|solution please|facit|rätt svar|rätta svaret|ge mig svaret|vad är svaret|vilket alternativ är rätt)\b/i.test(helpRequest);
-  const asksToCheckDraft = !answerRequest && /\b(my answer|my work|my solution|is my answer right|is this right|check my|mitt svar|min lösning|min uträkning|är mitt svar rätt|är min lösning rätt|är det rätt|kolla mitt svar|rätta mitt svar)\b/i.test(helpRequest);
-  const hasDraft = asksToCheckDraft;
+  const asksToCheckDraft = !answerRequest && (body.helpIntent === "self-check" || /\b(my answer|my work|my solution|is my answer right|is this right|check my|mitt svar|min lösning|min uträkning|är mitt svar rätt|är min lösning rätt|är det rätt|kolla mitt svar|rätta mitt svar)\b/i.test(helpRequest));
+  const hasDraft = asksToCheckDraft && typeof currentQuestion?.learnerDraft === "string" && Boolean(currentQuestion.learnerDraft.trim());
   const questionText = String(currentQuestion?.text || currentQuestion?.question || "").slice(0, 4000);
   const declaredGraphModes = [];
   if (currentQuestion && Object.hasOwn(currentQuestion, "graphMode")) declaredGraphModes.push(currentQuestion.graphMode);
@@ -747,13 +749,21 @@ function sendActiveExamGuidance(req, res, body, issuanceState = "active", truste
     ? Math.min(2, Math.max(0, body.helpLevel))
     : 0;
   res.setHeader("Cache-Control", "no-store");
-  const ladder = hasDraft ? draftChecks : hints;
+  const ladder = asksToCheckDraft ? draftChecks : hints;
   const normalizedQuestion = questionText.toLocaleLowerCase(en ? "en-US" : "sv-SE");
   let contextualSequence = null;
   const comparisonQuestion = /\b(compare|compared|comparison|contrast|difference|differences|jämför|jämföra|jämförelse|skillnad|skillnader)\b/i.test(normalizedQuestion);
   const causeEffectQuestion = /\b(why|cause|causes|caused|reason|reasons|because|varför|orsak|orsaker|orsaken|beror|leder till)\b/i.test(normalizedQuestion);
-  if (/fotosyntes|photosynthesis/.test(normalizedQuestion)) {
-    contextualSequence = hasDraft
+  const calculationQuestion = type !== "graph" && (
+    /\b(beräkna|räkna ut|calculate|compute)\b/i.test(normalizedQuestion) ||
+    (/\b(lös|solve|bestäm|determine)\b/i.test(normalizedQuestion) &&
+      (/[0-9]/.test(normalizedQuestion) ||
+        /\b(ekvation|formel|samband|funktion|värde|uttryck|x|y|equation|formula|relationship|function|value|expression)\b/i.test(normalizedQuestion)))
+  );
+  if (type === "graph") {
+    contextualSequence = graphMode === "line" || graphMode === "scatter" ? ladder[graphMode] : ladder.genericGraph;
+  } else if (!calculationQuestion && !comparisonQuestion && !causeEffectQuestion && /fotosyntes|photosynthesis/.test(normalizedQuestion)) {
+    contextualSequence = asksToCheckDraft
       ? (en ? [
         "If you have a draft, sort the substances into what the process takes in and what it forms or releases. Which claim in your material can you check first?",
         "If you have started an answer, check that it distinguishes inputs from products. Which sentence in your material supports each group?",
@@ -772,8 +782,8 @@ function sendActiveExamGuidance(req, res, body, issuanceState = "active", truste
         "Följ processbeskrivningen från början till slut. Vilka ämnen hör till respektive del, och vilken roll får de i materialet?",
         "Gör en enkel in-genom-ut-lista och kontrollera varje punkt mot materialet. Förklara sedan skillnaden mellan det som används och det som bildas.",
       ]);
-  } else if (/\bmitos\b/.test(normalizedQuestion) && /\bmeios\b/.test(normalizedQuestion)) {
-    contextualSequence = hasDraft
+  } else if (!calculationQuestion && !causeEffectQuestion && /\bmitos\b/.test(normalizedQuestion) && /\bmeios\b/.test(normalizedQuestion)) {
+    contextualSequence = asksToCheckDraft
       ? (en ? [
         "Compare your draft using the same headings for both processes: purpose and outcome. Which part needs evidence from your material?",
         "Check that each comparison point describes both processes on the same basis. What does your material support for each one?",
@@ -792,32 +802,27 @@ function sendActiveExamGuidance(req, res, body, issuanceState = "active", truste
         "Leta upp en beskrivning av båda processerna under samma rubrik. Vilken skillnad stöds av materialet, inte bara minnet?",
         "Gör en tabell med syfte och resultat som rubriker. Fyll rutorna från materialet och formulera sedan skillnaden med egna ord.",
       ]);
-  } else if (type === "mc" &&
-      /^\s*(?:vilken\s+(?:typ\s+av\s+transport|transporttyp)|(?:which|what)\s+(?:type|kind)\s+of\s+transport)\b/i.test(normalizedQuestion) &&
+  } else if (type === "mc" && !calculationQuestion && !comparisonQuestion && !causeEffectQuestion &&
+      /^\s*(?:vad kallas det när|what is it called when|vilken\s+(?:typ\s+av\s+transport|transporttyp)|(?:which|what)\s+(?:type|kind)\s+of\s+transport)\b/i.test(normalizedQuestion) &&
       /transport|rör\s+sig|sprids|movement|moves?|moving|spread/i.test(normalizedQuestion) &&
       /membran|membrane/i.test(normalizedQuestion)) {
     // Only transport-type identification: calculation and open-response
     // questions retain their own guidance. Use clues in the signed question.
     // Never name a transport type, select an option or supply its definition.
     contextualSequence = en ? [
-      hasDraft
+      asksToCheckDraft
         ? "If you have chosen an option, compare it with the clues in the question: what moves, what does it pass through, and which direction is stated? Do not assume your choice is correct."
         : "Start with the clues in the question: what moves, what does it pass through, and which direction is stated? Write them down before choosing a concept.",
       "Make a small comparison using your material. For each transport type, note what moves, what boundary is crossed and the direction of movement. Which details agree with the question?",
       "Check your list against the descriptions in your material, one feature at a time. Which option conflicts with a clue, and which remains after you have checked every clue yourself?",
     ] : [
-      hasDraft
+      asksToCheckDraft
         ? "Om du har valt ett alternativ, jämför det med ledtrådarna i frågan: vad rör sig, vad passerar det och vilken riktning anges? Utgå inte från att ditt val är rätt."
         : "Utgå från ledtrådarna i frågan: vad rör sig, vad passerar det och vilken riktning anges? Skriv upp dem innan du väljer begrepp.",
       "Gör en liten jämförelse med hjälp av materialet. För varje transporttyp: vad transporteras, vilken gräns passeras och i vilken riktning sker rörelsen? Vilka detaljer stämmer med frågan?",
       "Kontrollera din lista mot beskrivningarna i materialet, en egenskap i taget. Vilket alternativ motsägs av en ledtråd, och vilket återstår när du själv har kontrollerat alla ledtrådar?",
     ];
-  } else if (type !== "graph" && (
-    /\b(beräkna|räkna ut|calculate|compute)\b/i.test(normalizedQuestion) ||
-    (/\b(lös|solve|bestäm|determine)\b/i.test(normalizedQuestion) &&
-      (/[0-9]/.test(normalizedQuestion) ||
-        /\b(ekvation|formel|samband|funktion|värde|uttryck|x|y|equation|formula|relationship|function|value|expression)\b/i.test(normalizedQuestion)))
-  )) {
+  } else if (calculationQuestion) {
     contextualSequence = en ? [
       "Identify the quantity the question asks for. Which values are given, and what units belong to them?",
       "Find the relationship or formula in your material that connects the given values to the quantity asked for. Which value can you substitute first?",
@@ -827,7 +832,17 @@ function sendActiveExamGuidance(req, res, body, issuanceState = "active", truste
       "Hitta sambandet eller formeln i materialet som kopplar de givna värdena till det som efterfrågas. Vilket värde kan du sätta in först?",
       "Räkna ett steg i taget, behåll enheterna synliga och kontrollera om resultatet är rimligt i den ursprungliga frågan.",
     ];
-  } else if (comparisonQuestion && !causeEffectQuestion) {
+  } else if (comparisonQuestion && causeEffectQuestion) {
+    contextualSequence = en ? [
+      "Split the task into a comparison and an explanation. Choose the same feature for both items and note one difference before explaining it.",
+      "Put the two items in columns under the same heading. Which mechanism in your material could explain the difference you found?",
+      "Check that your response includes both the comparison and a supported cause-and-effect link. Explain how that link accounts for the difference.",
+    ] : [
+      "Dela upp uppgiften i en jämförelse och en förklaring. Välj samma egenskap för båda och skriv en skillnad innan du förklarar den.",
+      "Sätt det du jämför i två kolumner under samma rubrik. Vilken mekanism i materialet kan förklara skillnaden du hittat?",
+      "Kontrollera att ditt svar innehåller både jämförelsen och ett underbyggt orsakssamband. Förklara hur sambandet leder till skillnaden.",
+    ];
+  } else if (comparisonQuestion) {
     contextualSequence = en ? [
         "Choose one shared comparison point. What does your material say about each item under that same point?",
         "Find evidence about both items under the same heading. What contrast does that evidence support?",
@@ -861,6 +876,17 @@ function sendActiveExamGuidance(req, res, body, issuanceState = "active", truste
         "Bygg en kort orsakskedja från materialet och kontrollera att varje led har stöd, inte bara antas.",
       ];
   }
+  if (!contextualSequence && /^(?:vad gör |vad är .+?(?::s|s) (?:främsta |huvudsakliga )?funktion|what does .+? do(?:[?.!]|$)|what is (?:the )?(?:main |primary )?(?:role|function|purpose) of )/i.test(normalizedQuestion)) {
+    contextualSequence = en ? [
+      "Distinguish the thing's role from its location or structure. What job is the question asking you to describe?",
+      "Start your own sentence with the thing followed by an action word. Which action in your material describes what it does?",
+      "Check that your answer states its job, rather than only where it is or what it looks like. For multiple choice, compare each proposed role with that description.",
+    ] : [
+      "Skilj på vilken uppgift något har, var det finns och hur det ser ut. Vilken uppgift ber frågan dig beskriva?",
+      "Börja en egen mening med det frågan handlar om och ett handlingsverb. Vilken handling i materialet beskriver vad det gör?",
+      "Kontrollera att svaret beskriver uppgiften, inte bara platsen eller utseendet. Vid flerval: jämför varje föreslagen roll med den beskrivningen.",
+    ];
+  }
   const sequence = contextualSequence || (type === "graph"
     ? (graphMode === "line" || graphMode === "scatter" ? ladder[graphMode] : ladder.genericGraph)
     : ladder[type]);
@@ -892,7 +918,7 @@ function sendActiveExamGuidance(req, res, body, issuanceState = "active", truste
       "Jämför nyckelordet med ett närliggande begrepp i materialet. Vilken skillnad gör källan?",
       "Förklara begreppet med egna ord och koppla det till en konkret detalj i materialet.",
     ]) : null;
-  const slopeQuestion = /\b(lutning|lutningen|riktningskoefficient|slope|gradient)\b/i.test(questionText);
+  const slopeQuestion = type !== "graph" && /\b(lutning|lutningen|riktningskoefficient|slope|gradient)\b/i.test(questionText);
   const questionHasSpecificGuidance = Boolean(contextualSequence || type === "graph" || slopeQuestion);
   const effectiveRequestGuidance = questionHasSpecificGuidance ? null : requestGuidance;
   const slopeGuidance = en
@@ -932,6 +958,7 @@ function sendActiveExamGuidance(req, res, body, issuanceState = "active", truste
         : sequence?.[requestedLevel] || ladder.short[requestedLevel])),
     helpCap: 2,
     helpLevelUsed: requestedLevel,
+    helpIntent: asksToCheckDraft ? "self-check" : "guidance",
     examActive: issuanceState === "active",
     ...(body.topic === "studiecoach" ? { coachDeferred: true } : {}),
     ...(issuanceState !== "active" ? { examState: issuanceState } : {}),

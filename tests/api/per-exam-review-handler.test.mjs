@@ -76,6 +76,7 @@ function createActiveQuestionContext(input, activeCourse = course) {
       options: publicQuestion.options,
       graphMode: input.graphMode,
       answered: input.answered === true,
+      answer: typeof input.answer === "string" ? input.answer : "",
       questionProof: signed[0].active_question_proof,
     },
     examState: { phase: "exam", submissionId },
@@ -2160,8 +2161,8 @@ test("active comparison and cause-effect questions receive distinct answer-free 
         text: "Jämför de två ämnena och förklara varför de reagerar olika.",
       }),
     });
-    assert.match(ambiguous.body.answer, /vilket begrepp eller samband/i,
-      "questions matching both structures retain the generic fallback");
+    assert.match(ambiguous.body.answer, /jämförelse och en förklaring/i,
+      "compound tasks receive a plan for both requested operations");
 
     assert.ok(calls.every(({ url }) => !url.includes("openai.com") &&
       !url.includes("reserve_per_chat_quota")), "active hints remain deterministic and quota-free");
@@ -2273,7 +2274,7 @@ test("active P.E.R gives a useful answer-free ladder for slope questions", async
       userQuestion: "Är min lösning rätt?",
       pageContext: createActiveQuestionContext({
         id: "active-drafted-slope",
-        type: "short", answered: true,
+        type: "short", answered: true, answer: "PRIVATE_STUDENT_DRAFT",
         text: "Förklara lutningen i ett linjärt samband.",
       }),
     });
@@ -2399,6 +2400,65 @@ test("active P.E.R keeps hints answer-free when the client question is not verif
   } finally {
     activeCount = 0;
   }
+});
+
+test("active task guidance prioritizes operations over topics and handles function and transport paraphrases", async () => {
+  activeCount = 1;
+  calls.length = 0;
+  try {
+    const cases = [
+      { text: "Förklara varför fotosyntesen går långsammare när temperaturen blir för hög.", expected: /förändras|orsak|mekanism/i, forbidden: /sortera det växten|glukos|enzym/i },
+      { text: "Beräkna hastigheten för fotosyntesen om 15 enheter bildas på 5 sekunder.", expected: /vilken storhet/i, forbidden: /sortera|3 enheter/i },
+      { text: "Placera fotosyntesens mätpunkter från tabellen.", type: "graph", graphMode: "scatter", expected: /axel|tabell/i, forbidden: /sortera|glukos/i },
+      { text: "Vad gör ribosomerna i en cell?", type: "mc", expected: /uppgift|roll/i, forbidden: /protein|aminosyr|rätt alternativ/i },
+      { text: "Vad kallas det när vatten rör sig genom ett membran mot högre koncentration av lösta ämnen?", type: "mc", expected: /riktning|ledtråd/i, forbidden: /osmos|diffusion|aktiv transport/i },
+      { text: "What does the cell membrane do?", type: "mc", lang: "en", expected: /role|job/i, forbidden: /regulates|transport|correct option/i },
+    ];
+    for (const [index, item] of cases.entries()) {
+      const response = await invoke({ lang: item.lang || "sv", helpLevel: 0,
+        pageContext: createActiveQuestionContext({ id: `task-precedence-${index}`, ...item }) });
+      assert.equal(response.statusCode, 200);
+      assert.match(response.body.answer, item.expected);
+      assert.doesNotMatch(response.body.answer, item.forbidden);
+    }
+    for (const text of ["What does osmosis mean?", "What is the inverse function of f(x) = 2x + 1?"]) {
+      const response = await invoke({ lang: "en", helpLevel: 0,
+        pageContext: createActiveQuestionContext({ id: text.slice(0, 12), text, type: "short" }) });
+      assert.doesNotMatch(response.body.answer, /thing's role|action word|proposed role/i);
+    }
+    for (const helpLevel of [0, 1, 2]) {
+      const graph = await invoke({ helpLevel, userQuestion: "Är mitt svar rätt?",
+        pageContext: createActiveQuestionContext({ id: `scatter-slope-${helpLevel}`, type: "graph", graphMode: "scatter",
+          text: "Placera mätpunkterna och diskutera lutningen.", answer: "PRIVATE_GRAPH_DRAFT" }) });
+      assert.match(graph.body.answer, /punkt|tabell|observation/i);
+      assert.doesNotMatch(graph.body.answer, /lutningsfråga|din valda metod|PRIVATE_GRAPH/i);
+    }
+    assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("reserve_per_chat_quota")));
+  } finally { activeCount = 0; }
+});
+
+test("active self-check distinguishes missing drafts and retains intent without trusting or echoing answers", async () => {
+  activeCount = 1;
+  calls.length = 0;
+  try {
+    const context = createActiveQuestionContext({ id: "draft-presence", type: "short", text: "Förklara lutningen i ett linjärt samband." });
+    const blank = await invoke({ userQuestion: "Är mitt svar rätt?", pageContext: context });
+    assert.doesNotMatch(blank.body.answer, /du har börjat svara/i);
+    for (const answer of ["PRIVATE_DRAFT_1 wrong", "PRIVATE_DRAFT_2 opposite"]) {
+      const response = await invoke({ userQuestion: "Är mitt svar rätt?", pageContext: {
+        ...context, currentQuestion: { ...context.currentQuestion, answer, answered: false },
+      } });
+      assert.match(response.body.answer, /Du har börjat svara/i);
+      assert.doesNotMatch(response.body.answer, /PRIVATE_DRAFT|rätt svar|det stämmer/i);
+      assert.equal(response.body.helpIntent, "self-check");
+      const next = await invoke({ userQuestion: "Visa metoden", helpLevel: 2, helpIntent: response.body.helpIntent,
+        pageContext: { ...context, currentQuestion: { ...context.currentQuestion, answer } } });
+      assert.equal(next.body.helpIntent, "self-check");
+      assert.match(next.body.answer, /din valda metod/i);
+      assert.doesNotMatch(next.body.answer, /PRIVATE_DRAFT|rätt svar|det stämmer/i);
+    }
+    assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("reserve_per_chat_quota")));
+  } finally { activeCount = 0; }
 });
 
 test("active conceptual questions do not receive their formula or axis mapping as a fixed hint", async () => {
