@@ -4,6 +4,7 @@ import { Readable } from "node:stream";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
+const Ajv = require("ajv");
 const generateExam = require("../../api/generate-exam.js");
 const gradeExam = require("../../api/grade.js");
 const assessment = require("../../api/_assessment.js");
@@ -594,6 +595,39 @@ const questions = [
   estimated_answer_length: "none",
   scoring_rubric: { parts: [], full_score_requirements: "", partial_credit_notes: "" },
 }));
+
+const schemaMc = { ...questions[0], graph_spec: null };
+const schemaShort = {
+  ...schemaMc, type: "short", options: [], correct_index: -1,
+  scoring_rubric: { parts: [{ description: "Ange summan", points: 1 }],
+    full_score_requirements: "Ange 5.", partial_credit_notes: "" },
+};
+for (const requested of [3, 6, 12]) {
+  const validateShortSchema = new Ajv({ strict: true }).compile(generateExam.buildMockExamSchema(requested, "short").schema);
+  const data = { title: "Syntetiskt schemaexempel", level: "C",
+    questions: Array.from({ length: requested }, (_, index) => ({ ...schemaShort, id: `schema-${index}` })) };
+  assert.equal(validateShortSchema(data), true, JSON.stringify(validateShortSchema.errors));
+  for (const parts of [[], [{ description: "", points: 1 }], [{ description: "   ", points: 1 }],
+    [{ description: "Ange summan", points: 0 }], [{ description: "Ange summan", points: -1 }]]) {
+    const malformed = structuredClone(data);
+    malformed.questions[0].scoring_rubric.parts = parts;
+    assert.equal(validateShortSchema(malformed), false,
+      `${requested}: generation schema rejects empty, blank or nonpositive short-answer scoring parts`);
+  }
+  const wrongType = structuredClone(data);
+  wrongType.questions[0] = schemaMc;
+  assert.equal(validateShortSchema(wrongType), false, "a short-only request cannot emit an MC candidate");
+}
+const validateMixedSchema = new Ajv({ strict: true }).compile(generateExam.buildMockExamSchema(3, "mix").schema);
+const mixedSchemaData = { title: "Syntetiskt blandat schema", level: "C", questions: [schemaMc, schemaShort, schemaMc] };
+assert.equal(validateMixedSchema(mixedSchemaData), true, JSON.stringify(validateMixedSchema.errors));
+const emptyMixedRubric = structuredClone(mixedSchemaData);
+emptyMixedRubric.questions[1].scoring_rubric.parts = [];
+assert.equal(validateMixedSchema(emptyMixedRubric), false,
+  "mixed generation cannot use the MC empty-rubric exception for a short-answer question");
+assert.deepEqual(generateExam.buildMockExamSchema(3, "mc").schema.properties.questions.items.properties.type.enum, ["mc"]);
+assert.deepEqual(generateExam.buildMockExamSchema(1).schema.properties.questions.items.properties.type.enum, ["mc", "short", "graph"],
+  "default schema inspection and graph callers keep the previous schema");
 
 const underfilledNormalization = generateExam.normalizeGeneratedExam({ questions: structuredClone(questions.slice(0, 2)) }, {
   qType: "mc", graphMode: null, pointTable: null, isMath: true, pastedText: "", lang: "sv", numQuestions: 3,
@@ -1693,6 +1727,14 @@ try {
     assert.ok(repairCall, `${invalidCount} structural failures trigger exactly one bounded repair`);
     assert.match(repairCall.body.input.at(-1).content,
       new RegExp(`"source_answer_not_extractable":${invalidCount}`));
+    const generationCalls = calls.filter((call) => call.url === "https://api.openai.com/v1/responses"
+      && call.body.text?.format?.name === "mock_exam_schema");
+    assert.ok(generationCalls.length >= 2);
+    assert.ok(generationCalls.every((call) => {
+      const item = call.body.text.format.schema.properties.questions.items;
+      return item.properties.type.enum.length === 1 && item.properties.type.enum[0] === "short"
+        && item.properties.scoring_rubric.properties.parts.minItems === 1;
+    }), "initial and repair calls both emit the selected type's nonempty-rubric contract");
     assert.ok(repairCall.body.input[1].content.endsWith(extractionMaterial));
     assert.ok(verifierInputs.slice(reviewStart).every((review) =>
       review.questions.every((question) => !question.id.startsWith("extract-invalid-"))),

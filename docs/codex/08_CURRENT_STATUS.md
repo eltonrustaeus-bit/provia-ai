@@ -1,5 +1,69 @@
 # 08 Current Status
 
+## Complete delivery exposed remaining semantic defects — 2026-10-28
+
+- Reviewed checkpoint `55d638e196d62db0d2d9b7063056eced9e5a57d4` is pushed;
+  deployment `dpl_H9PaAALHL9ExAZqE7qFVnAfNxmTr` is READY on the same stable
+  feature alias. Staging URL, pilot mode and budget cap were rechecked before
+  one new controlled request with the exact prior source/settings.
+- That request succeeded: database state `succeeded/terminal`, 12 requested,
+  12 delivered, `partial=false`. UI and stored response agree. Delivery was
+  about 308 seconds after the recorded UI start. No `invalid_part_mapping`
+  diagnostic was observed on this deployment; semantic source rejections,
+  missing quotes, distractor errors and empty short-answer rubrics still
+  occurred during candidate generation. One successful count is not a
+  reliability or semantic-quality claim.
+- Manual inspection found a real issued defect: question 7 asks which
+  energy-storing substance is generated from cell respiration, but offers
+  glucose, oxygen and carbon dioxide. After grading, the displayed key says
+  glucose and repeats that false relationship; its own source excerpt says
+  energy in glucose becomes available as ATP. Reviewer and blind-solver
+  agreement did not prevent this role/relationship error. This blocks a
+  pilot-ready quality claim and needs a concrete semantic regression.
+- Repeated targets also passed: ribosome function appears as short answer
+  (question 2) and MC (8); photosynthesis inputs/process recur in 4/9/12;
+  high-temperature enzyme effects recur in 5/10. Questions 4 and 12 have
+  especially close stems, while existing lexical/answer-target dedupe missed
+  them. The exact metadata still needs inspection before choosing a fix.
+- One active-exam P.E.R request returned an answer-free but generic study
+  hint. It did not name the answer or option, but did not provide the desired
+  task-specific pedagogical guidance. Do not record that as a full pedagogy
+  pass. Desktop screenshot showed the widget, while native AX output omitted
+  it; the existing desktop `aria-owns` behavior needs investigation before
+  claiming accessibility is verified.
+- The same synthetic exam was completed and graded once: 11/13 points,
+  including the deliberately wrong ribosome answer and the deliberately
+  unanswered defective MC. The user confirmed the app's unanswered-question
+  submission dialog after browser automation could not operate it. Result
+  feedback correctly identified the ribosome mistake. Readback confirmed
+  zero active exams and zero queued/running pipeline jobs. No further exam
+  was started.
+- Budget guard after generation and grading: spent 2.744343 USD, reserved
+  0.263628, available 0.371100 under the unchanged lower cap. These are guard
+  accounting amounts, not invoice totals.
+- Local type-schema follow-up addresses an observed batch where all five
+  short-answer candidates lacked a usable scoring rubric. Initial and repair
+  schemas now use the selected type; short-answer parts must contain 1–20
+  nonblank descriptions with positive point values. Mixed items use isolated
+  MC/short branches, preserving the MC empty-rubric allowance. Default and
+  graph schema calls remain unchanged. Structural and semantic runtime gates
+  are unchanged.
+- Offline controls: focused handler/schema file passed; the four-file
+  pipeline/HTTP/graph/gold regression passed 35/35. Ajv covers requested 3/6/12,
+  wrong type, empty/blank/nonpositive parts and the mixed-type exception;
+  handler fixtures assert both initial and repair calls emit the contract.
+  Syntax/diff checks passed. Independent review found no code/call-path defect;
+  its documentation question about `exclusiveMinimum` is resolved by the
+  [official supported-schema guide](https://developers.openai.com/api/docs/guides/structured-outputs?api-mode=responses),
+  which explicitly lists it for numbers. Hosted acceptance of this generation
+  schema has not been tested yet.
+- The type-schema follow-up is ready for an approved feature checkpoint.
+  Remaining work is substantive: semantic correctness, duplicate-target
+  control, useful active-exam P.E.R, and current six-question/mistake-training
+  live evidence. Continue offline from the identified counterexamples before
+  spending on another exam. Main/Production and database configuration remain
+  untouched.
+
 ## Source-review cardinality and immediate repair follow-up — 2026-10-28
 
 - The user approved reviewed checkpoints on the existing feature Preview for

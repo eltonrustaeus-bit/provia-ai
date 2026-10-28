@@ -384,8 +384,8 @@ function pickModel({ isMath, env = process.env }) {
   return isMath ? math : base;
 }
 
-function buildMockExamSchema(numQuestions) {
-  return {
+function buildMockExamSchema(numQuestions, qType = null) {
+  const format = {
     type: "json_schema",
     name: "mock_exam_schema",
     strict: true,
@@ -486,6 +486,24 @@ function buildMockExamSchema(numQuestions) {
       }
     }
   };
+  if (["mc", "short", "mix", "mixed"].includes(qType)) {
+    const base = format.schema.properties.questions.items;
+    const short = structuredClone(base);
+    short.properties.type.enum = ["short"];
+    short.properties.options.minItems = 0;
+    short.properties.options.maxItems = 0;
+    short.properties.correct_index.enum = [-1];
+    const parts = short.properties.scoring_rubric.properties.parts;
+    parts.minItems = 1;
+    parts.maxItems = 20;
+    parts.items.properties.description.pattern = "\\S";
+    parts.items.properties.points.exclusiveMinimum = 0;
+    const mc = structuredClone(base);
+    mc.properties.type.enum = ["mc"];
+    format.schema.properties.questions.items = qType === "short" ? short
+      : qType === "mc" ? mc : { anyOf: [mc, short] };
+  }
+  return format;
 }
 
 async function readJsonBody(req, maxBytes = 64 * 1024) {
@@ -1653,7 +1671,7 @@ function buildRepairPayload(payload, { lang, numQuestions, existingQuestions = [
   }
   return {
     ...payload,
-    text: { ...payload.text, format: buildMockExamSchema(repairCount) },
+    text: { ...payload.text, format: buildMockExamSchema(repairCount, qType) },
     input: [
       ...repairInput,
       { role: "user", content: `${instruction}\n\n${structuralSourceGuidance}${repairFactualAnswerInstruction} ${repairSourceReferenceInstruction}` },
@@ -1959,7 +1977,7 @@ module.exports = async function handler(req, res, internalContext = null) {
 
   try {
     const model = pickModel({ isMath });
-    const responseFormat = buildMockExamSchema(numQuestions);
+    const responseFormat = buildMockExamSchema(numQuestions, qType);
 
     const { systemPrompt, userPrompt, questionCountOffset } = buildExamPrompts({
       lang, level, course, qType, numQuestions,
