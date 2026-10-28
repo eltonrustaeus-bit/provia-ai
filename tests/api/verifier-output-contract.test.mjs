@@ -16,6 +16,13 @@ const sourceSupport = (quote, parts = 0, answers = 0) => ({
 
 async function runWithResults(results, questions = [question("q1"), question("q2")], material = "", timeoutMs, targetLevel, comparisonQuestions, lang = "en", reviewHintsById, trainingFocus, comparisonAnswerTargets) {
   const originalFetch = globalThis.fetch;
+  const originalConsoleInfo = console.info;
+  const sourceContractEvents = [];
+  console.info = (message) => {
+    if (typeof message === "string" && message.startsWith('{"event":"exam_verifier_source_contract"')) {
+      sourceContractEvents.push(JSON.parse(message));
+    }
+  };
   const originalAbortTimeout = AbortSignal.timeout;
   const boundAbortTimeout = originalAbortTimeout.bind(AbortSignal);
   let fetchCalls = 0;
@@ -32,9 +39,10 @@ async function runWithResults(results, questions = [question("q1"), question("q2
     });
   };
   try {
-    return { outcome: await verifyQuestions(questions, { apiKey: "synthetic", model: "synthetic", lang, material, timeoutMs, targetLevel, comparisonQuestions, comparisonAnswerTargets, reviewHintsById, trainingFocus }), fetchCalls, requestBody, requestTimeoutMs };
+    return { outcome: await verifyQuestions(questions, { apiKey: "synthetic", model: "synthetic", lang, material, timeoutMs, targetLevel, comparisonQuestions, comparisonAnswerTargets, reviewHintsById, trainingFocus }), fetchCalls, requestBody, requestTimeoutMs, sourceContractEvents };
   } finally {
     globalThis.fetch = originalFetch;
+    console.info = originalConsoleInfo;
     AbortSignal.timeout = originalAbortTimeout;
   }
 }
@@ -560,6 +568,76 @@ assert.equal(topicalReviewInput.source_material, "Fotosyntesen sker i kloroplast
 assert.equal(topicalReviewInput.questions[0].question, topicalButUnsupportedQuestion.question);
 assert.equal(decideApproval(topicalButUnsupportedReview.outcome.perQuestion.get(topicalButUnsupportedQuestion.id)), false,
   "the full verifier transport and approval contract fail closed for a topical but unsupported question");
+assert.deepEqual(topicalButUnsupportedReview.sourceContractEvents, [{
+  event: "exam_verifier_source_contract", evaluated: 1, failures: { unsupported_verdict: 1 },
+}], "semantic unsupported verdicts are distinguishable without logging their source or reviewer text");
+
+// Source paragraph numbers must not be confused with positions in the reviewer's
+// per-question evidence array. This occurs even when the source fact is valid.
+const numberedQuote = "Enzymer påskyndar kemiska reaktioner utan att själva förbrukas.";
+const numberedQuestion = {
+  ...validOpenQuestion, id: "biology-paragraph-12", question: "Vad gör enzymer?",
+  model_answer: numberedQuote, rubric: numberedQuote,
+  scoring_rubric: { parts: [{ description: numberedQuote, points: 1 }],
+    full_score_requirements: numberedQuote, partial_credit_notes: "" },
+  source_references: [numberedQuote],
+};
+for (const index of [0, 1, 12]) {
+  const support = sourceSupport(numberedQuote, 1);
+  support.question_evidence = [index];
+  const checked = await runWithResults([{
+    ...validOpenReview, id: numberedQuestion.id, source_support: support,
+  }], [numberedQuestion], `12. ${numberedQuote}`, undefined, "C", undefined, "sv");
+  assert.equal(decideApproval(checked.outcome.perQuestion.get(numberedQuestion.id)), index === 0,
+    `a sole quote from source paragraph 12 needs local index 0, not ${index}`);
+  assert.deepEqual(checked.sourceContractEvents, index === 0 ? [] : [{
+    event: "exam_verifier_source_contract", evaluated: 1, failures: { invalid_index: 1 },
+  }], "invalid local indices produce only fixed diagnostic categories and counts");
+  const quoteSchema = checked.requestBody.text.format.schema.properties.results.items
+    .properties.source_support.properties.evidence_quotes.items;
+  const quotePattern = new RegExp(quoteSchema.pattern);
+  assert.equal(quotePattern.test("a".repeat(500)), true, "the emitted schema permits 500-character quotes");
+  assert.equal(quotePattern.test("a".repeat(501)), false, "the emitted schema rejects 501-character quotes");
+  assert.equal(quotePattern.test(""), false, "the emitted schema rejects empty quotes");
+}
+for (const length of [500, 501]) {
+  const quote = "a".repeat(length);
+  const checked = await runWithResults([{
+    ...validOpenReview, source_support: sourceSupport(quote, 1),
+  }], [validOpenQuestion], quote);
+  assert.equal(decideApproval(checked.outcome.perQuestion.get(validOpenQuestion.id)), length === 500,
+    "runtime keeps the same 500-character boundary even when a provider ignores schema constraints");
+}
+assert.match(buildVerifierPrompt("sv"), /Index börjar på 0.*inte i source_material/);
+assert.match(buildVerifierPrompt("sv"), /ett enda citat.*\[0\].*enda giltiga indexvalet/);
+assert.match(buildVerifierPrompt("en"), /zero-based indices.*own quote array, not source_material/);
+assert.match(buildVerifierPrompt("en"), /one quote, \[0\] is the only valid index choice/);
+assert.match(buildVerifierPrompt("sv"), /1–500 tecken/);
+assert.match(buildVerifierPrompt("en"), /1–500 characters/);
+const malformedSourceVerdict = await runWithResults([{
+  ...validOpenReview, source_support: { ...validOpenReview.source_support, rubric_parts: [1] },
+}], [validOpenQuestion], "Ekvationer: 2x = 4.");
+assert.equal(decideApproval(malformedSourceVerdict.outcome.perQuestion.get(validOpenQuestion.id)), false);
+assert.deepEqual(malformedSourceVerdict.sourceContractEvents, [{
+  event: "exam_verifier_source_contract", evaluated: 1, failures: { invalid_support_shape: 1 },
+}], "malformed part verdicts remain rejected and produce a bounded shape diagnostic");
+for (const includeMissingQuote of [false, true]) {
+  const quotes = [numberedQuote, numberedQuote];
+  if (includeMissingQuote) quotes.push("Den här meningen finns inte i källmaterialet.");
+  const checked = await runWithResults([{
+    ...validOpenReview, id: numberedQuestion.id,
+    source_support: { ...sourceSupport(numberedQuote, 1), evidence_quotes: quotes },
+  }], [numberedQuestion], numberedQuote);
+  assert.equal(decideApproval(checked.outcome.perQuestion.get(numberedQuestion.id)), false,
+    "duplicate quotes remain rejected by the existing evidence contract");
+  assert.deepEqual(checked.sourceContractEvents, [{
+    event: "exam_verifier_source_contract", evaluated: 1,
+    failures: includeMissingQuote ? { quote_not_in_source: 1, duplicate_quote: 1 } : { duplicate_quote: 1 },
+  }], "duplicate supported quotes are distinguished from genuinely absent evidence");
+}
+assert.match(buildVerifierPrompt("sv"), /varje källcitat bara en gång; återanvänd indexet/);
+assert.match(buildVerifierPrompt("en"), /source quote only once and reuse its index/);
+
 for (const source_support of [
   { ...validOpenReview.source_support, rubric_parts: [] },
   { ...validOpenReview.source_support, rubric_parts: [false] },

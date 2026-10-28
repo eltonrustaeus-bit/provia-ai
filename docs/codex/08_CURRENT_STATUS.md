@@ -1,5 +1,67 @@
 # 08 Current Status
 
+## Current Preview live evidence and source-index follow-up — 2026-10-28
+
+- Deployed Preview is `be5eff97331b9bff1d91ac23cfa4673a0096f837`, deployment
+  `dpl_DPUMsZUhWcGTrMDwdUc1zpfeSsbK`, through the same stable branch alias.
+  It points to the verified staging project with pilot mode and the matching
+  lower budget cap. The existing browser session refreshed successfully; no
+  new tab, login, account, role or quota adjustment was needed.
+- Live homepage P.E.R passed two synthetic cases: choose Mockprov before
+  mistake training for a new learner, and explain how photosynthesis and cell
+  respiration are connected. Responses were direct and showed no self-review
+  note. Verified telemetry: two `gpt-6-luna` provider calls, 2934–4034 ms.
+- The improvement coach reused its saved recommendation without a new model
+  call. Visible latest score 100% and +17 percentage-point trend matched a
+  read-only aggregate of the five latest server-verified results (83 -> 100).
+  The recommendation distinguished historical weak results from recent success.
+- The previous synthetic three-question result was recovered as 6/6 through
+  server replay. P.E.R then correctly explained the selected 2/2 answer against
+  its actual rubric. No new model grading call was recorded. That result stays
+  on the account; only its local recovery copy was released via New topic to
+  prepare the next single synthetic exam.
+- One new Biologi 1, level C, mixed 12-question request used 12 numbered,
+  synthetic source paragraphs. It ended `failed/terminal` with
+  `STAGE_RETRY_LIMIT`, 3/12 approved, after 270.4 seconds of job time. No exam
+  was issued; the UI correctly displayed 3/12 and a final failure. Readback:
+  zero active exams and zero queued/running private pipeline jobs. There was
+  no new attempt after this terminal outcome.
+- Sanitized batch diagnostics show source-support rejections, occasional
+  non-extractive science answers, weak options and scoring/alignment findings.
+  Solver disagreement was not observed. Recorded exam-provider events: 6
+  generate, 3 repair, 10 reviewer, 2 blind solver, all `gpt-4o-mini-2024-07-18`.
+  These are stages of one request, not 21 separate exams. Source-support counts
+  combine malformed evidence and genuine unsupported claims; they do not prove
+  which subtype caused this run's rejections.
+- Budget guard before these controls: spent 2.277246 USD. After three P.E.R
+  calls and the one terminal exam request: spent 2.429079, reserved 0.263628,
+  available 0.686364 under cap 3.379071. These are guard accounting amounts,
+  not a claim about an OpenAI invoice.
+- Independent source review found a prompt/schema gap: evidence indices were
+  not explicitly zero-based and local to each question's quote array, while
+  runtime requires it. Quote length was bounded at runtime but not described
+  by the emitted quote schema. The local follow-up clarifies both languages
+  and adds a string pattern limiting quote size, a constraint supported by the
+  [official Structured Outputs schema guide](https://developers.openai.com/api/docs/guides/structured-outputs?api-mode=responses).
+  It also explicitly forbids duplicate quotes and explains index reuse. All
+  runtime and semantic approval gates remain unchanged.
+- The local follow-up also logs `exam_verifier_source_contract` with evaluated
+  count and fixed failure-count keys: invalid quote shape, quote absent from
+  source, duplicate quote, unsupported reviewer verdict, invalid support shape,
+  invalid index, and invalid part mapping. It emits no source/candidate text, notes, identities
+  or evidence indices, and a logging failure cannot change approval. Categories
+  may overlap and are not semantic truth judgments independent of the reviewer.
+- Local contract checks cover a paragraph-12 quote: own-array index 0 passes,
+  indices 1/12 fail, 500 characters pass, and 501 fail. Existing unsupported-
+  claim rejections remain. The focused four-file regression passed 39/39;
+  syntax and diff checks passed. Independent final follow-up found no remaining
+  findings in the reviewed prompt/schema/diagnostic scope.
+  This fix is not deployed; its effect on live yield is unproven.
+- Goal remains incomplete: current 12-question live yield failed; 6-question
+  delivery, new mistake-training generation and active-exam P.E.R still need
+  current-version live evidence. Do not retry paid tests without an actionable
+  reviewed change and a fresh environment/budget check.
+
 ## Saved-exam recovery checkpoint — 2026-10-28 (feature Preview scope)
 
 - Current working checkout: `codex/exgen-focused-mistake-evidence-2026-10-25`,
