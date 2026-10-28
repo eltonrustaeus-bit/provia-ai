@@ -275,7 +275,8 @@ function trainingActionDirections(value) {
       word.startsWith("exit") || word.startsWith("leav") || word === "product" || word === "products" ||
       word.startsWith("generer") || word.startsWith("avge") || word.startsWith("frigör") ||
       word.startsWith("frisätt") || word.startsWith("skap") || word.startsWith("utsöndr") ||
-      word === "output" || word === "outputs" || word.startsWith("release") || word.startsWith("form")) ||
+      word === "output" || word === "outputs" || word.startsWith("release") ||
+      ["formar", "formade", "format", "formeras", "formerades", "formerats", "forms", "formed", "forming"].includes(word)) ||
       words.some((word, index) => word.startsWith("släpp") &&
         words.slice(index + 1, index + 3).includes("ut")) ||
       words.some((word, index) => ["kom", "kommer", "come", "comes", "came", "go", "goes"].includes(word) &&

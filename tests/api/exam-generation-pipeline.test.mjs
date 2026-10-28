@@ -167,6 +167,17 @@ test("a prior-mistake match must cite evidence from that focus source when avail
   }, ["focus-4"], slopeFocus), ["focus-4"],
   "k-value terminology maps to the verified slope skill");
 
+  const formulaFocus = [{ focusId: "focus-formula", concept: "Ohms lag",
+    skill: "Beräkna strömmen med formeln U = R · I",
+    sourceQuestion: "Hur beräknar man strömmen med formeln U = R · I?",
+    expectedAnswer: "I = U/R", sourceEvidence: ["Strömmen beräknas med formeln I = U/R."] }];
+  assert.deepEqual(pipeline.supportedTrainingFocusMatches({
+    question: "Beräkna strömmen genom resistorn med sambandet U = R · I.",
+    model_answer: "I = U/R.",
+    source_references: ["Strömmen beräknas med formeln I = U/R."],
+  }, ["focus-formula"], formulaFocus), ["focus-formula"],
+  "the noun formeln does not turn a valid calculation focus into an output-only action");
+
   const legacyMaterial = "Fotosyntesen använder ljus, vatten och koldioxid för att bilda druvsocker och syre. Gröna växter tar upp koldioxid genom klyvöppningarna.";
   const legacyFocus = [{ focusId: "focus-5", concept: "Fotosyntes",
     skill: "Identifiera ämnen växten använder", sourceQuestion: "Vilka ämnen använder växten i fotosyntesen?",
