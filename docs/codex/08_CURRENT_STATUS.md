@@ -1,5 +1,58 @@
 # 08 Current Status
 
+## Saved-exam recovery checkpoint — 2026-10-28 (feature Preview scope)
+
+- Current working checkout: `codex/exgen-focused-mistake-evidence-2026-10-25`,
+  based on `0f9cb999f0672f1e86bb3a3eeb4fd8dde71d6159`. Local code/tests are
+  `js/exam-flow.js`, `tests/frontend/exam-flow.regression.mjs`, and
+  `tests/frontend/graph-exam-flow.test.mjs` (accept the new explicit confirmation).
+  The user approved committing these four files (including this status file)
+  and pushing to the existing feature branch for Preview. The deployment must
+  be checked against the resulting commit; production release is not included.
+- Fresh read-only Git and Vercel checks agree: remote feature branch
+  `codex/exgen-generation-quality-2026-10-20` and its existing stable Preview
+  are READY on `0f9cb99` (`dpl_38Ekf3nAmeSUFPdVAyKZWAMeNqmf`). `main` and
+  the deployment serving `exgen.se` remain on `ad60a68`
+  (`dpl_5jhXXmoq94bp3gqyPwtJvLgEycd1`). No release was performed.
+- Root cause: starting a new exam could overwrite the per-user local copy
+  of an existing signed exam/result. The local patch blocks ordinary and
+  prefilled generation while that copy needs attention, offers continuation
+  or result recovery, and requires explicit confirmation for its removal.
+- Recovery now retains expired/aged local answers, restores original course
+  and exam settings after confirmed replacement, keeps the result visible
+  after language changes, and rejects late recovery responses after navigation.
+  Deferred redraws check both saved-copy identity and current account.
+- A new complete save carries a random revision; small quota-fallback progress
+  is tied to that revision. This prevents an older fallback from masking a
+  later complete save if cleanup fails, without relying on timestamp ordering.
+  Legacy pairs retain their existing matching behavior until a versioned save.
+- Reading a draft no longer deletes fallback data and invalidates the caller's
+  own snapshot. Successful account-save retry updates the result's persistence
+  state; language changes wait for the in-flight save and cannot recreate a
+  false failure or a second save request.
+- Independent review identified those two P2 issues; both were fixed and
+  rechecked with no remaining findings in that follow-up. The broader review
+  also confirmed the expiry, settings, ownership and result-redraw fixes.
+- Offline results: core API/pipeline/source/gold/public-P.E.R 75/75,
+  P.E.R review handler 76/76, P.E.R exam-context frontend 104/104,
+  graph exam -> P.E.R -> mistake-focused training -> grading passed.
+  The final full exam-flow regression passed 246/246 on the reviewed code.
+  The goal audit also checked ordinary-chat correction display: 2/2 targeted
+  API tests passed, including persistence failure without a self-review note.
+  Syntax and diff checks passed. All provider/database responses were synthetic
+  or mocked; API-suite runtime is not a measurement of production response time.
+- Limits: localStorage snapshot comparison is not atomic across simultaneous
+  tab writes; this patch detects sequential conflicts, not every interleaving.
+  Legacy base/fallback records cannot prove recency when their metadata is
+  ambiguous. Do not describe either limitation as solved.
+- No new live AI request, database/account/quota/secret change, or user-browser
+  tab was made. The previous staging check found a saved result-recovery draft;
+  it remains untouched. Offline fixtures do not prove live model quality,
+  timing, 6/12-question yield, or the complete four-context P.E.R journey.
+- Next: execute the approved feature push and verify the exact Preview commit.
+  Reuse the stable Preview tab/session; verify environment and available budget
+  before one synthetic end-to-end run, and finish that same run before another.
+
 # Production exam-pipeline migrations — 2026-10-25
 
 - [x] Applied exactly migrations `20261024140557`, `20261024151433`,
