@@ -14,6 +14,8 @@ const questions = [
 ];
 const result = (id, overrides = {}) => ({
   id,
+  source_check: { premise_supported: true, independent_answer: id === "q1" ? "b" : "yes",
+    basis: "derived", evidence_quotes: [], option_matches: id === "q1" ? [false, true, false] : [true, false] },
   option_verdicts: id === "q1" ? [false, true, false] : [true, false],
   option_plausibility: id === "q1" ? [true, true, true] : [true, true],
   index: id === "q1" ? 1 : 0,

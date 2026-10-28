@@ -1122,6 +1122,7 @@ let verifierRejectComparisonDuplicate = false;
 let solverRejectQuestionId = null;
 let solverRejectNonsenseOption = true;
 let solverAnswerIndexOverrides = new Map();
+let solverSourceCheckOverrides = new Map();
 let regenerationQuestions = null;
 let regenerationQuestionBatches = null;
 let throwOnRepair = false;
@@ -1377,7 +1378,12 @@ globalThis.fetch = async (input, init = {}) => {
           ? (expectedIndex + 1) % q.options.length
           : expectedIndex;
         return {
-        id: q.id, option_verdicts: q.options.map((_, i) => i === solverIndex),
+        id: q.id,
+        source_check: solverSourceCheckOverrides.get(q.id) || {
+          premise_supported: true, independent_answer: q.options[solverIndex] || "No single answer",
+          basis: "derived", evidence_quotes: [], option_matches: q.options.map((_, i) => i === solverIndex),
+        },
+        option_verdicts: q.options.map((_, i) => i === solverIndex),
         option_plausibility: q.options.map((option) => !(solverRejectNonsenseOption && option === "Kesäkten")),
         index: solverIndex,
         confidence: 1, reason: "Syntetiskt kontrollsvar.",
@@ -1695,6 +1701,44 @@ try {
   "biology question references are grounded in the submitted source material");
   assert.ok(verifierInputs.at(-1).source_material.includes("Fotosyntes sker i kloroplasterna"),
     "the independent reviewer receives the synthetic biology source material");
+
+  const respirationQuote = "Cellandningen gör energi i glukos tillgänglig i form av ATP.";
+  const relationshipMaterial = `${biologyMaterial} ${respirationQuote}`;
+  const reversedRelationship = {
+    ...biologyQuestions[2], id: "respiration-reversed",
+    question: "Vilket ämne används av celler för att lagra energi, genererat från cellandningen?",
+    options: ["Glukos", "Syre", "Koldioxid"], correct_index: 0,
+    model_answer: "Glukos används av celler för att lagra energi, genererat från cellandningen.",
+    concept_tag: "ATP", learning_objective: "Förklara cellandningens syfte",
+    source_references: [respirationQuote],
+  };
+  activeQuestions = [...biologyQuestions.slice(0, 2), reversedRelationship];
+  regenerationQuestions = [{ ...biologyQuestions[2], id: "relationship-repaired-output" }];
+  solverSourceCheckOverrides.set(reversedRelationship.id, {
+    premise_supported: true, independent_answer: "ATP", basis: "source_fact",
+    evidence_quotes: [respirationQuote], option_matches: [false, false, false],
+  });
+  calls.length = 0;
+  const relationRepaired = await invoke(generateExam, {
+    lang: "sv", level: "C", course: biologyCourse, pastedText: relationshipMaterial, qType: "mc", numQuestions: 3,
+  });
+  assert.equal(relationRepaired.status, 200, JSON.stringify(relationRepaired.body));
+  assert.equal(relationRepaired.body.exam.questions.length, 3);
+  assert.equal(relationRepaired.body.exam.questions.some((question) => question.id === reversedRelationship.id), false,
+    "an agreeing old option verdict and reviewer cannot issue a key contradicted by the independent answer audit");
+  assert.ok(relationRepaired.body.exam.questions.some((question) => question.id === "relationship-repaired-output"),
+    "the existing bounded repair replaces the rejected relationship question");
+  const relationRepairCall = calls.find((call) => call.body?.text?.format?.name === "mock_exam_schema"
+    && call.body.input.at(-1).content.includes("KVALITETSREPARATION"));
+  assert.match(relationRepairCall.body.input.at(-1).content, /solver_no_single_answer/,
+    "the same safe failure category reaches repair without a database contract change");
+  const relationSolverCall = calls.find((call) => call.body?.text?.format?.name === "exam_solver_schema");
+  const relationSolverItems = JSON.parse(relationSolverCall.body.input[1].content.split("Frågor:\n")[1]);
+  assert.ok(relationSolverItems.every((question) => !Object.hasOwn(question, "correct_index") && !Object.hasOwn(question, "model_answer")),
+    "the answer audit still receives no generator key or exemplar");
+  solverSourceCheckOverrides.clear();
+  regenerationQuestions = null;
+  activeQuestions = biologyQuestions;
 
   const extractionMaterial = "Cellmembranet reglerar ämnestransport. Mitokondrierna gör energi användbar. Ribosomer bygger proteiner.";
   const extractionQuestions = [

@@ -2366,7 +2366,7 @@ module.exports = async function handler(req, res, internalContext = null) {
           let solverOk = q.type !== "mc";
           if (q.type === "mc") {
             const decision = s1.callOk
-              ? solver.decideKeep(s1.perQuestion.get(String(q.id)), q)
+              ? solver.decideKeep(s1.perQuestion.get(String(q.id)), q, pastedText)
               : { keep: false, reason: "solver_unavailable" };
             solverOk = decision.keep;
             solverOutcome.checked++;
@@ -2561,7 +2561,7 @@ module.exports = async function handler(req, res, internalContext = null) {
                       let solverOk = q.type !== "mc";
                       if (q.type === "mc") {
                         const decision = s2.callOk
-                          ? solver.decideKeep(s2.perQuestion.get(String(q.id)), q)
+                          ? solver.decideKeep(s2.perQuestion.get(String(q.id)), q, pastedText)
                           : { keep: false, reason: "solver_unavailable" };
                         solverOk = decision.keep;
                         solverOutcome2.checked++;

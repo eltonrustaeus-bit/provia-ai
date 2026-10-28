@@ -1,5 +1,35 @@
 # 08 Current Status
 
+## Independent source-answer audit — 2026-10-28
+
+- New goal authorizes reviewed feature checkpoints and a main/Production release
+  only after relevant tests, independent review and critical staging journeys pass.
+  Database/schema, secrets, model settings, accounts and quota changes remain excluded.
+- The blind MC solver now emits a bounded source check before option votes:
+  premise validity, independent answer, factual/derived/unanswerable basis,
+  literal evidence and per-option answer matches. Both the answer audit and
+  existing option votes must identify the same sole answer and trusted key.
+  Unsupported premises, absent answers and malformed/invented evidence fail closed.
+  Existing confidence, plausibility, reviewer and issuance gates are retained.
+- Initial and repair approval both pass source material; the offline model-eval
+  harness passes its fixture material too. No extra provider call, model change,
+  failure-code category or database contract was introduced. Evidence strings
+  remain request-local and are not added to telemetry or browser responses.
+- The exact observed respiration stem/key is frozen in a synthetic regression.
+  A mocked independent answer of ATP with no matching option excludes the bad
+  question despite an agreeing reviewer/old option vote; normal bounded repair
+  fills the slot with a separately reviewed candidate. Valid input/output tasks,
+  synonym matching, energy conversion and derived calculations have controls.
+- Offline source/solver/handler/pipeline/HTTP/verifier/gold tests passed 43/43;
+  syntax and diff checks passed. Independent read-only review found no runtime
+  approval bypass; its P2 instruction conflict was corrected by explicitly
+  limiting absent-option rejection to MC questions in both verifier languages.
+- Important limit: these tests prove enforcement when the model supplies the
+  correct independent audit, not that a live model will do so. Consistently wrong
+  semantic judgments can still agree. The known semantic defect is not yet
+  proven fixed live. No new exam, paid call, main/Production or hosted data/config
+  mutation was made for this implementation.
+
 ## Targeted duplicate and active-hint follow-up — 2026-10-28
 
 - Type-schema checkpoint `1492347c456289cee180a5d9cc99ea1d735021e7` is pushed;

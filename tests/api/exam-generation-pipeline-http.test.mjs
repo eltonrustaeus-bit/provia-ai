@@ -204,6 +204,8 @@ globalThis.fetch = async (input, init = {}) => {
           const index = question.options.indexOf(answer);
           return {
             id: question.id,
+            source_check: { premise_supported: true, independent_answer: answer,
+              basis: "derived", evidence_quotes: [], option_matches: question.options.map((option) => option === answer) },
             option_verdicts: question.options.map((option) => option === answer),
             option_plausibility: question.options.map(() => true),
             index, confidence: 1, reason: "Oberoende aritmetisk kontroll.",
