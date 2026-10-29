@@ -822,6 +822,30 @@ function factualDirections(text) {
   return directions;
 }
 
+function missingMcAssessesOnlyFact(question, fact) {
+  const options = question?.options;
+  const correct = question?.correct_index;
+  if (!Array.isArray(options) || options.length < 2 || !Number.isInteger(correct) ||
+      correct < 0 || correct >= options.length) return false;
+  const factTokens = semanticQuestionTokens({ question: fact });
+  const knownTokens = new Set([...factTokens, ...semanticQuestionTokens(question)]);
+  const answerTokens = semanticQuestionTokens({ question: `${options[correct]} ${question.model_answer || ""}` });
+  // New information in the selected answer may itself distinguish the choices.
+  // Abstain rather than treating low distractor overlap as proof of no extra skill.
+  if ([...answerTokens].some(token => !knownTokens.has(token))) return false;
+  const genericRubric = semanticQuestionTokens({ question: "Rätt korrekt alternativ svar ger full poäng ange identifiera välj beskriva förklara funktion roll correct answer option full points identify select describe explain function role" });
+  const rubricTokens = semanticQuestionTokens({ question: question.rubric || "" });
+  if ([...rubricTokens].some(token => !factTokens.has(token) && !genericRubric.has(token) && !/^\d+$/u.test(token))) return false;
+  const minimumOverlap = Math.max(2, Math.ceil(factTokens.size / 2));
+  const covered = options.map(option => {
+    const terms = semanticQuestionTokens({ question: option });
+    return [...factTokens].filter(token => terms.has(token)).length >= minimumOverlap;
+  });
+  // If two options share the known fact, distinguishing them tests something
+  // beyond that fact. An absent MC rubric cannot erase that extra skill.
+  return covered[correct] && covered.filter(Boolean).length === 1;
+}
+
 function compareAnchoredScoredFacts(left, right) {
   const concept = semanticConceptTag(left);
   const objective = exactComparisonTokens(left?.learning_objective).join(" ");
@@ -835,19 +859,28 @@ function compareAnchoredScoredFacts(left, right) {
   if (leftDirections.length === 1 && rightDirections.length === 1 && leftDirections[0] !== rightDirections[0]) return "conflict";
   const rawRequirements = (question) => {
     const rubric = question?.scoring_rubric;
-    if (!Array.isArray(rubric?.parts) || rubric.parts.length === 0) return null;
-    const values = rubric.parts.map((part) => part?.description);
-    if (typeof rubric.full_score_requirements === "string" && rubric.full_score_requirements.trim()) values.push(rubric.full_score_requirements);
-    return JSON.stringify(values.map(factualText));
+    const values = Array.isArray(rubric?.parts) ? rubric.parts.map((part) => part?.description) : [];
+    if (typeof rubric?.full_score_requirements === "string" && rubric.full_score_requirements.trim()) values.push(rubric.full_score_requirements);
+    return values.length ? JSON.stringify(values.map(factualText)) : null;
   };
   const leftRaw = rawRequirements(left);
   const rightRaw = rawRequirements(right);
+  const missingMcRubric = leftRaw === null && left.type === "mc" && rightRaw !== null ? left
+    : rightRaw === null && right.type === "mc" && leftRaw !== null ? right : null;
+  let leftScope = explicitScoringScope(left);
+  let rightScope = explicitScoringScope(right);
   // Preserve every scored requirement, including ones the bounded classifier
   // cannot understand. Unknown additional skills must not fall through to a
-  // broad stem/answer shortcut.
-  if (leftRaw !== rightRaw && (leftRaw || rightRaw)) return "conflict";
-  const leftScope = explicitScoringScope(left);
-  const rightScope = explicitScoringScope(right);
+  // broad stem/answer shortcut. MC candidates normally have no rubric parts;
+  // that absence is not itself a contradictory requirement. Only a single
+  // source-anchored fact and a bounded equivalent task may bridge that shape.
+  if (leftRaw !== rightRaw && (leftRaw || rightRaw)) {
+    const knownScope = missingMcRubric === left ? rightScope : leftScope;
+    if (!missingMcRubric || !knownScope || knownScope.facts.length !== 1 ||
+        !missingMcAssessesOnlyFact(missingMcRubric, knownScope.facts[0])) return "conflict";
+    if (missingMcRubric === left) leftScope = knownScope;
+    else rightScope = knownScope;
+  }
   if (!leftScope || !rightScope) return "unknown";
   if (leftScope.key !== rightScope.key) return "conflict";
   const direction = factualDirections(leftScope.facts.join(" "));
@@ -876,7 +909,8 @@ function compareAnchoredScoredFacts(left, right) {
     leftScope.facts.every((fact) => /temperatur/u.test(fact)) &&
     [left, right].every((question) => !temperatureCondition(question) ||
       leftScope.facts.every((fact) => temperatureCondition({ question: fact }) === temperatureCondition(question)));
-  if (!sameInputTask && !sameTemperatureTask) return "unknown";
+  const sameFunctionTask = repeatsAnchoredFunctionTask(left, right);
+  if (!sameInputTask && !sameTemperatureTask && !sameFunctionTask) return missingMcRubric ? "conflict" : "unknown";
   const segmenter = new Intl.Segmenter("sv", { granularity: "sentence" });
   const sentences = (question) => (Array.isArray(question.source_references) ? question.source_references : [])
     .flatMap((quote) => [...segmenter.segment(String(quote).replace(/\s+/gu, " ").trim())]
@@ -888,7 +922,7 @@ function compareAnchoredScoredFacts(left, right) {
   // paraphrases them. Factual correctness of either exemplar remains the
   // independent reviewer's responsibility, not a lexical similarity claim.
   return answers.every((answer) => answer.length >= 4) &&
-    leftScope.facts.every((fact) => shared.includes(fact)) ? "equal" : "unknown";
+    leftScope.facts.every((fact) => shared.includes(fact)) ? "equal" : missingMcRubric ? "conflict" : "unknown";
 }
 
 function functionTaskSignature(question) {

@@ -5,14 +5,21 @@ import { test } from "node:test";
 const require = createRequire(import.meta.url);
 const { isDuplicateQuestion, gateExam } = require("../../api/_assessment.js");
 const source = "Ribosomerna bygger proteiner av aminosyror.";
+function rubric(...facts) {
+  return { parts: facts.map((description) => ({ description, points: 1 })),
+    full_score_requirements: facts.length === 1 ? facts[0] : "" };
+}
 const first = {
   type: "short", question: "Vad gör ribosomerna i en cell?",
   concept_tag: "Ribosomer", learning_objective: "Förklara ribosomernas funktion",
-  model_answer: source, source_references: [source],
+  model_answer: source, source_references: [source], scoring_rubric: rubric(source),
 };
 const repeated = {
   ...first, type: "mc", question: "Vad är ribosomernas främsta funktion i en cell?",
   model_answer: "Ribosomerna bygger proteiner av aminosyror i en cell.",
+  scoring_rubric: { parts: [], full_score_requirements: "" },
+  options: [source, "Lagra och skydda cellens DNA.", "Frigöra energi i ATP genom cellandning."], correct_index: 0,
+  rubric: source,
 };
 function expectDuplicate(left, right, expected, message) {
   assert.equal(isDuplicateQuestion(left, right), expected, message);
@@ -21,6 +28,23 @@ function expectDuplicate(left, right, expected, message) {
 
 test("the observed ribosome function repeat is rejected across short and MC formats", () => {
   expectDuplicate(first, repeated, true, "same function, objective, source and answer target");
+  expectDuplicate(first, { ...repeated, scoring_rubric: null }, true, "MC without rubric parts has the same assessed function");
+  expectDuplicate({ ...first, scoring_rubric: rubric(source, "Förklara sambandet med DNA.") }, repeated, false,
+    "an absent MC rubric cannot erase an additional scored requirement");
+  expectDuplicate(first, { ...repeated, scoring_rubric: { parts: [], full_score_requirements: "Förklara sambandet med DNA." } }, false,
+    "a nonempty MC full-score requirement is not a missing rubric");
+  const extraTemplate = { ...repeated,
+    options: ["Ribosomerna bygger proteiner av aminosyror med mRNA som mall.", "Ribosomerna bygger proteiner av aminosyror med DNA som mall.", "Ribosomerna bygger proteiner av aminosyror med tRNA som mall."],
+    model_answer: "Ribosomerna bygger proteiner av aminosyror med mRNA som mall.",
+    rubric: "Identifiera mRNA som mall vid proteinsyntesen.",
+  };
+  expectDuplicate(first, extraTemplate, false, "the MC rubric assesses an additional template distinction");
+  expectDuplicate(first, { ...extraTemplate, rubric: "" }, false, "MC options can assess an additional distinction without rubric parts");
+  expectDuplicate(first, { ...extraTemplate, rubric: "",
+    options: [extraTemplate.options[0], "Tillverkar proteiner med DNA som mall.", "Syntetiserar polypeptider med tRNA som mall."] }, false,
+    "paraphrasing distractors cannot hide extra information in the correct option");
+  expectDuplicate(first, { ...repeated, model_answer: repeated.model_answer + " mRNA är mallen." }, false,
+    "an extra model-answer fact cannot inherit the short-answer scope");
 });
 
 test("an anchored function match preserves other targets, contexts and additional tasks", () => {
@@ -62,8 +86,6 @@ test("opposite stated temperature conditions stay distinct despite shared words 
 // issued rubrics were scrubbed/encrypted and are not inferred from the stems.
 const inputFact = "Fotosyntesen använder koldioxid och vatten samt ljusenergi.";
 const outputFact = "Fotosyntesen bildar glukos och syre.";
-const rubric = (...facts) => ({ parts: facts.map((description) => ({ description, points: 1 })),
-  full_score_requirements: facts.length === 1 ? facts[0] : "" });
 const photo = {
   type: "short", question: "Vad är fotosyntes och vilka ämnen används i processen?",
   concept_tag: "Fotosyntes", learning_objective: "Förklara fotosyntesens ingående ämnen",
@@ -106,7 +128,9 @@ test("a general effect and explicit condition match only with the same source-ba
     learning_objective: "Förklara temperaturens påverkan på enzymer", model_answer: fact,
     source_references: [fact], scoring_rubric: rubric(fact) };
   const specific = { ...general, type: "mc", question: "Hur påverkas enzymers aktivitet vid mycket hög temperatur?",
-    model_answer: "Vid mycket hög temperatur kan enzymers aktivitet minska eftersom deras form kan förändras." };
+    model_answer: fact,
+    scoring_rubric: { parts: [], full_score_requirements: "" }, rubric: fact,
+    options: [fact, "Aktiviteten ökar alltid och reaktionen påskyndas.", "Reaktionshastigheten är alltid oförändrad."], correct_index: 0 };
   expectDuplicate(general, specific, true, "explicit equal scoring requirements establish the same condition and fact");
   expectDuplicate(general, { ...specific, question: "Hur påverkas enzymers aktivitet vid mycket låg temperatur?" }, false,
     "a conflicting stated condition cannot use the relaxed match");
