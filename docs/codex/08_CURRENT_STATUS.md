@@ -1,5 +1,47 @@
 # 08 Current Status
 
+## Active-attempt pedagogy and course-linked coaching — 2026-10-29
+
+- Continuation starts from clean `13cd067`; XelioV context and role cards were
+  reloaded. The full goal still requires a final staged student journey before
+  main/Production release. Two existing read-only reviewers were reused.
+- Assessment checkpoint `06987ac` restores bounded cross-format matching when
+  MC rubric parts are absent. A single explicit source fact must support the
+  same task; selected-option/model-answer terms, top-level rubric and option
+  distinctions preserve additional skills. Production-shaped rubric fixtures
+  and paraphrased mRNA/DNA/tRNA counterexamples cover the review findings.
+  Unknown paraphrases remain conservative false negatives; historical scrubbed
+  rubrics are not reconstructed or claimed fixed by these synthetic fixtures.
+- Active P.E.R now reads structural features of the bounded learner attempt:
+  missing calculation steps, one-sided comparisons, causal links, slope ratios,
+  selected-MC reasoning and canonical graph draft states. Fixed prompts perform
+  no arithmetic/correctness assessment, reflect no draft text, and require a
+  signed current active question. Task-specific MC guidance and unknown-graph
+  fallback are preserved. Counterexamples cover signed scalars, unit notation,
+  truncated excerpts and null graph slots.
+- Coaching retains course-linked mistake labels/error categories from the
+  authenticated verified-result rows. Labels are bounded untrusted grading
+  summaries, not scientific facts or instructions. Legitimate system-related
+  concepts survive filtering; equal-score focus changes invalidate the v5 cache.
+  The UI says "fokus från sparad rättning", including an 80% result with a
+  specific mistake. Postgrade guidance requires a transferable strategy and
+  prohibits inventing a changed score.
+- Offline: quality/pipeline/HTTP/gold group **54/54**; scoped P.E.R API **30/30**;
+  helper/provenance/identity group **5/5**; page-target browser checks **95/95**.
+  Independent final rechecks cleared the bounded assessment and P.E.R findings.
+  Legacy `tipsMode` still uses client-supplied exercise data; do not describe
+  that separate route as verified personal-mistake evidence.
+- The previously approved production fencing migration and its ledger version
+  were verified on 2026-10-28; source version is `20261020170419`. No further
+  production-database, schema, account, quota or model change is included;
+  code release remains conditional on the goal's stated release gates.
+- Fresh staging read: no active exams/jobs; available **0.370188 USD**. Prior
+  12-question usage was 128926 input / 18328 output tokens across 29 stages,
+  about **0.060672 USD** under the app's conservative counter (not an invoice).
+  Thus the prior blanket "insufficient" budget assessment was too categorical.
+  One complete comparison journey can be attempted under the unchanged hard
+  cap after the new Preview is READY. No paid call has yet run on this checkpoint.
+
 ## Scored-fact diversity checkpoint — 2026-10-28
 
 - Source-answer audit checkpoint `45631477bdc969d38ab8cdbbbbabbe1f8b71fdd0`

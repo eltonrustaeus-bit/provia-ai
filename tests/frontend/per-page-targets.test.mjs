@@ -125,7 +125,7 @@ await assertPageTopic("/förbättring.html", "förbättring");
         await responseGate;
         await route.fulfill({ json: {
           answer: "LIVE_CARD_AFTER_RERENDER",
-          coachEvidenceSummary: { latestPercent: 45, trendDeltaPp: -17, recentResultCount: 3, focusCourse: "Biologi 1" },
+          coachEvidenceSummary: { latestPercent: 80, trendDeltaPp: 18, recentResultCount: 3, focusCourse: "Biologi 1" },
         } });
       } else await route.fulfill({ json: { ok: true } });
     },
@@ -143,13 +143,13 @@ await assertPageTopic("/förbättring.html", "förbättring");
   ok("in-flight coach response renders into the current card after navigation rerender",
     await page.locator("#coachText").textContent() === "LIVE_CARD_AFTER_RERENDER");
   ok("coach score summary comes from the verified server evidence, not local 62% history",
-    await page.locator("#lastText").textContent() === "45 % · verifierat resultat",
+    await page.locator("#lastText").textContent() === "80 % · verifierat resultat",
     await page.locator("#lastText").textContent());
   ok("coach trend explicitly describes the server-verified sample",
-    await page.locator("#trendText").textContent() === "-17 p.p. · senaste 3 verifierade",
+    await page.locator("#trendText").textContent() === "+18 p.p. · senaste 3 verifierade",
     await page.locator("#trendText").textContent());
   ok("coach focus is sourced from the server-verified course list",
-    await page.locator("#focusText").textContent() === "Biologi 1 · verifierade resultat under 70 %",
+    await page.locator("#focusText").textContent() === "Biologi 1 · fokus från sparad rättning",
     await page.locator("#focusText").textContent());
   ok("navigation rerender does not start a duplicate model request", coachCalls === 1, String(coachCalls));
   await ctx.close();
