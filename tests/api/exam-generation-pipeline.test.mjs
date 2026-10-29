@@ -1484,3 +1484,61 @@ test.after(() => {
   operations.retryPipelineStep = original.retryPipelineStep;
   operations.completePipelineJob = original.completePipelineJob;
 });
+
+test("pipeline accumulation excludes repeated presented functions despite differing unasked rubrics", async () => {
+  const fact = "Ribosomerna bygger proteiner av aminosyror.";
+  const first = { id: "first-function", type: "short", question: "Vad gör ribosomerna i en cell?",
+    concept_tag: "Ribosomer", learning_objective: "Ribosomernas funktion", model_answer: fact,
+    source_references: [fact], scoring_rubric: { parts: [{ description: fact, points: 1 }] }, validation_status: "verified" };
+  const job = { id: "11111111-1111-4111-8111-111111111111", user_id: "synthetic-function-user",
+    idempotency_key: "22222222-2222-4222-8222-222222222222", request_hash: "a".repeat(64),
+    attempt_id: "33333333-3333-4333-8333-333333333333", lease_token: "44444444-4444-4444-8444-444444444444",
+    deadline_at: new Date(Date.now() + 300000).toISOString(), stage: "generate", requested_count: 3,
+    payload: { course: "Biologi 1", pastedText: fact, qType: "short", numQuestions: 3 },
+    accepted_questions: [first], progress_current: 1 };
+  const saved = { generate: generation.generateVerifiedBatch, pipeline: operations.renewPipelineLease,
+    quota: operations.renewGenerationLease, checkpoint: operations.checkpointPipelineJob };
+  let checkpoint;
+  operations.renewPipelineLease = async () => true;
+  operations.renewGenerationLease = async () => true;
+  operations.checkpointPipelineJob = async input => {
+    checkpoint = input;
+    return { status: "checkpointed", stage: input.nextStage, progress_current: input.progressCurrent };
+  };
+  generation.generateVerifiedBatch = async () => ({ status: 200, body: { ok: true, questions: [
+    { ...first, id: "repeat", question: "Vilken funktion har ribosomer i cellen?",
+      scoring_rubric: { parts: [{ description: fact, points: 1 }, { description: "Förklara sambandet med DNA.", points: 1 }] } },
+    { id: "distinct", type: "short", question: "Vad innehåller cellkärnan?", model_answer: "DNA", validation_status: "verified" },
+  ] } });
+  try {
+    const result = await pipeline.advance(job);
+    assert.equal(result.status, "progress");
+    assert.equal(checkpoint.progressCurrent, 2);
+    assert.equal(checkpoint.nextStage, "repair");
+    assert.deepEqual(checkpoint.acceptedQuestions.map(q => q.id), [first.id, pipeline.batchQuestionId(job, { id: "distinct" })]);
+    assert.equal(checkpoint.repairFeedback.duplicateCount, 1);
+    job.accepted_questions = [];
+    job.progress_current = 0;
+    generation.generateVerifiedBatch = async () => {
+      const left = { ...first, points: 1, cognitive_level: "förstå" };
+      const right = { ...left, id: "repeat", points: 2, question: "Vilken funktion har ribosomer i cellen?",
+        scoring_rubric: { parts: [{ description: fact, points: 1 }, { description: "Förklara sambandet med DNA.", points: 1 }] } };
+      const different = { ...left, id: "distinct", question: "Vad innehåller cellkärnan?", concept_tag: "DNA", model_answer: "DNA." };
+      const gate = require("../../api/_assessment.js").gateExam({ questions: [left, right, different] },
+        { profile: "natural_sciences", sourceMaterial: fact });
+      assert.deepEqual(gate.dropped.map(item => item.issues), [["repeated_function_task"]]);
+      return { status: 200, body: { ok: true, questions: gate.questions,
+        qualityDiagnostics: { structuralIssueCounts: { repeated_function_task: gate.dropped.length } } } };
+    };
+    await pipeline.advance(job);
+    assert.equal(checkpoint.progressCurrent, 2);
+    assert.equal(checkpoint.nextStage, "repair");
+    assert.equal(checkpoint.repairFeedback.duplicateCount, 1,
+      "generator-pruned repeats still guide the next repair through the existing bounded field");
+  } finally {
+    generation.generateVerifiedBatch = saved.generate;
+    operations.renewPipelineLease = saved.pipeline;
+    operations.renewGenerationLease = saved.quota;
+    operations.checkpointPipelineJob = saved.checkpoint;
+  }
+});

@@ -33,9 +33,9 @@ function nextBatchType(questions, targets, requested) {
   return mcMissing >= shortMissing ? "mc" : "short";
 }
 
-function noSemanticDuplicate(questions, candidate) {
+function noSemanticDuplicate(questions, candidate, options = {}) {
   return !questions.some((question) =>
-    String(question.id) === String(candidate.id) || assessment.isDuplicateQuestion(question, candidate));
+    String(question.id) === String(candidate.id) || assessment.questionPairConflict(question, candidate, options));
 }
 
 function questionBreadthKey(question) {
@@ -486,7 +486,9 @@ async function advance(job, { deadlineAt = null } = {}) {
   const rankedQuestions = generated.body.questions.map((question, index) => ({ question, index,
     sourceIndices: coverage.questionSectionIndices(question, sections) }));
   const eligibleCount = rankedQuestions.filter(({ question }) => question.validation_status === "verified" &&
-    (!targets || question.type === batchType) && noSemanticDuplicate(existing, question)).length;
+    (!targets || question.type === batchType) && noSemanticDuplicate(existing, question, {
+      profile: assessment.detectSubjectProfile(job.payload.course, job.payload.pastedText), sourceMaterial: job.payload.pastedText,
+    })).length;
   if (eligibleCount > slots) {
     const representedBreadth = new Set(existing.map(questionBreadthKey).filter(Boolean));
     const breadthCounts = new Map();
@@ -531,7 +533,9 @@ async function advance(job, { deadlineAt = null } = {}) {
     if (accepted.some((prior) => prior.id === candidate.id)) {
       batchIdCollisions++; duplicateCandidates++; continue;
     }
-    if (!noSemanticDuplicate([...accepted, ...priorQuestions], candidate)) {
+    if (!noSemanticDuplicate([...accepted, ...priorQuestions], candidate, {
+      profile: assessment.detectSubjectProfile(job.payload.course, job.payload.pastedText), sourceMaterial: job.payload.pastedText,
+    })) {
       semanticDuplicateCandidates++; duplicateCandidates++; continue;
     }
     accepted.push(candidate);
@@ -547,6 +551,10 @@ async function advance(job, { deadlineAt = null } = {}) {
   const quality = generated.body.qualityDiagnostics && typeof generated.body.qualityDiagnostics === "object"
     ? generated.body.qualityDiagnostics
     : {};
+  const generatorPairDrops = ["duplicate_question", "repeated_function_task"].reduce((sum, code) => {
+    const count = quality.structuralIssueCounts?.[code];
+    return sum + (Number.isInteger(count) && count > 0 ? Math.min(3, count) : 0);
+  }, 0);
   console.info(JSON.stringify({
     event: "exam_generation_pipeline_batch",
     requestId: pipelineRequestId(job, quality.requestId),
@@ -602,7 +610,7 @@ async function advance(job, { deadlineAt = null } = {}) {
     progressCurrent: accepted.length,
     repairFeedback: mergeRepairFeedback(job.payload.repairFeedback, {
       ...quality,
-      duplicateCount: duplicateCandidates,
+      duplicateCount: Math.min(3, duplicateCandidates + generatorPairDrops),
     }),
   });
   if (["retry_queued", "retry_limit", "partial_ready"].includes(checkpoint?.status)) {

@@ -4,6 +4,7 @@ import { test } from "node:test";
 
 const require = createRequire(import.meta.url);
 const { isDuplicateQuestion, gateExam } = require("../../api/_assessment.js");
+const { questionPairConflict } = require("../../api/_assessment.js");
 const source = "Ribosomerna bygger proteiner av aminosyror.";
 function rubric(...facts) {
   return { parts: facts.map((description) => ({ description, points: 1 })),
@@ -248,4 +249,34 @@ test("decimal points and line wrapping cannot manufacture a complete shared sour
   ]) expectDuplicate({ ...base, source_references: [leftSource] }, { ...base, type: "mc",
     question: "Vad är processen och vad ingår i processen?", source_references: [rightSource] }, false,
     "only actual complete source sentences can establish scoped equality");
+});
+
+test("repeated presented function tasks are excluded separately from rubric equivalence", async () => {
+  const left = { ...first, id: "first-function", points: 1, cognitive_level: "förstå", validation_status: "verified" };
+  const right = { ...left, id: "second-function", question: "Vilken funktion har ribosomer i cellen?", points: 2,
+    learning_objective: "En annan etikett ändrar inte uppgiften som visas",
+    scoring_rubric: rubric(source, "Förklara sambandet med DNA.") };
+  const options = { profile: "natural_sciences", sourceMaterial: source };
+  assert.equal(isDuplicateQuestion(left, right), false, "the existing raw-rubric conflict remains conservative");
+  assert.equal(questionPairConflict(left, right, options), "repeated_function_task");
+  assert.equal(questionPairConflict(right, left, options), "repeated_function_task");
+  const gated = gateExam({ questions: [left, right] }, options);
+  assert.equal(gated.questions.length, 1);
+  assert.deepEqual(gated.dropped[0].issues, ["repeated_function_task"]);
+  const pipeline = require("../../api/_exam-generation-pipeline.cjs");
+  assert.equal(pipeline.noSemanticDuplicate([left], right, options), false);
+  assert.equal(pipeline.noSemanticDuplicate([left], right), true, "missing historical material makes only the new policy abstain");
+  for (const changed of [
+    { question: "Vilken funktion har ribosomer i växtcellen?" },
+    { question: "Vilken funktion har ribosomer i cellen och hur samverkar de med DNA?" },
+    { model_answer: `${source} DNA innehåller information.` },
+    { source_references: ["Ribosomerna bygger proteiner"] },
+  ]) assert.equal(questionPairConflict(left, { ...right, ...changed }, options), "", JSON.stringify(changed));
+  assert.equal(questionPairConflict(left, right, { ...options, profile: "mathematics" }), "");
+  assert.equal(questionPairConflict(left, right, { ...options, sourceMaterial: "Om ett villkor gäller kan " + source }), "",
+    "an embedded clause cannot manufacture a complete shared answer sentence");
+  const generation = require("../../api/generate-exam.js");
+  await assert.rejects(generation.finalizeVerifiedExam({ userId: "11111111-1111-4111-8111-111111111111",
+    payload: { lang: "sv", course: "Biologi 1", qType: "short", level: "C", numQuestions: 2, pastedText: source },
+    questions: [left, right] }), /Final structural validation/);
 });

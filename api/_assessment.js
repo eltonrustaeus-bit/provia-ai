@@ -13,6 +13,7 @@
 const crypto = require("crypto");
 const graphAnswers = require("./_graph.js");
 const { hasCoordinatedRequirementAmbiguity } = require("./_source-requirement-options.cjs");
+const { losesSourceQuantitySubject } = require("./_source-quantity-subject.cjs");
 const MAX_MC_OPTIONS = 5;
 
 // ── Answer-key signing (integrity, not confidentiality) ─────────────────────
@@ -308,6 +309,9 @@ function generalQualityIssues(q, options) {
   if (!(Number(q.points) > 0)) issues.push("nonpositive_points");
   if (options?.profile === "natural_sciences" && hasCoordinatedRequirementAmbiguity(q, options?.sourceMaterial)) {
     issues.push("source_requirement_options_incomplete");
+  }
+  if (options?.profile === "natural_sciences" && losesSourceQuantitySubject(q, options?.sourceMaterial)) {
+    issues.push("source_quantity_subject_changed");
   }
   if (options?.outputLanguage === "sv") {
     // A closed set of unambiguous noun genders catches common MC agreement
@@ -626,6 +630,7 @@ const BLOCKING = new Set([
   "source_answer_not_extractable",
   "language_quality",
   "source_requirement_options_incomplete",
+  "source_quantity_subject_changed",
   "open_question_ungradeable", "leaked_instructions", "corrupted_option_text", "math_options_numerically_equal", "math_option_type_mismatch",
   "unsupported_single_word_option_outlier",
   "cognitive_level_missing", "scoring_rubric_missing_for_open", "scoring_rubric_points_mismatch", "law_deprecated_terminology",
@@ -1393,6 +1398,32 @@ function isDuplicateQuestion(left, right) {
 //   catch_all_option               — "alla av ovanstående"-style option
 //   longest_option_is_answer       — the key is conspicuously the longest choice
 
+// A separate variation policy, not a relaxation of rubric-equivalence dedup.
+// Identical presented work and a complete, material-verified answer remain
+// repetitive even if metadata/rubrics assign different unasked requirements.
+function questionPairConflict(left, right, options = {}) {
+  if (isDuplicateQuestion(left, right)) return "duplicate_question";
+  if (options.profile !== "natural_sciences" || left?.type !== "short" || right?.type !== "short" ||
+      !semanticConceptTag(left) || semanticConceptTag(left) !== semanticConceptTag(right)) return "";
+  const signature = functionTaskSignature(left);
+  if (!signature || signature !== functionTaskSignature(right)) return "";
+  const material = normalizeSourceAnswer(options.sourceMaterial);
+  if (!material || material.length > 12000) return "";
+  const normalizedAnswer = value => normalizeSourceAnswer(value).replace(/[.!?]+$/u, "").trim();
+  const answer = normalizedAnswer(left.model_answer);
+  if (!answer || answer !== normalizedAnswer(right.model_answer)) return "";
+  const segmenter = new Intl.Segmenter("sv", { granularity: "sentence" });
+  const sentences = String(options.sourceMaterial).split(/\n\s*\n|\n(?=\s*\d+[.)]\s)/u).flatMap(block =>
+    [...segmenter.segment(normalizeSourceAnswer(block.replace(/^\s*\d+[.)]\s*/u, "")))]
+      .map(({ segment }) => segment.trim()).filter(sentence => /[.!]$/u.test(sentence)));
+  const anchor = sentences.find(sentence => normalizedAnswer(sentence) === answer);
+  if (!anchor) return "";
+  const citesAnchor = question => Array.isArray(question.source_references) && question.source_references.some(quote =>
+    typeof quote === "string" && material.includes(normalizeSourceAnswer(quote)) &&
+    normalizeSourceAnswer(quote).includes(anchor));
+  return citesAnchor(left) && citesAnchor(right) ? "repeated_function_task" : "";
+}
+
 // Gate an exam. Keeps only questions safe to show; signs their answer keys.
 function gateExam(exam, opts) {
   const options = opts || {};
@@ -1424,8 +1455,9 @@ function gateExam(exam, opts) {
       dropped.push({ id: String(q && q.id != null ? q.id : ""), issues: blocking });
       continue;
     }
-    if (kept.some((accepted) => isDuplicateQuestion(accepted, q))) {
-      dropped.push({ id: String(q && q.id != null ? q.id : ""), issues: ["duplicate_question"] });
+    const pairConflict = kept.map(accepted => questionPairConflict(accepted, q, options)).find(Boolean);
+    if (pairConflict) {
+      dropped.push({ id: String(q && q.id != null ? q.id : ""), issues: [pairConflict] });
       continue;
     }
     if (issues.length) flagged.push({ id: String(q && q.id != null ? q.id : ""), issues });
@@ -1453,5 +1485,6 @@ module.exports = {
   answerKeyString,
   questionDedupeSignature,
   isDuplicateQuestion,
+  questionPairConflict,
   COGNITIVE_VERBS,
 };

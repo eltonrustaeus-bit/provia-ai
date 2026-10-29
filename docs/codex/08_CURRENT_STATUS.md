@@ -1,5 +1,44 @@
 # 08 Current Status
 
+## Source-subject and presented-task checks — 2026-10-30
+
+- Reviewed grading checkpoint `933c54f` is pushed and READY as
+  `dpl_5NYfbALyNnqmuhacTeaSSC3SAYFB` on the existing feature alias. The same
+  failed submission was deliberately retried once after that concrete fix:
+  **14/16 (88%)**, saved and verified at 2026-10-29 23:13:58 UTC. The intended
+  wrong ribosome response received 0/2. No additional exam was created.
+- The saved result confirmed another false glucose-to-ATP claim in a separate
+  MC model explanation, despite its correct terminology key. Both that field
+  and the keyed option now enter the bounded source-subject veto.
+- This Swedish natural-science veto recognizes explicit positive quantity /
+  bearer / relation frames and parsed function, process or quantity tasks.
+  It rejects the observed q1/q8 cases and the internal verbatim head-loss
+  substring. Negation, unknown embedding, unparsed task contexts and competing
+  positive source clauses abstain. Physics counterexamples accompany biology.
+  It is not a universal factual validator; independent review/solver remain.
+- Generation and review prompts separately require source-faithful keyed
+  options and model answers. Fixed transient repair feedback requests a newly
+  supported task; no key is silently changed and no new category is persisted.
+- A separate presented-work policy rejects short-answer function repeats only
+  with the same parsed entity/context, exact complete answer and a shared full
+  sentence verified in actual material. Existing raw rubric-equivalence dedup
+  is unchanged. Extra asked tasks, changed context, missing anchors and math
+  remain separate. Differing metadata labels do not justify identical work.
+- All seven pair checks enforce the shared policy, including initial gates,
+  repair merges, pipeline accumulation and finalization. Both generator-pruned
+  and pipeline-pruned repeats feed the existing capped duplicateCount field.
+  An actual pipeline.advance regression covers both routes and continued repair.
+- Read-only reviewers cleared the bounded source/policy and integration fixes
+  after their counterexamples were addressed. Offline quality/HTTP/solver/
+  verifier/coverage/gold group **85/85** passes; source eligibility recheck
+  **3/3** passes after the final scoped change. Hosted acceptance is pending.
+- Permanent recovery compared all 51 surviving tracked old files with pushed
+  `6604ab4`: no differences. No old files were deleted. Staging counter after
+  saved grading: spent 2.965564, reserved 0.263628, available **0.149879 USD**
+  under unchanged cap 3.379071. Main/Production remains held for content
+  acceptance and the full branch release review; no schema/model/secret/
+  account/quota change.
+
 ## Grading score-contract recovery — 2026-10-30
 
 - The exact `6604ab4` staging journey delivered 12/12 in 165 seconds. It

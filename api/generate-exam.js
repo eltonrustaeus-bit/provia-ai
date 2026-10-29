@@ -1086,6 +1086,7 @@ function buildExamPrompts({ lang, level, course, qType, numQuestions, examQuesti
     "1) type får vara 'mc', 'short' eller 'graph' (INTE essä). graph används bara när frågetyp-valet är graph. " +
     "2) Om type=='mc': options ska ha exakt 3 alternativ och correct_index ska vara 0..2. " +
     "2b) Om frågetyp-valet är blandat och materialet inte ger stöd för två tydliga, rimliga och ämnesrelevanta distraktorer i samma kategori, välj short för den frågan i stället för att hitta på alternativ. Vid enbart flerval: avgränsa frågan till ett bättre underbyggt innehåll eller låt den falla på kvalitetsgranskningen. " +
+    "2c) Bevara källans hela subjekt, egenskaper, villkor och relationer i både korrekt alternativ och model_answer. En egenskap hos ett ämne är inte samma sak som ämnet självt; förkorta inte bort huvudordet i ett källutdrag. Kontrollera de två svarsfälten separat. " +
     "3) Om type=='short': options ska vara [] och correct_index ska vara -1. " +
     "3b) Om type=='graph': graph_spec ska följa det valda grafunderlaget: line använder kind='line', heltalen slope/intercept, tom points och tomma x_label/y_label; scatter använder kind='scatter', null slope/intercept och exakt tre källpunkter med axelrubriker från tabellen. options ska vara [] och correct_index ska vara -1. " +
     "3c) Alla andra frågetyper ska ha graph_spec=null. " +
@@ -1162,6 +1163,7 @@ function buildExamPrompts({ lang, level, course, qType, numQuestions, examQuesti
     "1) type may be 'mc', 'short' or 'graph' (NO essays). Use graph only when the selected question type is graph. " +
     "2) If type=='mc': options must have exactly 3 choices and correct_index must be 0..2. " +
     "2b) If the selected type is mixed and the material cannot support two clear, plausible, relevant distractors in the same category, use short answer for that item instead of inventing choices. For multiple-choice-only, narrow the question to better-supported material or let it fail quality review. " +
+    "2c) Preserve the complete source subject, properties, conditions and relations in both the correct option and model_answer. A property of a substance is not the substance itself; never remove the head noun when shortening a source excerpt. Check both answer fields separately. " +
     "3) If type=='short': options must be [] and correct_index must be -1. " +
     "3b) If type=='graph': graph_spec must match the selected source: line uses kind='line', integer slope/intercept, empty points and empty x_label/y_label; scatter uses kind='scatter', null slope/intercept and exactly three source points with axis labels from the table. options must be [] and correct_index must be -1. " +
     "3c) All other question types must have graph_spec=null. " +
@@ -1452,7 +1454,7 @@ const SAFE_REPAIR_SOLVER_FAILURE_CODES = new Set([
 ]);
 const SAFE_REPAIR_STRUCTURAL_SOURCE_CODES = new Set([
   "source_answer_not_extractable", "source_reference_missing",
-  "source_requirement_options_incomplete",
+  "source_requirement_options_incomplete", "source_quantity_subject_changed",
 ]);
 
 function structuralSourceFailureCounts(gate) {
@@ -1562,6 +1564,11 @@ function buildRepairPayload(payload, { lang, numQuestions, existingQuestions = [
     ? (lang === "en"
       ? "A broad requirement question split a source-supported combination across separate options. Replace it with a more precise task or a complete combination and plausible distractors; independently check uniqueness again. Do not merely change the answer key. "
       : "En bred fråga om förutsättningar delade upp en källstödd kombination i separata alternativ. Ersätt den med en mer precis fråga eller en fullständig kombination och rimliga distraktorer; kontrollera entydigheten på nytt. Byt inte bara facitnyckel. ")
+    : "";
+  const quantitySubjectGuidance = safeStructuralIssueCounts.source_quantity_subject_changed
+    ? (lang === "en"
+      ? "A candidate changed the subject of a source relation: a property of an object became the object itself. Preserve the complete subject, relation, destination and context in both the keyed option and model answer. Select a different supported task if necessary; do not merely change the key. "
+      : "En kandidat ändrade subjektet i ett källsamband: en egenskap hos ett föremål blev själva föremålet. Behåll hela subjektet, relationen, målet och sammanhanget i både rätt alternativ och modellsvar. Välj en annan källstödd uppgift om det behövs; byt inte bara facitindex. ")
     : "";
   const reviewFailureSummary = lang === "en"
     ? `Bounded review failure counts for the previous candidates (fixed categories only; not answer keys): ${JSON.stringify(safeReviewFailureCounts)}.`
@@ -1680,7 +1687,7 @@ function buildRepairPayload(payload, { lang, numQuestions, existingQuestions = [
     text: { ...payload.text, format: buildMockExamSchema(repairCount, qType) },
     input: [
       ...repairInput,
-      { role: "user", content: `${instruction}\n\n${structuralSourceGuidance}${requirementOptionsGuidance}${repairFactualAnswerInstruction} ${repairSourceReferenceInstruction}` },
+      { role: "user", content: `${instruction}\n\n${structuralSourceGuidance}${requirementOptionsGuidance}${quantitySubjectGuidance}${repairFactualAnswerInstruction} ${repairSourceReferenceInstruction}` },
     ],
   };
 }
@@ -2106,7 +2113,7 @@ module.exports = async function handler(req, res, internalContext = null) {
       });
     }
     let duplicateQuestionIds = gate.dropped
-      .filter((item) => item.issues.includes("duplicate_question"))
+      .filter((item) => item.issues.some(code => ["duplicate_question", "repeated_function_task"].includes(code)))
       .map((item) => item.id);
     if (["mix", "mixed"].includes(qType)) {
       const balanced = selectMixedQuestions(gate.questions, mixedTypeTargets(numQuestions));
@@ -2233,7 +2240,7 @@ module.exports = async function handler(req, res, internalContext = null) {
             for (const question of repairGate.questions) {
               const id = String(question.id);
               if (mixedTargets && (question.type !== "mc" && question.type !== "short" || typeCounts[question.type] >= mixedTargets[question.type])) continue;
-              if (keptIds.has(id) || kept.some((accepted) => assessment.isDuplicateQuestion(accepted, question))) {
+              if (keptIds.has(id) || kept.some((accepted) => assessment.questionPairConflict(accepted, question, { profile: subjectProfile, sourceMaterial: pastedText }))) {
                 repairDuplicateCount++;
                 continue;
               }
@@ -2435,7 +2442,7 @@ module.exports = async function handler(req, res, internalContext = null) {
           const round1ApprovedIds = new Set();
           for (const q of round1ApprovedCandidates) {
             const id = String(q.id);
-            if (round1ApprovedIds.has(id) || round1ApprovedQuestions.some((accepted) => assessment.isDuplicateQuestion(accepted, q))) continue;
+            if (round1ApprovedIds.has(id) || round1ApprovedQuestions.some((accepted) => assessment.questionPairConflict(accepted, q, { profile: subjectProfile, sourceMaterial: pastedText }))) continue;
             round1ApprovedIds.add(id);
             round1ApprovedQuestions.push(q);
           }
@@ -2596,7 +2603,7 @@ module.exports = async function handler(req, res, internalContext = null) {
                     const retryIds = new Set();
                     for (const q of kept) {
                       const id = String(q.id);
-                      if (retryIds.has(id) || retryUniqueQuestions.some((accepted) => assessment.isDuplicateQuestion(accepted, q))) {
+                      if (retryIds.has(id) || retryUniqueQuestions.some((accepted) => assessment.questionPairConflict(accepted, q, { profile: subjectProfile, sourceMaterial: pastedText }))) {
                         repairDuplicateCount++;
                         continue;
                       }
@@ -2619,7 +2626,7 @@ module.exports = async function handler(req, res, internalContext = null) {
                       for (const q of repairQuestions) {
                         let id = String(q.id);
                         if (combinedQuestions.length >= numQuestions) break;
-                        if (combinedQuestions.some((accepted) => assessment.isDuplicateQuestion(accepted, q))) {
+                        if (combinedQuestions.some((accepted) => assessment.questionPairConflict(accepted, q, { profile: subjectProfile, sourceMaterial: pastedText }))) {
                           repairCrossRoundDuplicateCount++;
                           continue;
                         }
@@ -3127,7 +3134,7 @@ module.exports.finalizeVerifiedExam = async function finalizeVerifiedExam({ user
   }
   const distinct = [];
   for (const question of finalGate.questions) {
-    if (distinct.some((accepted) => assessment.isDuplicateQuestion(accepted, question))) {
+    if (distinct.some((accepted) => assessment.questionPairConflict(accepted, question, { profile: subjectProfile, sourceMaterial: pastedText }))) {
       throw new Error("Duplicate question in verified exam");
     }
     distinct.push(question);
