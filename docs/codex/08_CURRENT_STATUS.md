@@ -1,5 +1,35 @@
 # 08 Current Status
 
+## Replay cleanup and two-part P.E.R teaching — 2026-10-30
+
+- `f78271e` is READY on the existing feature alias. The next synthetic job
+  `153b42a2-712d-4745-ae5d-11f5ee2ce3b7` delivered **12/12 in 83.17 seconds**,
+  charging 0.024540 USD to the conservative app counter. Source/candidates
+  were scrubbed after terminal success. Prior runs took 128 and 165 seconds;
+  this is a run-specific comparison, not an established average.
+- Manual review found another clear energy-input MC repetition (q2/q9) and
+  circular wording in q5. Independent content review agrees. The new function
+  policy is intentionally narrower than these cases; main remains held.
+  All answers are filled; this same exam will be finished, not replaced.
+- P.E.R kept facit hidden at q4, but its generic verb hint was insufficient for
+  the two-part contents/function task. A fixed scaffold now explicitly separates
+  those parts and guides the learner to connect two statements. It neither
+  echoes nor evaluates the draft's facts. Comparison, causal and calculation
+  precedence is preserved; unsigned questions cannot select the scaffold.
+- Full-branch read-only audit found no new auth, quota, issuance or dependency
+  blocker, but reproduced an inherited grade replay/practice cleanup race.
+  These success and rejection terminals now await confirmed release of the
+  exact held fence; two bounded attempts accept released/missing. Unknown
+  cleanup returns no result/proof. Memoized finally cleanup remains.
+- Offline: grading/recovery/scaffold group **12/12**; four selected real P.E.R
+  handler cases **4/4**; hosted pipeline migration/lease/quota/ACL regression
+  **29/29** in PGlite. Delayed release, unknown release and retry/missing tests
+  cover both replay and practice, including acquired/released fence equality.
+  Independent bounded review cleared the fixes after precedence corrections.
+- PR #125 is a draft for the feature branch. Main/Production is unchanged.
+  Fresh staging balance before final grading is **0.125339 USD**, reserved
+  0.263628, spent 2.990104, cap 3.379071. No budget/schema/model/account change.
+
 ## Source-subject and presented-task checks — 2026-10-30
 
 - Reviewed grading checkpoint `933c54f` is pushed and READY as

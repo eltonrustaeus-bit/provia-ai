@@ -3,6 +3,25 @@ import { createRequire } from "node:module";
 import test from "node:test";
 const { activeAttemptGuidance } = createRequire(import.meta.url)("../../api/_per-active-scaffold.cjs");
 
+test("contents-plus-function guidance separates the two asked parts without judging the draft", () => {
+  const question = "Vad innehåller cellkärnan och vilken funktion har detta i cellen?";
+  const a = activeAttemptGuidance({ question, type: "short", draft: "Cellkärnan innehåller ATP som ger cellen energi." });
+  const b = activeAttemptGuidance({ question, type: "short", draft: "Innehåll: DNA. Funktion: information vid proteintillverkning." });
+  assert.deepEqual(a, b, "the pedagogical scaffold neither validates nor repeats supplied facts");
+  assert.match(a[0], /två delar: innehåll och funktion/);
+  assert.match(a[1], /två korta rader/);
+  for (const rung of a) assert.doesNotMatch(rung, /ATP|DNA|proteiner|cellkärnan|ditt svar är (?:rätt|fel)/i);
+  assert.equal(activeAttemptGuidance({ question, type: "short", draft: "" }), null);
+  assert.equal(activeAttemptGuidance({ question: question + " Jämför med cytoplasman.", type: "short", draft: "Mitt försök" })[0].includes("två delar: innehåll"), false,
+    "additional asked comparison keeps its own teaching path");
+  for (const text of ["Vad innehåller cellkärnan och vilken funktion har detta i jämförelse med cytoplasman?",
+    "Vad innehåller cellkärnan och vilken funktion har detta i cellen och varför behövs det?"]) {
+    const guidance = activeAttemptGuidance({ question: text, type: "short", draft: "Mitt försök" });
+    assert.doesNotMatch(guidance[0], /två delar: innehåll/);
+    assert.match(guidance[0], /kolumner|orsakskopplingen/);
+  }
+});
+
 test("active teaching changes the next action when the attempt structure changes without judging answers", () => {
   const pairs = [
     { question: "Beräkna farten när sträckan är 60 m och tiden är 5 s.", type: "short", a: "12", b: "60 / 5 = 12 m/s", signal: /beräkningssteg/ },

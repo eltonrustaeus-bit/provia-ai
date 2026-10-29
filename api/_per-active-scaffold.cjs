@@ -104,6 +104,17 @@ function activeAttemptGuidance({ question = "", type, graphMode, draft = "", req
     "Pröva varje länk var för sig. Har du förklarat hur den leder vidare, eller bara satt händelserna i ordning?",
     "Läs förklaringen baklänges från följd till orsak och pröva den mot frågans villkor. Jag har inte bekräftat förklaringens fakta.",
   ];
+  const contentsAndFunction = /^(?:vad innehåller (?:(?:en|ett|den|det) )?[\p{L}-]+ och vilken funktion har (?:detta|det|dessa)(?: i (?:(?:en|ett|den|det) )?[\p{L}-]+)?[?.!]*|what does [\p{L} -]+ contain and what (?:is its|is their|are their) function[?.!]*)$/u.test(text.trim());
+  if (type === "short" && contentsAndFunction) return en ? [
+    "The question has two parts: contents and function. Separate what is found there from what it is used for; do not assume the substance named in your draft is correct.",
+    "Write two short lines: ‘Contents: …’ and ‘Function: …’. Connect the same thing across both lines, using the distinction the question asks for.",
+    "Check that your second line describes what the contents do, rather than repeating their name. Both facts still need your own check against the study material.",
+  ] : [
+    "Frågan har två delar: innehåll och funktion. Skilj på vad som finns där och vad det används till; utgå inte från att ämnet i ditt utkast är rätt.",
+    "Skriv två korta rader: ‘Innehåll: …’ och ‘Funktion: …’. Knyt ihop samma sak i båda raderna utifrån det frågan ber om.",
+    "Kontrollera att den andra raden beskriver vad innehållet gör, i stället för att upprepa dess namn. Faktauppgifterna behöver du fortfarande själv pröva mot materialet.",
+  ];
+
   if (type === "mc") {
     const hasReason = /\b(?:jag (?:valde|väljer|tror|tänker)|i (?:chose|choose|think))\b[\s\S]{1,160}\b(?:eftersom|därför|för att|because)\b/iu.test(String(request).slice(0, 300));
     if (Array.isArray(taskSequence) && taskSequence.length === 3) {

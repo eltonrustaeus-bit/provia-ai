@@ -28,6 +28,7 @@ let mockResultVerified = true;
 let savedCanonicalResult = null;
 let savedFingerprint = null;
 let replayFails = false;
+let releaseHook = null;
 
 process.env.SUPABASE_URL = origin;
 process.env.SUPABASE_SERVICE_ROLE_KEY = "local-only-service-role";
@@ -48,7 +49,7 @@ globalThis.fetch = async (input, init = {}) => {
     if (leaseOutcomeOverride) return Response.json(leaseOutcomeOverride);
     return Response.json(activeExamCount > 0 ? "exam_active" : "acquired");
   }
-  if (url === `${origin}/rest/v1/rpc/release_per_answer_lease`) return Response.json("released");
+  if (url === `${origin}/rest/v1/rpc/release_per_answer_lease`) return releaseHook ? releaseHook() : Response.json("released");
   if (url.startsWith(`${origin}/rest/v1/exam_latest_issuances?`)) return Response.json([]);
   if (url === `${origin}/rest/v1/rpc/claim_exam_grading`) {
     const fingerprint = JSON.parse(init.body).p_answer_fingerprint;
@@ -109,6 +110,45 @@ function invoke(body) {
     };
     grade(req, res);
   });
+}
+
+async function checkTerminalLease(request, expectedStatus = 200) {
+  let unblock, started;
+  const releasing = new Promise(resolve => { started = resolve; });
+  releaseHook = () => { started(); return new Promise(resolve => { unblock = () => resolve(Response.json("released")); }); };
+  let ended = false;
+  const pending = invoke(request).then(result => { ended = true; return result; });
+  await releasing;
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(ended, false, "the real HTTP terminal waits for the held lease release");
+  unblock();
+  assert.equal((await pending).status, expectedStatus);
+  releaseHook = null;
+  if (expectedStatus !== 200) return;
+  calls.length = 0;
+  releaseHook = () => new Response(null, { status: 503 });
+  const unknown = await invoke(request);
+  assert.equal(unknown.status, 503);
+  assert.equal(unknown.body.result, undefined);
+  assert.equal(unknown.body.exam_proof, undefined);
+  const fences = calls.filter(call => call.url.endsWith("/rpc/release_per_answer_lease")).map(call => call.body);
+  assert.equal(fences.length, 2);
+  assert.equal(fences[0], fences[1], "both bounded release attempts use the exact same owner and fence");
+  const acquired = JSON.parse(calls.find(call => call.url.endsWith("/rpc/acquire_per_answer_lease")).body);
+  assert.equal(JSON.parse(fences[0]).p_lease_id, acquired.p_lease_id);
+  assert.equal(JSON.parse(fences[0]).p_user_id, acquired.p_user_id);
+  const retryStart = calls.length;
+  let attempt = 0;
+  releaseHook = () => ++attempt === 1 ? new Response(null, { status: 503 }) : Response.json("missing");
+  assert.equal((await invoke(request)).status, 200, "lost release acknowledgement recovers through the same fence");
+  const retryCalls = calls.slice(retryStart);
+  const retryAcquired = JSON.parse(retryCalls.find(call => call.url.endsWith("/rpc/acquire_per_answer_lease")).body);
+  const retryFences = retryCalls.filter(call => call.url.endsWith("/rpc/release_per_answer_lease")).map(call => JSON.parse(call.body));
+  assert.equal(retryFences.length, 2);
+  assert.deepEqual(retryFences[0], retryFences[1]);
+  assert.equal(retryFences[0].p_lease_id, retryAcquired.p_lease_id);
+  assert.equal(retryFences[0].p_user_id, retryAcquired.p_user_id);
+  releaseHook = null;
 }
 
 try {
@@ -396,6 +436,16 @@ try {
   assert.equal(recovered.status, 200, "a lost response can be recovered from the saved canonical result");
   assert.equal(recovered.body.recovered, true);
   assert.deepEqual(recovered.body.result, official.body.result);
+  const replayCalls = [...calls];
+  await checkTerminalLease(officialRequest);
+  await checkTerminalLease({ lang: "sv", course, pastedText: material, mode: "graph_practice_retry", examProof,
+    questions: [publicQuestion], answers: examProof.answers });
+  mockResultVerified = false;
+  await checkTerminalLease(officialRequest, 403);
+  await checkTerminalLease({ lang: "sv", course, pastedText: material, mode: "graph_practice_retry", examProof,
+    questions: [publicQuestion], answers: examProof.answers }, 403);
+  mockResultVerified = true;
+  calls.splice(0, calls.length, ...replayCalls);
 
   mockResultVerified = false;
   const unverifiedRecovery = await invoke(officialRequest);

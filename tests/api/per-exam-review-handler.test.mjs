@@ -2543,6 +2543,27 @@ test("signed active attempts receive different next actions while unverified att
   } finally { activeCount = 0; }
 });
 
+test("signed contents-and-function tasks get two-part teaching at every active rung without provider work", async () => {
+  activeCount = 1; calls.length = 0;
+  try {
+    const context = createActiveQuestionContext({ id: "contents-function", type: "short",
+      text: "Vad innehåller cellkärnan och vilken funktion har detta i cellen?",
+      answer: "Cellkärnan innehåller ATP som ger cellen energi." });
+    const expected = [/två delar: innehåll och funktion/, /två korta rader/, /den andra raden/];
+    for (const helpLevel of [0, 1, 2]) {
+      const response = await invoke({ helpLevel, userQuestion: "Hur kan jag tänka vidare?", pageContext: context });
+      assert.equal(response.statusCode, 200);
+      assert.equal(response.body.helpCap, 2);
+      assert.match(response.body.answer, expected[helpLevel]);
+      assert.doesNotMatch(response.body.answer, /ATP|DNA|proteiner|ditt svar är (?:rätt|fel)/i);
+    }
+    delete context.currentQuestion.questionProof;
+    const unsigned = await invoke({ helpLevel: 0, userQuestion: "Hjälp mig", pageContext: context });
+    assert.doesNotMatch(unsigned.body.answer, /två delar: innehåll och funktion/);
+    assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("reserve_per_chat_quota")));
+  } finally { activeCount = 0; }
+});
+
 test("a selected MC answer keeps task-specific steps and a drafted unknown graph stays neutral", async () => {
   activeCount = 1; calls.length = 0;
   try {

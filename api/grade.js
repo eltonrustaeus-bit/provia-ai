@@ -71,6 +71,29 @@ function answerLeaseFailure(outcome, graphPractice = false) {
   return { status: 503, error: "EXAM_STATE_UNAVAILABLE" };
 }
 
+async function finishPostExamLease(userId, lease) {
+  if (!lease?.leaseId) return true;
+  if (!lease.releasePromise) lease.releasePromise = (async () => {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      let outcome = null;
+      try { outcome = await examIssuance.releasePerAnswerLease(userId, lease.leaseId); } catch {}
+      if (outcome === "released" || outcome === "missing") {
+        lease.leaseId = null;
+        return true;
+      }
+    }
+    return false;
+  })();
+  return lease.releasePromise;
+}
+
+async function jsonAfterPostExamLease(res, status, body, userId, lease) {
+  if (!(await finishPostExamLease(userId, lease))) {
+    return json(res, 503, { ok: false, error: "EXAM_STATE_UNAVAILABLE" });
+  }
+  return json(res, status, body);
+}
+
 function clamp(n, min, max) {
   const x = Number(n);
   if (!Number.isFinite(x)) return min;
@@ -505,6 +528,7 @@ module.exports = async function handler(req, res) {
     const level = safeString(p.level, 10) || history[history.length - 1]?.level || "C";
 
     let claimed = null;
+    let postExamLease = null;
     async function fail(status, payload) {
       if (claimed) {
         const released = await examIssuance.releaseExamGrading(user.id, claimed.id, claimed.fingerprint, claimed.claimId);
@@ -513,7 +537,7 @@ module.exports = async function handler(req, res) {
         if (released === "fenced") return json(res, 409, { ok: false, error: "EXAM_GRADING_SUPERSEDED" });
         if (released !== "released") return json(res, 503, { ok: false, error: "EXAM_STATE_UNAVAILABLE" });
       }
-      return json(res, status, payload);
+      return jsonAfterPostExamLease(res, status, payload, user.id, postExamLease);
     }
 
     function failProvider(stage, category, error, message, upstreamStatus) {
@@ -540,38 +564,38 @@ module.exports = async function handler(req, res) {
           const failure = answerLeaseFailure(lease.outcome);
           return json(res, failure.status, { ok: false, error: failure.error });
         }
+        const reply = (status, body) => jsonAfterPostExamLease(res, status, body, user.id, lease);
         try {
           const recoveryClient = await supabaseClient();
-          if (!recoveryClient) return json(res, 503, { ok: false, error: "EXAM_STATE_UNAVAILABLE" });
+          if (!recoveryClient) return await reply(503, { ok: false, error: "EXAM_STATE_UNAVAILABLE" });
           const { data: savedResult, error: savedResultError } = await recoveryClient.from("mock_results")
             .select("verified_at")
             .eq("user_id", user.id)
             .eq("submission_id", submissionId)
             .maybeSingle();
-          if (savedResultError) return json(res, 503, { ok: false, error: "EXAM_STATE_UNAVAILABLE" });
-          if (!savedResult?.verified_at) return json(res, 403, { ok: false, error: "EXAM_RESULT_NOT_VERIFIED" });
+          if (savedResultError) return await reply(503, { ok: false, error: "EXAM_STATE_UNAVAILABLE" });
+          if (!savedResult?.verified_at) return await reply(403, { ok: false, error: "EXAM_RESULT_NOT_VERIFIED" });
           const recovered = await examIssuance.recoverExamResult(user.id, submissionId, fingerprint);
-          if (!recovered) return json(res, 503, { ok: false, error: "EXAM_STATE_UNAVAILABLE" });
-          if (recovered.status === "expired") return json(res, 410, { ok: false, error: "EXAM_RESULT_EXPIRED" });
+          if (!recovered) return await reply(503, { ok: false, error: "EXAM_STATE_UNAVAILABLE" });
+          if (recovered.status === "expired") return await reply(410, { ok: false, error: "EXAM_RESULT_EXPIRED" });
           const resultIds = recovered.result.per_question.map((item) => String(item?.id || ""));
           if (resultIds.length !== questions.length || resultIds.some((id, index) => id !== questions[index].id)) {
-            return json(res, 503, { ok: false, error: "EXAM_RESULT_INVALID" });
+            return await reply(503, { ok: false, error: "EXAM_RESULT_INVALID" });
           }
           await examIssuance.replayLearningJob(user.id, submissionId);
-          return json(res, 200, {
+          return await reply(200, {
             ok: true, recovered: true, result: recovered.result,
             exam_proof: examCompletion.issueCompletion(user.id, course, submittedQuestions),
             persistence: { mock_result_saved: true },
           });
         } finally {
-          await examIssuance.releasePerAnswerLease(user.id, lease.leaseId);
+          await finishPostExamLease(user.id, lease);
         }
       }
       if (claim !== "claimed") return json(res, 409, { ok: false, error: "EXAM_NOT_ACTIVE" });
       claimed = { id: submissionId, fingerprint, claimId };
     }
 
-    let postExamLeaseId = null;
     try {
     const quotaClient = await supabaseClient();
     if (!quotaClient) return fail(503, { ok: false, error: "Grading is temporarily unavailable" });
@@ -581,7 +605,7 @@ module.exports = async function handler(req, res) {
         const failure = answerLeaseFailure(lease.outcome, true);
         return fail(failure.status, { ok: false, error: failure.error });
       }
-      postExamLeaseId = lease.leaseId;
+      postExamLease = lease;
       try {
         const { data, error } = await quotaClient.from("mock_results")
           .select("submission_id,num_questions,verified_at")
@@ -619,6 +643,9 @@ module.exports = async function handler(req, res) {
       // Practice retries never alter the official result, mistake bank, mastery,
       // or saved exam history. The correct equation stays hidden until the UI
       // explicitly offers the full-score answer after an attempt.
+      if (!(await finishPostExamLease(user.id, postExamLease))) {
+        return fail(503, { ok: false, error: "EXAM_STATE_UNAVAILABLE" });
+      }
       return json(res, 200, {
         ok: true,
         practice: true,
@@ -1127,7 +1154,7 @@ module.exports = async function handler(req, res) {
       }));
       return fail(500, { ok: false, error: "grading_failed", message: lang === "sv" ? "Rättningen kunde inte slutföras. Försök igen." : "Grading could not be completed. Please try again." });
     } finally {
-      if (postExamLeaseId) await examIssuance.releasePerAnswerLease(user.id, postExamLeaseId);
+      await finishPostExamLease(user.id, postExamLease);
     }
   });
 };
