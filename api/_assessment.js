@@ -305,6 +305,18 @@ function generalQualityIssues(q, options) {
   if (!q || typeof q !== "object") return ["not_an_object"];
   if (!String(q.question || "").trim()) issues.push("empty_prompt");
   if (!(Number(q.points) > 0)) issues.push("nonpositive_points");
+  if (options?.outputLanguage === "sv") {
+    // A closed set of unambiguous noun genders catches common MC agreement
+    // defects. Unknown vocabulary stays with the independent language review.
+    const match = String(q.question || "").match(/^(vilken|vilket) av följande ([\p{L}]+)(?![\p{L}\p{N}_\p{Pd}])/iu);
+    if (match) {
+      const common = new Set("gaser atomer molekyler processer reaktioner metoder celler funktioner linjer grafer ekvationer".split(" "));
+      const neuter = new Set("ämnen alternativ påståenden tal uttryck begrepp organ proteiner".split(" "));
+      const noun = match[2].toLocaleLowerCase("sv-SE");
+      const expected = common.has(noun) ? "vilken" : neuter.has(noun) ? "vilket" : null;
+      if (expected && match[1].toLocaleLowerCase("sv-SE") !== expected) issues.push("language_quality");
+    }
+  }
 
   const cogLevel = String(q.cognitive_level || "").trim().toLowerCase();
   if (!cogLevel) issues.push("cognitive_level_missing");
@@ -608,6 +620,7 @@ const BLOCKING = new Set([
   "empty_option", "duplicate_options", "answer_key_out_of_range",
   "source_reference_missing", "requested_type_mismatch",
   "source_answer_not_extractable",
+  "language_quality",
   "open_question_ungradeable", "leaked_instructions", "corrupted_option_text", "math_options_numerically_equal", "math_option_type_mismatch",
   "unsupported_single_word_option_outlier",
   "cognitive_level_missing", "scoring_rubric_missing_for_open", "scoring_rubric_points_mismatch", "law_deprecated_terminology",
@@ -807,7 +820,7 @@ function explicitScoringScope(question) {
     const text = factualText(value);
     const prefix = text.match(/^(ange|beskriv|förklara|state|describe|explain) (?:att |that )(.+)$/u);
     const fact = prefix ? prefix[2] : text;
-    if (fact.split(" ").length < 4 || !/\b(?:använder|används|bildar|bildas|omvandlar|omvandlas|förändrar|förändra|påverkar|bygger|uses?|produces?|converts?|changes?|builds?)\b/u.test(fact)) return null;
+    if (fact.split(" ").length < 4 || !/\b(?:använder|används|bildar|bildas|omvandlar|omvandlas|förändrar|förändra|påverkar|bygger|fångar|absorberar|binder|uses?|produces?|converts?|changes?|builds?)\b/u.test(fact)) return null;
     const action = prefix ? prefix[1] : "state";
     const requirement = { action, fact };
     if (!requirements.some((entry) => entry.action === action && entry.fact === fact)) requirements.push(requirement);
@@ -820,6 +833,22 @@ function factualDirections(text) {
   if (/\b(?:använder|används|reaktanter|ingångsämnen|uses?|inputs?|reactants?)\b/u.test(text)) directions.push("input");
   if (/\b(?:bildar|bildas|producerar|produceras|produkter|produces?|outputs?|products?)\b/u.test(text)) directions.push("output");
   return directions;
+}
+
+function objectTask(question) {
+  const text = factualText(question?.question);
+  const match = text.match(/^vad (fångar|absorberar|binder) ([\p{L}-]+)(?: upp)?(?: i ([\p{L}-]+))?$/u);
+  if (!match || match[2] !== semanticConceptTag(question)) return null;
+  return { action: match[1], entity: match[2], context: match[3] || "" };
+}
+
+function optionSuppliesWholeObjectFact(question, option, fact) {
+  const task = objectTask(question);
+  if (!task) return false;
+  const reconstructed = `${task.entity} ${task.action} ${factualText(option)}`;
+  // A one-word choice can complete the object's whole fact, but cannot inherit
+  // a downstream purpose, condition or second fact from the model answer.
+  return factualText(fact).replace(/\bfångar upp\b/u, "fångar") === reconstructed;
 }
 
 function missingMcAssessesOnlyFact(question, fact) {
@@ -841,6 +870,14 @@ function missingMcAssessesOnlyFact(question, fact) {
     const terms = semanticQuestionTokens({ question: option });
     return [...factTokens].filter(token => terms.has(token)).length >= minimumOverlap;
   });
+  if (!covered[correct] && optionSuppliesWholeObjectFact(question, options[correct], fact)) {
+    const selectedTerms = semanticQuestionTokens({ question: options[correct] });
+    const optionsContainingAnswer = options.filter(option => {
+      const terms = semanticQuestionTokens({ question: option });
+      return selectedTerms.size > 0 && [...selectedTerms].every(token => terms.has(token));
+    });
+    return optionsContainingAnswer.length === 1;
+  }
   // If two options share the known fact, distinguishing them tests something
   // beyond that fact. An absent MC rubric cannot erase that extra skill.
   return covered[correct] && covered.filter(Boolean).length === 1;
@@ -910,7 +947,10 @@ function compareAnchoredScoredFacts(left, right) {
     [left, right].every((question) => !temperatureCondition(question) ||
       leftScope.facts.every((fact) => temperatureCondition({ question: fact }) === temperatureCondition(question)));
   const sameFunctionTask = repeatsAnchoredFunctionTask(left, right);
-  if (!sameInputTask && !sameTemperatureTask && !sameFunctionTask) return missingMcRubric ? "conflict" : "unknown";
+  const leftObject = objectTask(left);
+  const rightObject = objectTask(right);
+  const sameObjectTask = leftObject && rightObject && JSON.stringify(leftObject) === JSON.stringify(rightObject);
+  if (!sameInputTask && !sameTemperatureTask && !sameFunctionTask && !sameObjectTask) return missingMcRubric ? "conflict" : "unknown";
   const segmenter = new Intl.Segmenter("sv", { granularity: "sentence" });
   const sentences = (question) => (Array.isArray(question.source_references) ? question.source_references : [])
     .flatMap((quote) => [...segmenter.segment(String(quote).replace(/\s+/gu, " ").trim())]
@@ -929,9 +969,20 @@ function functionTaskSignature(question) {
   const text = String(question?.question || "").normalize("NFKC").toLowerCase()
     .replace(/[?.!]+$/u, "").replace(/\s+/gu, " ").trim();
   const action = text.match(/^vad gör (.+?)(?: i (.+))?$/u);
-  const functionName = text.match(/^vad är (.+?)(?::s|s) (?:främsta |huvudsakliga )?funktion(?: i (.+))?$/u);
-  const match = action || functionName;
-  return match ? JSON.stringify([match[1], match[2] || ""]) : "";
+  const functionName = text.match(/^vad är (.+?)(?::s|s) (?:främsta |huvudsakliga )?(?:funktion|roll)(?: i (.+))?$/u);
+  const role = text.match(/^vad är rollen (?:av|hos) (.+?)(?: i (.+))?$/u) ||
+    text.match(/^vilken (?:funktion|roll) har (.+?)(?: i (.+))?$/u);
+  const match = action || functionName || role;
+  if (!match || /\b(?:och|samt|and|inte|varför|hur|när|vid|under)\b/u.test(`${match[1]} ${match[2] || ""}`)) return "";
+  const concept = semanticConceptTag(question);
+  const entity = match[1].trim();
+  // Normalize only inflections of this tagged entity and generic cell context.
+  // Plant/animal cells, locations and additional modifiers stay distinct.
+  const entityForms = [concept, concept + "na", concept + "nas", concept + "s"];
+  const target = entityForms.includes(entity) ? concept : entity;
+  const rawContext = (match[2] || "").trim();
+  const context = /^(?:en cell|cellen|celler|cellerna|cell)$/u.test(rawContext) ? "cell" : rawContext;
+  return JSON.stringify([target, context]);
 }
 
 function repeatsAnchoredFunctionTask(left, right) {

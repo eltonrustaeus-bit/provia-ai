@@ -2083,6 +2083,7 @@ module.exports = async function handler(req, res, internalContext = null) {
     // ── STRUCTURAL GATE (subject-agnostic, deterministic) ─────────────────
     let gate = assessment.gateExam(exam, {
       profile: subjectProfile,
+      outputLanguage: lang,
       requireSourceReferences: true,
       requireExtractiveAnswers: subjectProfile === "natural_sciences",
       reviewSingleWordOptionOutliers: lang === "sv",
@@ -2208,6 +2209,7 @@ module.exports = async function handler(req, res, internalContext = null) {
           if (normalized?.exam) {
             const repairGate = assessment.gateExam(normalized.exam, {
               profile: subjectProfile,
+              outputLanguage: lang,
               requireSourceReferences: true,
               requireExtractiveAnswers: subjectProfile === "natural_sciences",
               reviewSingleWordOptionOutliers: lang === "sv",
@@ -2493,6 +2495,7 @@ module.exports = async function handler(req, res, internalContext = null) {
               if (normalized2?.exam) {
                 const candidateGate = assessment.gateExam(normalized2.exam, {
                   profile: subjectProfile,
+                  outputLanguage: lang,
                   requireSourceReferences: true,
                   requireExtractiveAnswers: subjectProfile === "natural_sciences",
                   reviewSingleWordOptionOutliers: lang === "sv",
@@ -3105,6 +3108,7 @@ module.exports.finalizeVerifiedExam = async function finalizeVerifiedExam({ user
   const subjectProfile = assessment.detectSubjectProfile(course, pastedText);
   const finalGate = assessment.gateExam({ questions }, {
     profile: subjectProfile,
+    outputLanguage: lang,
     requireSourceReferences: true,
     requireExtractiveAnswers: subjectProfile === "natural_sciences",
     reviewSingleWordOptionOutliers: lang === "sv",

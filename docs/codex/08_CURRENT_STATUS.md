@@ -1,5 +1,66 @@
 # 08 Current Status
 
+## Completed comparison journey and targeted follow-up — 2026-10-29
+
+- Exact Preview `c1e5b6163e649e0e5d9cd7f1f14c45d87c73a04b`
+  (`dpl_546Ru4N21vYLurxnGKGSVrXaq6MX`) completed one synthetic Biologi 1
+  journey on the same stable origin/account/tab. Job
+  `ce32777c-b8fc-4996-a38f-2a2769273b83` delivered **12/12 in 295 seconds**;
+  terminal payload and accepted candidates were scrubbed. It used 42 provider
+  stages versus 29 in the prior approximately 308-second run. This is not proof
+  of a speed or efficiency improvement. The budget counter charged 0.106373 USD
+  for generation; it is a conservative app counter, not an invoice.
+- All twelve questions were answered and the result was saved/verified at
+  **13/15 (87%)**. The deliberately incorrect ribosome/DNA answer received 0/2.
+  P.E.R used the selected seventh question and choice, provided two fixed
+  pedagogical steps without confirming correctness, then explained the actual
+  saved second-question mistake, score and next-time strategy after grading.
+  The improvement coach used course-linked saved focus; no extra exam was made.
+- Manual inspection still found repeated ribosome/chlorophyll targets and
+  "Vilket av följande gaser". The private scoring rubrics are encrypted and are
+  not reconstructed from the public stems. New bounded regression scopes are
+  explicitly synthetic; do not claim every live overlap is now a proven duplicate.
+- A local source-coverage fix recognizes **12 numbered prose blocks instead of
+  zero** in that exact synthetic source. Excerpts remain literal. Existing heading
+  handling, ambiguous-list abstention, citation uniqueness, advisory coverage
+  and mistake-training priority remain. A stale mock in the coverage test now
+  supplies the source evidence required by the existing focus matcher.
+- Bounded deduplication now understands role/function wording and generic cell
+  inflections. A one-word object choice only inherits a scope when stem plus
+  option reconstruct the entire explicit scored fact; purpose/condition clauses,
+  unknown extra requirements and shared-answer distractors remain distinct.
+  A Swedish-only closed noun-gender check rejects obvious MC agreement defects
+  before review/signing; compound continuations and unknown vocabulary abstain.
+- The first coach request exposed a real response/lease race: postgrade JSON
+  could finish before fenced release, and the next call returned busy until TTL.
+  Read-only review reproduced it with a delayed release. The local completion
+  path now awaits the exact lease release before JSON/end, retries an unknown
+  outcome twice using the same fence, and retains final cleanup. SSE completion
+  follows correction, persistence and release; its final history cannot replace
+  a correction with the earlier answer. Release-failure paths do not report success.
+  The streamed primary turn is only committed after deadline/review checks;
+  a late retry cannot reappear as a finished answer through a later history GET.
+- Final-done ordering also required a client correction: a safe unavailable
+  notice now updates the answer even before commitment. The browser fixture
+  reproduces `delta → safe notice → done` and checks visible and cached text.
+  Streaming work has a request deadline; optional review is bounded by remaining
+  time reserved for persistence/release. Late primary output returns a retry
+  error rather than starting another long review or falsely reporting success.
+  This does not guarantee completion through arbitrary database/network stalls.
+- Offline follow-up: quality/pipeline/HTTP/coverage/gold **64/64**; handler checks
+  after the lease fix **84/84**; latest P.E.R stream/deadline checks **20/20**;
+  browser session/safe-notice recovery **1/1**. Read-only reviewers cleared the
+  parser and bounded assessment corrections; the response-completion follow-up
+  review is pending. This follow-up is not yet live-verified or cleared for main.
+- Fresh staging counter after the completed generation, grading, explanation
+  and coaching: spent **2.855738 USD**, reserved **0.263628 USD**, available
+  **0.259705 USD** under the unchanged **3.379071 USD** cap. Old reservations
+  were left untouched; no additional live exam has started.
+- Main/Production still needs the goal's release gates: final independent
+  completion review, relevant regression results, exact READY Preview and a
+  fresh critical student journey within the unchanged remaining budget. No
+  new model, schema, secret, account or quota change was made.
+
 ## Active-attempt pedagogy and course-linked coaching — 2026-10-29
 
 - Continuation starts from clean `13cd067`; XelioV context and role cards were
@@ -39,8 +100,8 @@
   12-question usage was 128926 input / 18328 output tokens across 29 stages,
   about **0.060672 USD** under the app's conservative counter (not an invoice).
   Thus the prior blanket "insufficient" budget assessment was too categorical.
-  One complete comparison journey can be attempted under the unchanged hard
-  cap after the new Preview is READY. No paid call has yet run on this checkpoint.
+  This was the preflight for the completed comparison journey recorded above;
+  it did not authorize a cap increase.
 
 ## Scored-fact diversity checkpoint — 2026-10-28
 

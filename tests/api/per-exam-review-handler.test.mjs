@@ -104,6 +104,7 @@ let quotaMode = "ok";
 let verifiedCoachRowsByUser = null;
 let perSessionMessages = [{ role: "assistant", content: "VERIFIED_HISTORY_SENTINEL" }];
 let memoryEpochEnabled = false;
+let releaseLeaseHook = null;
 globalThis.fetch = async (input, init = {}) => {
   const url = typeof input === "string" ? input : input.url;
   calls.push({ url, body: init.body || "" });
@@ -126,7 +127,8 @@ globalThis.fetch = async (input, init = {}) => {
     }
     return Response.json(answerLeaseState);
   }
-  if (url.includes("/rest/v1/rpc/release_per_answer_lease")) return Response.json("released");
+  if (url.includes("/rest/v1/rpc/release_per_answer_lease")) return releaseLeaseHook
+    ? releaseLeaseHook(JSON.parse(init.body || "{}")) : Response.json("released");
   if (url.includes("/rest/v1/rpc/recover_graded_exam_result")) {
     if (reviewResultUnavailable) return Response.json({ error: "synthetic unavailable" }, { status: 503 });
     const payload = JSON.parse(init.body || "{}");
@@ -3506,6 +3508,74 @@ test("a verified post-grade explanation holds and releases its answer lease", as
   const providerIndex = calls.findIndex(({ url }) => url === "https://api.openai.com/v1/responses");
   const releaseIndex = calls.findIndex(({ url }) => url.includes("release_per_answer_lease"));
   assert.ok(acquireIndex >= 0 && providerIndex > acquireIndex && releaseIndex > providerIndex);
+});
+
+test("leased responses wait for fenced release before postgrade, history, cache and failure terminals", async () => {
+  for (const sample of [
+    { body: { examReview: true, examProof: proof }, method: "POST" },
+    { body: {}, method: "GET" },
+    { body: { topic: "studiecoach", coachCacheCheck: true }, method: "POST" },
+    { body: { examReview: true, examProof: proof }, method: "POST", providerFailure: true },
+  ]) {
+    calls.length = 0;
+    activeCount = 0;
+    latestSubmissionId = null;
+    answerLeaseState = "acquired";
+    providerUnavailable = sample.providerFailure === true;
+    let releaseEntered;
+    const entered = new Promise(resolve => { releaseEntered = resolve; });
+    let allowRelease;
+    const gate = new Promise(resolve => { allowRelease = resolve; });
+    let releasedId;
+    releaseLeaseHook = async payload => {
+      releasedId = payload.p_lease_id;
+      answerLeaseState = "busy";
+      releaseEntered();
+      await gate;
+      answerLeaseState = "acquired";
+      return Response.json("released");
+    };
+    const res = { statusCode: 200, headers: {}, status(code) { this.statusCode = code; return this; },
+      setHeader(name, value) { this.headers[name] = value; }, json(value) { this.body = value; return this; } };
+    const pending = handler({ method: sample.method, headers: { authorization: "Bearer synthetic-user-token", accept: "application/json" }, body: sample.body }, res);
+    try {
+      await entered;
+      assert.equal(res.body, undefined, "a successful/error HTTP terminal cannot precede fenced cleanup");
+      const busy = await invoke({ topic: "studiecoach", coachCacheCheck: true }, "POST", "application/json");
+      assert.equal(busy.statusCode, 409, "another request stays fenced while cleanup is pending");
+      const acquired = calls.find(({ url }) => url.includes("acquire_per_answer_lease"));
+      assert.equal(releasedId, JSON.parse(acquired.body).p_lease_id);
+      allowRelease();
+      await pending;
+      assert.ok(res.body);
+      assert.equal(res.statusCode, sample.providerFailure ? 502 : 200);
+      releaseLeaseHook = null;
+      const next = await invoke({ topic: "studiecoach", coachCacheCheck: true }, "POST", "application/json");
+      assert.equal(next.statusCode, 200, "the next coach request works immediately at the terminal boundary");
+    } finally {
+      allowRelease();
+      await pending;
+      releaseLeaseHook = null;
+      answerLeaseState = "acquired";
+      providerUnavailable = false;
+    }
+  }
+});
+
+test("unknown lease release retries the same fence twice and does not report success", async () => {
+  calls.length = 0;
+  activeCount = 0;
+  latestSubmissionId = null;
+  releaseLeaseHook = () => Response.json({ error: "synthetic release unavailable" }, { status: 503 });
+  try {
+    const res = await invoke({}, "GET", "application/json");
+    assert.equal(res.statusCode, 503);
+    assert.equal(res.body.code, "PER_COMPLETION_UNAVAILABLE");
+    assert.equal(res.body.history, undefined);
+    const releases = calls.filter(({ url }) => url.includes("release_per_answer_lease"));
+    assert.equal(releases.length, 2);
+    assert.equal(releases[0].body, releases[1].body, "fallback cleanup cannot release a subsequent request's fence");
+  } finally { releaseLeaseHook = null; }
 });
 
 test("an exam issued during post-grade review is caught by the atomic answer lease", async () => {

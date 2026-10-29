@@ -506,12 +506,12 @@ function recordHelpPreference(supabase, userId, level, epoch) {
 
    Fel sväljs och ger ingen rättelse. En trasig granskning får aldrig göra
    eleven sämre ställd än om den aldrig körts. */
-async function granskaSvar({ fråga, svar, helpLevel, isMath, läroplan, userId }) {
+async function granskaSvar({ fråga, svar, helpLevel, isMath, läroplan, userId, timeout = 20_000 }) {
   try {
     if (!needsReview(fråga, svar, { helpLevel, isMath })) return null;
     const rå = await callMeasuredPerAI(
       [{ role: "system", content: buildReviewPrompt({ fråga, svar, helpLevel, läroplan }) }],
-      { schema: REVIEW_SCHEMA, timeout: 20_000 }, { userId, step: "validate" },
+      { schema: REVIEW_SCHEMA, timeout }, { userId, step: "validate" },
     );
     const r = parseReview(rå);
     // Mät att granskaren körde, oavsett utfall — annars går det inte att se
@@ -1306,6 +1306,47 @@ async function acquirePerAnswerLease(user, lease) {
   return latestState === null ? null : "ungraded_exam";
 }
 
+async function finishPerAnswerLease(lease) {
+  if (!lease.userId || !lease.leaseId) return true;
+  if (!lease.releasePromise) lease.releasePromise = (async () => {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      let outcome = null;
+      try { outcome = await examIssuance.releasePerAnswerLease(lease.userId, lease.leaseId); } catch {}
+      if (outcome === "released" || outcome === "missing") {
+        lease.userId = null;
+        lease.leaseId = null;
+        return true;
+      }
+    }
+    return false;
+  })();
+  return lease.releasePromise;
+}
+
+// Vercel may stop work after the terminal response. Every leased JSON/SSE
+// terminal awaits fenced cleanup; a failed release must not claim completion.
+function perCompletionResponse(res, lease) {
+  let wrapped;
+  const releaseFailure = () => {
+    const error = "P.E.R kunde inte avsluta förfrågan säkert. Vänta en stund och försök igen.";
+    if (res.headersSent) {
+      res.write(`data: ${JSON.stringify({ error })}\n\n`);
+      return res.end();
+    }
+    return res.status(503).json({ error, code: "PER_COMPLETION_UNAVAILABLE" });
+  };
+  wrapped = new Proxy(res, { get(target, key) {
+    if (key === "status") return code => { target.status(code); return wrapped; };
+    if (key === "json" || key === "end") return async (...args) => {
+      if (!(await finishPerAnswerLease(lease))) return releaseFailure();
+      return target[key](...args);
+    };
+    const value = Reflect.get(target, key, target);
+    return typeof value === "function" ? value.bind(target) : value;
+  } });
+  return wrapped;
+}
+
 function rejectLeaseOutcome(req, res, body, outcome, { history = false, lease = null } = {}) {
   if (outcome === "exam_active") {
     if (history) return res.status(409).json({ error: "EXAM_ACTIVE" });
@@ -1811,9 +1852,11 @@ async function handleExplainRequest(req, res, perAnswerLease) {
       });
       const streamStartedAt = Date.now();
       try {
+        const primaryTimeout = Math.min(40_000, perAnswerLease.deadlineAt - Date.now() - 12_000);
+        if (primaryTimeout < 1000) throw new Error("P.E.R request has no primary work budget");
         const stream = await callAIStream(msgs, {
           model: process.env.OPENAI_MODEL_PER || undefined,
-          timeout: 55_000,
+          timeout: primaryTimeout,
           includeUsage: true,
           userId: user.id,
           signal: clientAbort.signal,
@@ -1917,9 +1960,11 @@ async function handleExplainRequest(req, res, perAnswerLease) {
         { role: 'user', content: userMsg, page: requestPage, examBound: isExamBoundPage(requestPage) },
         { role: 'assistant', content: fullText, page: requestPage, examBound: isExamBoundPage(requestPage) },
       ].slice(-20);
-      const historySaved = await savePerSessionHistory(supabase, user.id, newHistory, perMemoryEpoch);
+      let historySaved = false;
       let historyForMemory = newHistory;
-      let refreshMemory = !isHomepageRequest && historySaved;
+      let completionHistory = null;
+      let allowPrimaryCommit = true;
+      let refreshMemory = !isHomepageRequest;
       /* badOmNivå, inte helpLevel och inte requestedLevel.
          Signalen lär sig vilket förklaringsdjup eleven FÖREDRAR. Två saker får
          därför inte hamna här:
@@ -1932,14 +1977,23 @@ async function handleExplainRequest(req, res, perAnswerLease) {
          badOmNivå är null tills eleven faktiskt tryckt på ett steg. */
       if (badOmNivå !== null && !studyCoachRequest && !isHomepageRequest) recordHelpPreference(supabase, user.id, badOmNivå, perMemoryEpoch);
 
-      // Confirm the saved primary answer before optional self-review. The client
-      // can then distinguish a completed answer from a delayed correction pass.
-      res.write(`data: ${JSON.stringify({ done: true, ...(historySaved ? { history: newHistory } : {}), helpCap, helpLevelUsed: helpLevel })}\n\n`);
-
       /* Ordinary chat replaces a seriously flawed answer in place. Active-exam
          guidance keeps its existing review UI and answer restrictions. */
+      // The client has a 59s deadline and this route has 60s. Do not start a
+      // full 20s optional review late in that window: retain room for corrected
+      // persistence and two bounded release attempts. A late answer is a retry,
+      // never a falsely completed, unreviewed response.
+      const reviewTimeout = Math.min(20_000, perAnswerLease.deadlineAt - Date.now() - 22_000);
+      if (reviewTimeout < 1000 && needsReview(userQuestion, fullText, { helpLevel, isMath: !!curriculumContext })) {
+        await usageWrite;
+        res.write(`data: ${JSON.stringify({ error: body.lang === "en"
+          ? "The answer could not be completed in time. Please retry."
+          : "Svaret kunde inte färdigställas i tid. Försök igen." })}\n\n`);
+        return res.end();
+      }
       const granskning = await granskaSvar({
         fråga: userQuestion, svar: fullText, helpLevel, userId: user.id,
+        timeout: Math.max(1, reviewTimeout),
         /* curriculumContext byggs BARA av _math-curriculum.js, och bara när
            ämnet redan avgjorts som matematik. Den är därför en uppmätt signal,
            till skillnad från ett ord i frågan.
@@ -1963,12 +2017,15 @@ async function handleExplainRequest(req, res, perAnswerLease) {
                 correctedHistorySaved = await savePerSessionHistory(supabase, user.id, correctedHistory, perMemoryEpoch);
               }
               if (correctedHistorySaved) {
+                historySaved = true;
                 historyForMemory = correctedHistory;
+                completionHistory = correctedHistory;
                 res.write(`data: ${JSON.stringify({
                   reviewedAnswer: replacementAnswer,
                   history: correctedHistory,
                 })}\n\n`);
               } else {
+                allowPrimaryCommit = false;
                 refreshMemory = false;
                 const safeNotice = body.lang === "en"
                   ? "I could not verify this answer safely. Please ask again."
@@ -1976,6 +2033,8 @@ async function handleExplainRequest(req, res, perAnswerLease) {
                 correctedHistory[lastAssistant] = { ...correctedHistory[lastAssistant], content: safeNotice };
                 let noticeSaved = await savePerSessionHistory(supabase, user.id, correctedHistory, perMemoryEpoch);
                 if (!noticeSaved) noticeSaved = await savePerSessionHistory(supabase, user.id, correctedHistory, perMemoryEpoch);
+                completionHistory = noticeSaved ? correctedHistory : null;
+                historySaved = noticeSaved;
                 res.write(`data: ${JSON.stringify({
                   reviewUnavailable: safeNotice,
                   ...(noticeSaved ? { history: correctedHistory } : {}),
@@ -1991,7 +2050,11 @@ async function handleExplainRequest(req, res, perAnswerLease) {
                 granskning,
                 ...(correctedHistorySaved ? { history: correctedHistory } : {}),
               })}\n\n`);
-              if (correctedHistorySaved) historyForMemory = correctedHistory;
+              if (correctedHistorySaved) {
+                historySaved = true;
+                historyForMemory = correctedHistory;
+                completionHistory = correctedHistory;
+              } else allowPrimaryCommit = false;
             }
           } else {
             res.write(`data: ${JSON.stringify({ granskning })}\n\n`);
@@ -2001,8 +2064,17 @@ async function handleExplainRequest(req, res, perAnswerLease) {
         }
       }
 
-      if (refreshMemory) refreshPerMemory(user.id, historyForMemory, learningSignals, perMemoryEpoch).catch(() => {});
+      if (allowPrimaryCommit && !historySaved) {
+        historySaved = await savePerSessionHistory(supabase, user.id, historyForMemory, perMemoryEpoch);
+        completionHistory = historySaved ? historyForMemory : null;
+      }
+      if (refreshMemory && historySaved) refreshPerMemory(user.id, historyForMemory, learningSignals, perMemoryEpoch).catch(() => {});
       await usageWrite;
+      if (!(await finishPerAnswerLease(perAnswerLease))) {
+        res.write(`data: ${JSON.stringify({ error: "P.E.R kunde inte avsluta förfrågan säkert. Vänta en stund och försök igen." })}\n\n`);
+        return res.end();
+      }
+      res.write(`data: ${JSON.stringify({ done: true, ...(completionHistory ? { history: completionHistory } : {}), helpCap, helpLevelUsed: helpLevel })}\n\n`);
       return res.end();
     }
 
@@ -2108,12 +2180,11 @@ async function handleExplainRequest(req, res, perAnswerLease) {
 }
 
 export default async function handler(req, res) {
-  const perAnswerLease = { userId: null, leaseId: null, allowIncompleteGeneralChat: false };
+  const perAnswerLease = { userId: null, leaseId: null, allowIncompleteGeneralChat: false,
+    deadlineAt: Date.now() + 56_000 };
   try {
-    return await handleExplainRequest(req, res, perAnswerLease);
+    return await handleExplainRequest(req, perCompletionResponse(res, perAnswerLease), perAnswerLease);
   } finally {
-    if (perAnswerLease.userId && perAnswerLease.leaseId) {
-      await examIssuance.releasePerAnswerLease(perAnswerLease.userId, perAnswerLease.leaseId);
-    }
+    await finishPerAnswerLease(perAnswerLease);
   }
 }

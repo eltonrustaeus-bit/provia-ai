@@ -37,6 +37,9 @@ let failResponses = false;
 let providerAnswer = "Börja med begreppet och pröva ett eget exempel.";
 let streamAnswer = "Börja med att hitta ett begrepp i ditt material.";
 let reviewAnswer = null;
+let releaseLeaseHook = null;
+let primaryCompletionHook = null;
+let capturedHistory = null;
 globalThis.fetch = async (input, init = {}) => {
   const url = typeof input === "string" ? input : input.url;
   const body = typeof init.body === "string" ? JSON.parse(init.body) : null;
@@ -47,12 +50,15 @@ globalThis.fetch = async (input, init = {}) => {
     if (failCorrectionHistorySave && body?.p_messages?.at(-1)?.content === "Kontrollera insättningen: rätt värde är x = 4.") {
       return Response.json(false);
     }
+    if (capturedHistory !== null) capturedHistory = body.p_messages;
     return Response.json(true);
   }
+  if (url.includes("/rest/v1/per_sessions")) return Response.json({ messages: capturedHistory || [] });
   if (url.includes("/rest/v1/rpc/save_per_long_memory_if_epoch")) return Response.json(true);
   if (url.includes("/rest/v1/rpc/active_exam_count")) return Response.json(activeCount);
   if (url.includes("/rest/v1/rpc/acquire_per_answer_lease")) return Response.json("acquired");
-  if (url.includes("/rest/v1/rpc/release_per_answer_lease")) return Response.json("released");
+  if (url.includes("/rest/v1/rpc/release_per_answer_lease")) return releaseLeaseHook
+    ? releaseLeaseHook(body) : Response.json("released");
   if (url.includes("/rest/v1/rpc/reserve_per_chat_quota")) return Response.json({ ok: true, count: 1 });
   if (url.includes("/rest/v1/rpc/commit_per_chat_quota")) {
     quotaCommitCalls += 1;
@@ -117,6 +123,7 @@ globalThis.fetch = async (input, init = {}) => {
         : null;
     const usage = { model: "measured-stream-model", choices: [], usage: { prompt_tokens: 90, completion_tokens: 21 } };
     const done = stopReasonWithoutDone ? "" : "data: [DONE]\n\n";
+    primaryCompletionHook?.();
     return new Response(`data: ${JSON.stringify(delta)}\n\n${terminal ? `data: ${JSON.stringify(terminal)}\n\n` : ""}data: ${JSON.stringify(usage)}\n\n${done}`, { status: 200 });
   }
   if (url === "https://api.openai.com/v1/responses") {
@@ -345,17 +352,81 @@ test("a serious ordinary-chat P.E.R correction replaces the answer without a sel
     assert.ok(correctionEvent);
     assert.equal(correctionEvent.reviewedAnswer, "Kontrollera insättningen: rätt värde är x = 4.");
     assert.equal(correctionEvent.history.at(-1).content, correctionEvent.reviewedAnswer);
+    assert.equal(events.find(event => event.done)?.history?.at(-1)?.content, correctionEvent.reviewedAnswer,
+      "the terminal event must not overwrite the reviewed answer with the original history");
     assert.equal(events.some((event) => event.granskning), false,
       "ordinary chat does not expose review metadata or an after-answer note");
 
     const historyWrites = requests.filter((request) => request.url.endsWith("/rest/v1/rpc/save_per_session_if_epoch"));
-    assert.equal(historyWrites.length, 2);
-    assert.equal(historyWrites[0].body.p_messages.at(-1).content, "Ekvationen ger x = 5.");
-    assert.equal(historyWrites[1].body.p_messages.at(-1).content, correctionEvent.reviewedAnswer);
-    assert.doesNotMatch(historyWrites[1].body.p_messages.at(-1).content, /P\.E\.R-kontroll|jag kontrollerade mitt svar/i);
+    assert.equal(historyWrites.length, 1, "the flagged primary is never committed to history");
+    assert.equal(historyWrites[0].body.p_messages.at(-1).content, correctionEvent.reviewedAnswer);
+    assert.doesNotMatch(historyWrites[0].body.p_messages.at(-1).content, /P\.E\.R-kontroll|jag kontrollerade mitt svar/i);
   } finally {
     streamAnswer = "Börja med att hitta ett begrepp i ditt material.";
     reviewAnswer = null;
+  }
+});
+
+test("stream completion waits for review, persisted correction and fenced lease release", async () => {
+  requests.length = 0;
+  streamAnswer = "Ekvationen ger x = 5.";
+  reviewAnswer = JSON.stringify({ allvar: "allvarlig",
+    fynd: [{ typ: "räknefel", citat: "x = 5", varför: "Insättning visar felet." }],
+    rättelse: "Kontrollera insättningen: rätt värde är x = 4." });
+  let releaseEntered;
+  const entered = new Promise(resolve => { releaseEntered = resolve; });
+  let allowRelease;
+  const gate = new Promise(resolve => { allowRelease = resolve; });
+  releaseLeaseHook = async () => { releaseEntered(); await gate; return Response.json("released"); };
+  const res = response();
+  const pending = handler({ method: "POST", headers: { authorization: "Bearer synthetic-user-token", accept: "text/event-stream" },
+    body: { userQuestion: "Hur löser jag ekvationen?", pageContext: { page: "app" } } }, res);
+  try {
+    await entered;
+    assert.equal(res.ended, undefined);
+    assert.doesNotMatch(res.chunks.join(""), /"done":true/);
+    assert.match(res.chunks.join(""), /"reviewedAnswer"/);
+    assert.ok(requests.some(request => request.body?.p_messages?.at(-1)?.content === "Kontrollera insättningen: rätt värde är x = 4."));
+    allowRelease();
+    await pending;
+    assert.equal(res.ended, true);
+    const events = res.chunks.filter(chunk => chunk.startsWith("data: ")).map(chunk => JSON.parse(chunk.slice(6).trim()));
+    assert.equal(events.at(-1).done, true);
+    assert.equal(events.at(-1).history.at(-1).content, "Kontrollera insättningen: rätt värde är x = 4.");
+    assert.equal(requests.filter(request => request.url.includes("release_per_answer_lease")).length, 1);
+  } finally {
+    allowRelease();
+    await pending;
+    releaseLeaseHook = null;
+    reviewAnswer = null;
+    streamAnswer = "Börja med att hitta ett begrepp i ditt material.";
+  }
+});
+
+test("a primary answer near the request deadline cannot start another full review or claim completion", async () => {
+  requests.length = 0;
+  const originalDateNow = Date.now;
+  const started = originalDateNow();
+  Date.now = () => started;
+  capturedHistory = [{ role: "assistant", content: "EARLIER_SAFE_RESPONSE" }];
+  primaryCompletionHook = () => { Date.now = () => started + 49_000; };
+  try {
+    const res = await invoke("text/event-stream", { userQuestion: "Hur löser jag ekvationen?" });
+    assert.equal(res.ended, true);
+    assert.match(res.chunks.join(""), /kunde inte färdigställas i tid/);
+    assert.doesNotMatch(res.chunks.join(""), /"done":true/);
+    assert.equal(requests.filter(request => request.url === "https://api.openai.com/v1/responses").length, 0,
+      "no second paid model step starts when correction/persistence/cleanup cannot fit");
+    assert.equal(requests.filter(request => request.url.includes("release_per_answer_lease")).length, 1);
+    const restored = response();
+    await handler({ method: "GET", headers: { authorization: "Bearer synthetic-user-token" } }, restored);
+    assert.deepEqual(restored.body.history, [{ role: "assistant", content: "EARLIER_SAFE_RESPONSE" }],
+      "a reload cannot restore the aborted unreviewed primary answer");
+    assert.equal(requests.filter(request => request.url.includes("save_per_session_if_epoch")).length, 0);
+  } finally {
+    primaryCompletionHook = null;
+    capturedHistory = null;
+    Date.now = originalDateNow;
   }
 });
 
@@ -384,10 +455,9 @@ test("ordinary-chat correction is not shown if corrected history cannot be saved
     assert.equal(events.some((event) => event.granskning), false,
       "ordinary chat does not fall back to a self-review note");
     const historyWrites = requests.filter((request) => request.url.endsWith("/rest/v1/rpc/save_per_session_if_epoch"));
-    assert.equal(historyWrites.length, 4, "the failed correction save retries once, then persists a safe notice");
-    assert.equal(historyWrites[0].body.p_messages.at(-1).content, "Ekvationen ger x = 5.");
+    assert.equal(historyWrites.length, 3, "the failed correction save retries once, then persists a safe notice");
+    assert.equal(historyWrites[0].body.p_messages.at(-1).content, "Kontrollera insättningen: rätt värde är x = 4.");
     assert.equal(historyWrites[1].body.p_messages.at(-1).content, "Kontrollera insättningen: rätt värde är x = 4.");
-    assert.equal(historyWrites[2].body.p_messages.at(-1).content, "Kontrollera insättningen: rätt värde är x = 4.");
   } finally {
     streamAnswer = "Börja med att hitta ett begrepp i ditt material.";
     reviewAnswer = null;

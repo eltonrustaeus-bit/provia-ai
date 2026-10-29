@@ -1,6 +1,40 @@
 "use strict";
 const { filterSourceReferences } = require("./_source-references.cjs");
 
+// Numbered factual notes often put the whole paragraph after the marker rather
+// than below a heading. Keep those blocks literal so target excerpts still
+// belong to the normalized source. Ambiguous lists are deliberately ignored.
+function numberedProseSections(lines) {
+  const sections = [];
+  const preamble = [];
+  let marker = null;
+  for (const line of lines) {
+    const match = line.match(/^\s*(\d+)([.)])\s+(\S.*)$/u);
+    if (!match && /^\s*\d/u.test(line)) return [];
+    if (match) {
+      if (Number(match[1]) !== sections.length + 1 || sections.length >= 12 ||
+          (marker && marker !== match[2])) return [];
+      marker = match[2];
+      sections.push({ title: `Avsnitt ${sections.length + 1}`, body: line });
+    } else if (sections.length) {
+      if (/^\s*(?:#{1,3}\s|\d+[.)])/u.test(line)) return [];
+      sections.at(-1).body += `\n${line}`;
+    } else if (line.trim()) {
+      preamble.push(line.trim());
+    }
+  }
+  if (sections.length < 2 || preamble.length > 1 ||
+      preamble.some(line => line.length > 120 || /^#/u.test(line))) return [];
+  const task = /^(?:fråga|svar|uppgift|steg|beräkna|bestäm|lös|rita|ange|beskriv|förklara|visa|jämför|question|answer|task|exercise|step|calculate|solve|explain)\b/iu;
+  for (const section of sections) {
+    const prose = section.body.replace(/^\s*\d+[.)]\s+/u, "").trim();
+    if (prose.length < 60 || prose.split(/\s+/u).length < 10 ||
+        task.test(prose) || /[?=]/u.test(prose) || !/[.!]/u.test(prose)) return [];
+    section.body = section.body.trimEnd();
+  }
+  return sections;
+}
+
 function sourceSections(material) {
   const lines = String(material || "").replace(/\r\n?/g, "\n").split("\n");
   const sections = [];
@@ -35,7 +69,8 @@ function sourceSections(material) {
     }
   }
   if (current && current.body.trim().length >= 60) sections.push(current);
-  return sections.length >= 2 && sections.length <= 12 ? sections : [];
+  if (sections.length >= 2 && sections.length <= 12) return sections;
+  return current ? [] : numberedProseSections(lines);
 }
 
 function questionSectionIndices(question, sections) {

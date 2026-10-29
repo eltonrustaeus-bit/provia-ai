@@ -1994,10 +1994,12 @@ function finalizeMsg(div, text) {
                   if (answerCommitted && typing) finalizeMsg(typing, answerText);
                   if (ev.history) perSaveHist(ev.history);
                 }
-                if (typeof ev.reviewUnavailable === 'string' && ev.reviewUnavailable.trim() && answerCommitted && typing) {
+                if (typeof ev.reviewUnavailable === 'string' && ev.reviewUnavailable.trim()) {
                   answerText = ev.reviewUnavailable;
-                  typing.className = 'per-msg teacher';
-                  typing.textContent = answerText;
+                  if (typing) {
+                    typing.className = 'per-msg teacher';
+                    typing.textContent = answerText;
+                  }
                   if (ev.history) perSaveHist(ev.history);
                   announceFailure(answerText);
                 }

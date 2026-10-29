@@ -62,6 +62,65 @@ test("an anchored function match preserves other targets, contexts and additiona
     "a short shared answer is insufficient");
 });
 
+test("role variants and generic cell inflections agree only with an explicit equal scoring scope", () => {
+  const observed = { ...first, question: "Vad är rollen av ribosomer i cellen?" };
+  for (const question of [
+    "Vad är ribosomernas roll i cellen?",
+    "Vilken funktion har ribosomer i celler?",
+    "Vad gör ribosomer i celler?",
+  ]) expectDuplicate(observed, { ...repeated, question }, true, question);
+  for (const question of [
+    "Vilken funktion har ribosomer i växtceller?",
+    "Vad är ribosomernas roll i cellen och hur styrs den?",
+    "Vad gör ribosomer i celler vid hög temperatur?",
+  ]) expectDuplicate(observed, { ...repeated, question }, false, question);
+  expectDuplicate(observed, { ...repeated, question: "Vad gör ribosomer i celler?",
+    scoring_rubric: rubric(source, "Ange vilken mall ribosomen använder.") }, false,
+    "normalizing the role wording cannot erase an unknown additional requirement");
+});
+
+test("a one-word MC option completes only an explicitly scored whole object relation", () => {
+  // Scoring scopes are synthetic; the staging stems and short option are real.
+  const fact = "Klorofyll fångar upp ljusenergi.";
+  const short = { type: "short", question: "Vad fångar klorofyll i växter?", concept_tag: "Klorofyll",
+    learning_objective: "Förklara klorofylls funktion i fotosyntesen", model_answer: fact,
+    source_references: [fact], scoring_rubric: rubric(fact) };
+  const mc = { ...short, type: "mc", question: "Vad fångar klorofyll upp i växter?",
+    options: ["Ljusenergi", "Koldioxid", "Vatten"], correct_index: 0,
+    scoring_rubric: { parts: [], full_score_requirements: "" }, rubric: "Rätt alternativ ger full poäng." };
+  expectDuplicate(short, mc, true, "the stem plus choice supplies the entire scored relation");
+  for (const change of [
+    { question: "Vad fångar klorofyll upp i djurceller?" },
+    { question: "Vad fångar klorofyll upp i växter och varför?" },
+    { options: ["Ljusenergi", "Ljusenergi med en viss våglängd", "Koldioxid"] },
+    { options: ["Röd ljusenergi", "Koldioxid", "Vatten"] },
+    { rubric: "Ange ljusets våglängd." },
+  ]) expectDuplicate(short, { ...mc, ...change }, false, JSON.stringify(change));
+  const purpose = "Klorofyll fångar upp ljusenergi som används i fotosyntesen.";
+  expectDuplicate({ ...short, model_answer: purpose, source_references: [purpose], scoring_rubric: rubric(purpose) },
+    { ...mc, model_answer: purpose, source_references: [purpose] }, false,
+    "a choice naming energy cannot inherit the separately scored purpose clause");
+});
+
+test("obvious Swedish MC noun agreement is rejected before issuance without rewriting the stem", () => {
+  const candidate = { id: "gas", type: "mc", question: "Vilket av följande gaser används i fotosyntesen?",
+    options: ["Syre", "Koldioxid", "Kväve"], correct_index: 1, points: 1, cognitive_level: "förstå" };
+  const rejected = gateExam({ questions: [candidate] }, { outputLanguage: "sv" });
+  assert.equal(rejected.questions.length, 0);
+  assert.ok(rejected.dropped[0].issues.includes("language_quality"));
+  assert.equal(candidate.question, "Vilket av följande gaser används i fotosyntesen?");
+  for (const question of [
+    "Vilken av följande gaser används i fotosyntesen?",
+    "Vilket av följande ämnen används i fotosyntesen?",
+    "Vilka av följande gaser förekommer i materialet?",
+    "Vilket av följande okändaord passar bäst?",
+    "Vilken av följande tal- och bokstavskombinationer kan användas som variabelnamn i Python?",
+    "Vilken av följande tal– och bokstavskombinationer beskrivs i materialet?",
+  ]) assert.equal(gateExam({ questions: [{ ...candidate, question }] }, { outputLanguage: "sv" }).questions.length, 1, question);
+  assert.equal(gateExam({ questions: [candidate] }, { outputLanguage: "en" }).questions.length, 1,
+    "the bounded Swedish agreement check does not infer the requested language");
+});
+
 test("opposite stated temperature conditions stay distinct despite shared words and metadata", () => {
   for (const [high, low] of [["hög", "låg"], ["höga", "låga"]]) {
     const make = (condition) => ({
