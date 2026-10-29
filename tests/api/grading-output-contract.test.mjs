@@ -2,11 +2,24 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { Readable } from "node:stream";
+import Ajv from "ajv";
 
 const require = createRequire(import.meta.url);
 const grade = require("../../api/grade.js");
 const tasks = require("../../api/_grade-task.js");
 const { normalizeGradeFeedback, validateNonMcGradeOutput, normalizeChoice } = grade;
+const slotSchema = grade.buildNonMcGradeSchema([{ id: "one", max_points: 1 }, { id: "two", max_points: 2 }]).schema;
+const validSlots = new Ajv({ strict: false }).compile(slotSchema);
+const slotOutput = { total_points: 2.5, max_points: 3, per_question: {
+  slot_1: { id: "one", points: 1, max_points: 1, feedback: "Feedback", model_answer: "Answer", concept_tag: "Fact", error_tags: [] },
+  slot_2: { id: "two", points: 1.5, max_points: 2, feedback: "Feedback", model_answer: "Answer", concept_tag: "Fact", error_tags: [] },
+} };
+assert.equal(validSlots(slotOutput), true, "mixed signed maxima preserve valid partial credit");
+for (const invalid of [{ points: 2 }, { points: -1 }, { max_points: 2 }, { id: "two" }]) {
+  const changed = structuredClone(slotOutput);
+  Object.assign(changed.per_question.slot_1, invalid);
+  assert.equal(validSlots(changed), false, "the requested provider schema excludes wrong IDs, maxima and scores");
+}
 const source = await readFile(new URL("../../api/grade.js", import.meta.url), "utf8");
 const expected = [{ id: "q1", max_points: 2 }, { id: "q2", max_points: 2 }];
 const row = (id) => ({
@@ -234,6 +247,10 @@ try {
   assert.equal(providerFormat.schema.properties.per_question.type, "object");
   assert.deepEqual(providerFormat.schema.properties.per_question.required, ["slot_1", "slot_2"],
     "the strict provider schema requires exactly one named slot per submitted answer");
+  assert.deepEqual(providerFormat.schema.properties.per_question.properties.slot_1.properties.max_points.enum, [2]);
+  assert.deepEqual(providerFormat.schema.properties.per_question.properties.slot_2.properties.id.enum, ["q2"]);
+  assert.equal(providerFormat.schema.properties.per_question.properties.slot_1.properties.points.maximum, 2,
+    "the real handler supplies the signed score boundary before the model runs");
   assert.deepEqual(graded.body.result.per_question.map((item) => item.model_answer), [
     "En kort beskrivning.", "En kort beskrivning.",
   ], "the signed answer key is returned instead of a contradictory grader answer");

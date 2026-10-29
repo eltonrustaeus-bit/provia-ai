@@ -544,7 +544,8 @@
     nudges: 0,
     lastNudge: 0,
     generating: false,  // spärr mot dubbel generering (kostar kvot)
-    submitting: false   // spärr mot dubbel inlämning
+    submitting: false,   // spärr mot dubbel inlämning
+    gradingError: ""
   };
 
   window.__getPerStudyContext = function () {
@@ -1974,6 +1975,7 @@
       S.draftSnapshot = requestDraftSnapshot;
       S.draftStorageConflict = false;
       S.exam = normalizeIds(r.exam);
+      S.gradingError = "";
       S.draftPhase = "active";
       var got = S.exam.questions.length;
       S.exam.requested_question_count = S.num;
@@ -2450,6 +2452,12 @@
 
     var sheet = el("div", "xf-sheet");
 
+    if (S.gradingError) {
+      var gradingError = el("p", "xf-note", S.gradingError);
+      gradingError.setAttribute("role", "alert");
+      sheet.appendChild(gradingError);
+    }
+
     if (S.draftStorageConflict) {
       var storageConflict = el("p", "xf-note", tx(
         "En sparad provversion har ändrats. Den versionen är kvar, men detta prov sparas inte på enheten. Lämna in det innan du stänger eller laddar om fliken.",
@@ -2843,6 +2851,7 @@
       }
     }
 
+    S.gradingError = "";
     var resumeAt = S.startedAt;
     closeExam(false);
     machine();
@@ -2854,15 +2863,15 @@
     });
 
     // Rättningen föll — lämna tillbaka eleven till provet med svaren kvar i
-    // stället för till en död skärm. S.nudges nollställs så att beskedet om
-    // felet aldrig tystas av inpasskvoten.
+    // stället för till en död skärm. Felet visas i frågeytan tills nästa
+    // inlämningsförsök, även om eleven navigerar mellan frågorna.
     function backToExam(msg) {
       stopMachine().then(function () {
         S.submitting = false;
         S.nudges = 0;
         S.lastNudge = 0;
+        S.gradingError = msg;
         openExam(resumeAt);
-        nudge(msg);
       });
     }
 

@@ -1968,12 +1968,12 @@ if (process.env.EXAM_FLOW_ONLY_RESULT_RECOVERY) {
     exam: document.querySelector(".xf-exam").classList.contains("on"),
     machine: document.querySelector(".xf-machine").classList.contains("on"),
     overflow: document.body.style.overflow,
-    nudge: document.querySelector(".xf-nudge").classList.contains("on"),
+    error: document.querySelector(".xf-sheet [role='alert']")?.textContent,
     answerKept: !!document.querySelector(".xf-mc-opt.sel") || !!document.querySelector(".xf-answer")?.value
   }));
   ok("T4a tillbaka i provet", st.exam === true);
   ok("T4b maskinytan stängd", st.machine === false);
-  ok("T4c eleven fick besked", st.nudge === true);
+  ok("T4c eleven fick bestående besked", /rättningen|Rättningen|server/i.test(st.error || ""));
   ok("T4d svaren kvar", st.answerKept === true);
   await page.screenshot({ path: SHOT + "/t4-grade-fail.png" });
   await ctx.close();

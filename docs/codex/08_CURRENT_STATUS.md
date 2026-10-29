@@ -1,5 +1,32 @@
 # 08 Current Status
 
+## Grading score-contract recovery — 2026-10-30
+
+- The exact `6604ab4` staging journey delivered 12/12 in 165 seconds. It
+  still contained a false glucose-to-ATP option and repeated ribosome function
+  tasks. These remain release blockers; no main/Production release is cleared.
+- One submission retained every answer but returned to the exam without a
+  saved result. Hosted logs identify `contract_score_range` in batch 1/2,
+  with all four rows present. This does not distinguish a mismatched maximum
+  from an out-of-range award. The model calls were measured; no automatic
+  second submission or new exam was made. The claim was safely released.
+- The grading request now constrains every schema slot to its signed question
+  ID and maximum, with awarded points between zero and that maximum. Fractional
+  partial credit and final rejection checks remain. This is prevention, not
+  clamping invalid output or relaxing the scoring contract.
+- A grading error remains in the question sheet across time and navigation;
+  accepted retries and newly generated exams clear it. It is not persisted
+  through a reload. The old transient nudge no longer hides this failure.
+- Offline: eight focused grading/terminal-state files pass **8/8**; a browser
+  regression passes **1/1**, preserving answers and proving no timed automatic
+  retry after 12 seconds or question navigation. Read-only review independently
+  exercised signed schema bounds. Hosted acceptance of this fix is pending.
+- The temporary checkout lost its Git metadata/base files. A permanent clone
+  was recovered at the exact pushed `6604ab4`; current goal code was already
+  committed and pushed. Old survivors were not deleted. Cause is unverified.
+- Fresh staging budget remains cap 3.379071, spent 2.963025, reserved 0.263628,
+  available **0.152418 USD**. The same unfinished exam/session is retained.
+
 ## Split-requirement ambiguity veto — 2026-10-29
 
 - Reviewed checkpoint `46623365f4d88900ce892f6e2e4b447ec033f843` was pushed

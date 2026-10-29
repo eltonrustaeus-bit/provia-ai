@@ -140,22 +140,22 @@ function safeArrayStrings(x, maxItems = 8, maxLen = 40) {
   return out;
 }
 
-function buildNonMcGradeSchema(itemCount) {
-  const slotNames = Array.from({ length: itemCount }, (_, index) => `slot_${index + 1}`);
-  const itemSchema = {
+function buildNonMcGradeSchema(items) {
+  const slotNames = items.map((_, index) => `slot_${index + 1}`);
+  const itemSchema = (item) => ({
     type: "object",
     additionalProperties: false,
     required: ["id", "points", "max_points", "feedback", "model_answer", "concept_tag", "error_tags"],
     properties: {
-      id: { type: "string" },
-      points: { type: "number" },
-      max_points: { type: "number" },
+      id: { type: "string", enum: [String(item.id)] },
+      points: { type: "number", minimum: 0, maximum: item.max_points },
+      max_points: { type: "number", enum: [item.max_points] },
       feedback: { type: "string" },
       model_answer: { type: "string" },
       concept_tag: { type: "string" },
       error_tags: { type: "array", items: { type: "string" }, maxItems: 8 },
     },
-  };
+  });
   return {
     type: "json_schema",
     name: "grade_non_mc_schema",
@@ -171,7 +171,7 @@ function buildNonMcGradeSchema(itemCount) {
           type: "object",
           additionalProperties: false,
           required: slotNames,
-          properties: Object.fromEntries(slotNames.map((slot) => [slot, itemSchema])),
+          properties: Object.fromEntries(slotNames.map((slot, index) => [slot, itemSchema(items[index])])),
         }
       }
     }
@@ -937,7 +937,7 @@ module.exports = async function handler(req, res) {
                 : "\nOutput per_question: slot_1 grades the first item, slot_2 the second, and so on. Fill every schema slot exactly once and copy its unchanged ID.") },
           { role: "user", content: JSON.stringify(userPayload) },
         ],
-        text: { format: buildNonMcGradeSchema(items.length) },
+        text: { format: buildNonMcGradeSchema(items) },
       };
       const gradingStartedAt = Date.now();
       let r;
@@ -1137,3 +1137,4 @@ module.exports.normalizeGradeFeedback = normalizeGradeFeedback;
 module.exports.validateNonMcGradeOutput = validateNonMcGradeOutput;
 module.exports.normalizeChoice = normalizeChoice;
 module.exports.gradingProviderTimeoutMs = gradingProviderTimeoutMs;
+module.exports.buildNonMcGradeSchema = buildNonMcGradeSchema;
