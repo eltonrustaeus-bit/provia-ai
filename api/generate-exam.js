@@ -1452,6 +1452,7 @@ const SAFE_REPAIR_SOLVER_FAILURE_CODES = new Set([
 ]);
 const SAFE_REPAIR_STRUCTURAL_SOURCE_CODES = new Set([
   "source_answer_not_extractable", "source_reference_missing",
+  "source_requirement_options_incomplete",
 ]);
 
 function structuralSourceFailureCounts(gate) {
@@ -1556,6 +1557,11 @@ function buildRepairPayload(payload, { lang, numQuestions, existingQuestions = [
     ? (lang === "en"
       ? `Earlier candidates failed deterministic source checks: ${JSON.stringify(safeStructuralIssueCounts)}. ${safeStructuralIssueCounts.source_answer_not_extractable ? "A required short answer was not an exact contiguous source excerpt. Select the exact answer excerpt before writing the task; preserve its conditions and meaning, and do not paraphrase it. " : ""}${safeStructuralIssueCounts.source_reference_missing ? "No usable source excerpt remained for a candidate. Choose a task with an actual supporting excerpt and copy it verbatim into source_references; do not invent a citation. " : ""}`
       : `Tidigare kandidater föll i den strukturella källkontrollen: ${JSON.stringify(safeStructuralIssueCounts)}. ${safeStructuralIssueCounts.source_answer_not_extractable ? "Ett kortsvar som krävde källutdrag var inte ett exakt sammanhängande utdrag. Välj det exakta svarutdraget innan du skriver uppgiften; behåll villkor och betydelse och parafrasera inte svaret. " : ""}${safeStructuralIssueCounts.source_reference_missing ? "Inget användbart källutdrag återstod för en kandidat. Välj en uppgift med ett verkligt stödjande utdrag och kopiera det ordagrant till source_references; hitta inte på ett citat. " : ""}`)
+    : "";
+  const requirementOptionsGuidance = safeStructuralIssueCounts.source_requirement_options_incomplete
+    ? (lang === "en"
+      ? "A broad requirement question split a source-supported combination across separate options. Replace it with a more precise task or a complete combination and plausible distractors; independently check uniqueness again. Do not merely change the answer key. "
+      : "En bred fråga om förutsättningar delade upp en källstödd kombination i separata alternativ. Ersätt den med en mer precis fråga eller en fullständig kombination och rimliga distraktorer; kontrollera entydigheten på nytt. Byt inte bara facitnyckel. ")
     : "";
   const reviewFailureSummary = lang === "en"
     ? `Bounded review failure counts for the previous candidates (fixed categories only; not answer keys): ${JSON.stringify(safeReviewFailureCounts)}.`
@@ -1674,7 +1680,7 @@ function buildRepairPayload(payload, { lang, numQuestions, existingQuestions = [
     text: { ...payload.text, format: buildMockExamSchema(repairCount, qType) },
     input: [
       ...repairInput,
-      { role: "user", content: `${instruction}\n\n${structuralSourceGuidance}${repairFactualAnswerInstruction} ${repairSourceReferenceInstruction}` },
+      { role: "user", content: `${instruction}\n\n${structuralSourceGuidance}${requirementOptionsGuidance}${repairFactualAnswerInstruction} ${repairSourceReferenceInstruction}` },
     ],
   };
 }

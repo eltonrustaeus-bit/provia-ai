@@ -1232,6 +1232,18 @@ test("improvement coach uses only the authenticated account's verified server re
     assert.ok(calls.every(({ url }) => !url.includes("record_per_help_level") &&
       !url.includes("learner_profile_facts")), "study coaching does not persist a client-inferred help preference");
 
+    verifiedCoachRowsByUser = { [userId]: [
+      { course: "Biologi 1", percent: 94, weak_concept_tags: ["Aktiv transport"], error_tags: [], verified_at: "2026-10-29T10:00:00Z" },
+      { course: "Biologi 1", percent: 45, weak_concept_tags: ["Ribosomer"], error_tags: [], verified_at: "2026-10-20T10:00:00Z" },
+    ] };
+    calls.length = 0;
+    const recovered = await invoke({ topic: "studiecoach" }, "POST", "application/json");
+    assert.equal(recovered.body.coachEvidenceSummary.latestPercent, 94);
+    const historicalPrompt = calls.find(({ url }) => url === "https://api.openai.com/v1/responses")?.body || "";
+    assert.match(historicalPrompt, /45%, 94%/);
+    assert.match(historicalPrompt, /Historisk signal: minst ett av de hämtade verifierade proven hade under 70%/);
+    assert.match(historicalPrompt, /Signalen beskriver inte senaste provet eller elevens nuvarande kursnivå/);
+
     verifiedCoachRowsByUser = {
       [userId]: [
         { course: "Historia 1b", percent: 100, weak_concept_tags: ["ONLY_UNVERIFIED_MARKER"], error_tags: [], verified_at: null },

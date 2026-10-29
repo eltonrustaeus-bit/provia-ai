@@ -12,6 +12,7 @@
 
 const crypto = require("crypto");
 const graphAnswers = require("./_graph.js");
+const { hasCoordinatedRequirementAmbiguity } = require("./_source-requirement-options.cjs");
 const MAX_MC_OPTIONS = 5;
 
 // ── Answer-key signing (integrity, not confidentiality) ─────────────────────
@@ -305,6 +306,9 @@ function generalQualityIssues(q, options) {
   if (!q || typeof q !== "object") return ["not_an_object"];
   if (!String(q.question || "").trim()) issues.push("empty_prompt");
   if (!(Number(q.points) > 0)) issues.push("nonpositive_points");
+  if (options?.profile === "natural_sciences" && hasCoordinatedRequirementAmbiguity(q, options?.sourceMaterial)) {
+    issues.push("source_requirement_options_incomplete");
+  }
   if (options?.outputLanguage === "sv") {
     // A closed set of unambiguous noun genders catches common MC agreement
     // defects. Unknown vocabulary stays with the independent language review.
@@ -621,6 +625,7 @@ const BLOCKING = new Set([
   "source_reference_missing", "requested_type_mismatch",
   "source_answer_not_extractable",
   "language_quality",
+  "source_requirement_options_incomplete",
   "open_question_ungradeable", "leaked_instructions", "corrupted_option_text", "math_options_numerically_equal", "math_option_type_mismatch",
   "unsupported_single_word_option_outlier",
   "cognitive_level_missing", "scoring_rubric_missing_for_open", "scoring_rubric_points_mismatch", "law_deprecated_terminology",

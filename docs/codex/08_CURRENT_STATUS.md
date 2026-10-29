@@ -1,5 +1,48 @@
 # 08 Current Status
 
+## Split-requirement ambiguity veto — 2026-10-29
+
+- Reviewed checkpoint `46623365f4d88900ce892f6e2e4b447ec033f843` was pushed
+  and READY as `dpl_6p1mssmEAnTWBQBJC1XZzdFWPuWd`, on the same feature alias.
+  Branch staging URL, pilot mode and unchanged budget cap were verified.
+  Production still has canonical migration `20261020170419`, no temporary
+  `20261028095505` ledger entry, UUID grading claim and verified-mistake column.
+- One subsequent synthetic Biologi 1 C/mixed journey delivered **12/12 in 128s**
+  (job `8c3d9c9c-e333-46c4-a7ea-5b91eaaf3231`). Live telemetry recognized
+  12 sections and the first three approved questions referenced three sections.
+  Generation charged **0.041299 USD** to the conservative app counter, versus
+  0.106373 in the previous run. These two runs do not establish general averages.
+- Every question was answered; saved grading was **15/16 (94%)**. Manual review
+  found a release blocker: "Vad krävs för aktiv transport över cellmembranet?"
+  offered ATP energy and transport proteins separately although its source
+  supported both. Choosing transport proteins received 0/1. P.E.R's postgrade
+  explanation identified the ambiguity and preserved the recorded score.
+  Main remains held; technical success is not content acceptance.
+- P.E.R homepage help, signed active guidance, postgrade explanation and the
+  immediate history/cache-check/new-coach transition completed on that exact
+  Preview. No lingering busy error; afterward active exams and leases were zero.
+  Both completed synthetic results were retained; no parallel exam was started.
+- New local guard vetoes this bounded natural-science MC failure pattern:
+  a complete broad requirement stem, explicit same process, a simple positive
+  source coordination, two separate whole-phrase choices and no full combination.
+  Conditions, negation, alternative mechanisms, unknown scope and qualified
+  choices abstain. The transport-boundary exception recognizes membrane nouns
+  only. "Can ... with help from" is treated as source-supported ambiguity, not
+  a claim of universal necessity. Reviewer, solver and signing gates remain.
+- Initial/repair/final structural gates enforce the veto, including already
+  model-verified candidates. Fixed transient repair feedback requests a precise
+  replacement and renewed uniqueness checking, never a prescribed key. No
+  persisted checkpoint category/schema change was introduced.
+- Coaching v6 labels an older under-70 result as a historical signal, explicitly
+  distinct from latest/current proficiency. Paired older-45/latest-94 evidence
+  is covered; earlier cached advice is invalidated by the revision.
+- Offline quality/pipeline/HTTP/coverage/gold group **67/67** and focused coach
+  checks **3/3** pass. Reused reviewers cleared both bounded follow-ups. Neither
+  new guard nor v6 coaching has yet had a live acceptance run. Available staging
+  counter **0.212609 USD**, reserved 0.263628, spent 2.902834, cap 3.379071;
+  no cap/account/quota/model/schema change. Next: publish this reviewed feature
+  checkpoint, then one complete acceptance journey under the remaining guard.
+
 ## Completed comparison journey and targeted follow-up — 2026-10-29
 
 - Exact Preview `c1e5b6163e649e0e5d9cd7f1f14c45d87c73a04b`
