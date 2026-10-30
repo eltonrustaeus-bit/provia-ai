@@ -551,10 +551,17 @@ async function advance(job, { deadlineAt = null } = {}) {
   const quality = generated.body.qualityDiagnostics && typeof generated.body.qualityDiagnostics === "object"
     ? generated.body.qualityDiagnostics
     : {};
-  const generatorPairDrops = ["duplicate_question", "repeated_function_task"].reduce((sum, code) => {
+  const generatorPairDrops = ["duplicate_question", "repeated_function_task", "repeated_energy_input_task"].reduce((sum, code) => {
     const count = quality.structuralIssueCounts?.[code];
     return sum + (Number.isInteger(count) && count > 0 ? Math.min(3, count) : 0);
   }, 0);
+  const repairReviewCounts = { ...quality.reviewFailureCounts };
+  const circularDrops = quality.structuralIssueCounts?.circular_location_task;
+  if (Number.isInteger(circularDrops) && circularDrops > 0) {
+    const previousClarity = repairReviewCounts.question_clarity;
+    repairReviewCounts.question_clarity = Math.min(20, Math.min(20, circularDrops) +
+      (Number.isInteger(previousClarity) && previousClarity > 0 ? Math.min(20, previousClarity) : 0));
+  }
   console.info(JSON.stringify({
     event: "exam_generation_pipeline_batch",
     requestId: pipelineRequestId(job, quality.requestId),
@@ -610,6 +617,7 @@ async function advance(job, { deadlineAt = null } = {}) {
     progressCurrent: accepted.length,
     repairFeedback: mergeRepairFeedback(job.payload.repairFeedback, {
       ...quality,
+      reviewFailureCounts: repairReviewCounts,
       duplicateCount: Math.min(3, duplicateCandidates + generatorPairDrops),
     }),
   });

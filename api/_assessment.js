@@ -14,6 +14,7 @@ const crypto = require("crypto");
 const graphAnswers = require("./_graph.js");
 const { hasCoordinatedRequirementAmbiguity } = require("./_source-requirement-options.cjs");
 const { losesSourceQuantitySubject } = require("./_source-quantity-subject.cjs");
+const { repeatsEnergyInputTask } = require("./_energy-input-task.cjs");
 const MAX_MC_OPTIONS = 5;
 
 // ── Answer-key signing (integrity, not confidentiality) ─────────────────────
@@ -307,6 +308,10 @@ function generalQualityIssues(q, options) {
   if (!q || typeof q !== "object") return ["not_an_object"];
   if (!String(q.question || "").trim()) issues.push("empty_prompt");
   if (!(Number(q.points) > 0)) issues.push("nonpositive_points");
+  const circularTask = String(q.question || "").trim().match(/^vad sker där (?:stora delar av )?([\p{L}-]{3,70}) (?:äger rum|sker)[?.!]*$/iu);
+  if (circularTask && !/^(?:ingen|inget|inga|inte|aldrig|ibland|sällan|något|någon)$/iu.test(circularTask[1])) {
+    issues.push("circular_location_task");
+  }
   if (options?.profile === "natural_sciences" && hasCoordinatedRequirementAmbiguity(q, options?.sourceMaterial)) {
     issues.push("source_requirement_options_incomplete");
   }
@@ -631,6 +636,7 @@ const BLOCKING = new Set([
   "language_quality",
   "source_requirement_options_incomplete",
   "source_quantity_subject_changed",
+  "circular_location_task",
   "open_question_ungradeable", "leaked_instructions", "corrupted_option_text", "math_options_numerically_equal", "math_option_type_mismatch",
   "unsupported_single_word_option_outlier",
   "cognitive_level_missing", "scoring_rubric_missing_for_open", "scoring_rubric_points_mismatch", "law_deprecated_terminology",
@@ -1403,6 +1409,9 @@ function isDuplicateQuestion(left, right) {
 // repetitive even if metadata/rubrics assign different unasked requirements.
 function questionPairConflict(left, right, options = {}) {
   if (isDuplicateQuestion(left, right)) return "duplicate_question";
+  if (options.profile === "natural_sciences" && repeatsEnergyInputTask(left, right, options.sourceMaterial)) {
+    return "repeated_energy_input_task";
+  }
   if (options.profile !== "natural_sciences" || left?.type !== "short" || right?.type !== "short" ||
       !semanticConceptTag(left) || semanticConceptTag(left) !== semanticConceptTag(right)) return "";
   const signature = functionTaskSignature(left);

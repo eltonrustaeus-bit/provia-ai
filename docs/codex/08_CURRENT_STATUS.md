@@ -1,5 +1,46 @@
 # 08 Current Status
 
+## Finished staging journey and energy-role follow-up — 2026-10-31
+
+- Resumed the same authenticated Preview tab and already-filled exam from
+  job `153b42a2-712d-4745-ae5d-11f5ee2ce3b7`. No parallel or replacement
+  generation was started. On exact READY `b78c048`, its submission saved
+  **16/18 (89%)**, verified 2026-10-30 23:13:25 UTC. The deliberate ATP/DNA
+  misconception scored 0/2; all other answers were retained and graded.
+- P.E.R's active q4 guidance separated contents/function and then asked the
+  learner to check the function statement, with facit disabled. Postgrade it
+  explained the actual 0/2, supplied DNA/protein information and explicitly
+  identified the feedback's unsupported cell-division detail without inventing
+  a score correction. Course coaching used the verified 85/87/94/88/89 history
+  and Biologi 1 mistakes. Homepage help answered directly with a working app
+  link and no internal self-review note. These are staging observations.
+- The signed saved result confirms q2/q9 both keyed Glukos and q5/q11 share
+  the complete energy-transfer exemplar. New bounded natural-science MC
+  variation policy parses energy-input identification tasks, checks same
+  process/carrier/atomic key and an explicit positive source relation, and
+  keeps different outputs, conditions, reasoning and calculations separate.
+  Process, bearer and carrier vary; this is not an ATP-specific key rule.
+- A separate circular-location clarity veto recognizes a positive unqualified
+  process frame such as q5. Negative or unparsed qualified contexts abstain;
+  the review counterexamples and a valid-citation disavowal fixture are covered.
+- Shared pair checks reject energy repeats before issuance/finalization.
+  Generator-side drops carry existing capped duplicateCount, and circular
+  drops carry existing question_clarity feedback into the next checkpoint.
+  There is no new persisted category, schema, model, account or quota change.
+- A small assistant-history display fix removes internal GOTO/CLARIFY markers
+  from restored visible text. User text and stored history are unchanged;
+  restoration does not execute actions or resend clarification requests.
+- Offline quality/HTTP/pipeline/verifier/solver/coverage/gold group **90/90**;
+  focused history browser **1/1**; active keyboard/focus/lifecycle browser
+  **1/1**. Bounded source/variation review cleared the negative-scope correction;
+  final repair-wiring and history microreviews also cleared the scoped fixes. This follow-up has
+  not yet been published or live-accepted. PR #125 remains draft; main is held.
+- Fresh production metadata confirms the canonical grading fence UUID/log,
+  verified-mistake column and lease/result RPC prerequisites. Those helpers,
+  dependency manifests and Vercel configuration have no diff from main.
+  Last staging counter after the completed journey: spent 2.996068, reserved
+  0.263628, available **0.119375 USD**, cap unchanged at 3.379071.
+
 ## Replay cleanup and two-part P.E.R teaching — 2026-10-30
 
 - `f78271e` is READY on the existing feature alias. The next synthetic job

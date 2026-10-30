@@ -47,6 +47,14 @@ function taskSharesContext(question, block, bearer) {
     sourceWords.some(sourceWord => [...nounForms(word)].some(form => nounForms(sourceWord).has(form))));
 }
 
+function sourceQuantityRelations(material) {
+  if (typeof material !== "string" || material.length > 12000) return [];
+  return sourceSentences(material).map(({ sentence, block }) => ({ sentence: lower(sentence), block: lower(block) }))
+    .filter(({ sentence, block }) => !qualified.test(sentence) && !/\b(?:om|när|medan|ibland)\b/u.test(block))
+    .map(({ sentence, block }) => ({ match: sentence.match(propertyRelation), sentence, block }))
+    .filter(({ match, sentence }) => match && positivePropertyPrefix(sentence.slice(0, match.index)));
+}
+
 function losesSourceQuantitySubject(question, material) {
   if (typeof material !== "string" || material.length > 12000) return false;
   const task = lower(question?.question);
@@ -61,10 +69,7 @@ function losesSourceQuantitySubject(question, material) {
     ? [question.options?.[question.correct_index], question.model_answer]
     : question?.type === "short" ? [question.model_answer] : [];
   const sentences = sourceSentences(material).map(({ sentence, block }) => ({ sentence: lower(sentence), block: lower(block) }));
-  const relations = sentences.filter(({ sentence, block }) => !qualified.test(sentence) &&
-      !/\b(?:om|när|medan|ibland)\b/u.test(block))
-    .map(({ sentence, block }) => ({ match: sentence.match(propertyRelation), sentence, block }))
-    .filter(({ match, sentence }) => match && positivePropertyPrefix(sentence.slice(0, match.index)));
+  const relations = sourceQuantityRelations(material);
   for (const value of claims) {
     const claim = lower(value);
     if (!claim || sentences.some(({ sentence }) => sentence === claim || sentence.endsWith(` och ${claim}`)) || qualified.test(claim)) continue;
@@ -86,4 +91,4 @@ function losesSourceQuantitySubject(question, material) {
   return false;
 }
 
-module.exports = { losesSourceQuantitySubject };
+module.exports = { losesSourceQuantitySubject, sourceQuantityRelations };

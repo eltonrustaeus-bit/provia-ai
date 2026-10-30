@@ -1454,7 +1454,7 @@ const SAFE_REPAIR_SOLVER_FAILURE_CODES = new Set([
 ]);
 const SAFE_REPAIR_STRUCTURAL_SOURCE_CODES = new Set([
   "source_answer_not_extractable", "source_reference_missing",
-  "source_requirement_options_incomplete", "source_quantity_subject_changed",
+  "source_requirement_options_incomplete", "source_quantity_subject_changed", "circular_location_task",
 ]);
 
 function structuralSourceFailureCounts(gate) {
@@ -1569,6 +1569,11 @@ function buildRepairPayload(payload, { lang, numQuestions, existingQuestions = [
     ? (lang === "en"
       ? "A candidate changed the subject of a source relation: a property of an object became the object itself. Preserve the complete subject, relation, destination and context in both the keyed option and model answer. Select a different supported task if necessary; do not merely change the key. "
       : "En kandidat ändrade subjektet i ett källsamband: en egenskap hos ett föremål blev själva föremålet. Behåll hela subjektet, relationen, målet och sammanhanget i både rätt alternativ och modellsvar. Välj en annan källstödd uppgift om det behövs; byt inte bara facitindex. ")
+    : "";
+  const circularTaskGuidance = safeStructuralIssueCounts.circular_location_task
+    ? (lang === "en"
+      ? "A task circularly asked what happens where the same event happens. State the actual named context and the specific action or mechanism the learner must explain, or choose another supported task. "
+      : "En uppgift frågade cirkulärt vad som sker där samma händelse äger rum. Ange det faktiska namngivna sammanhanget och vilken konkret process eller mekanism eleven ska förklara, eller välj en annan källstödd uppgift. ")
     : "";
   const reviewFailureSummary = lang === "en"
     ? `Bounded review failure counts for the previous candidates (fixed categories only; not answer keys): ${JSON.stringify(safeReviewFailureCounts)}.`
@@ -1687,7 +1692,7 @@ function buildRepairPayload(payload, { lang, numQuestions, existingQuestions = [
     text: { ...payload.text, format: buildMockExamSchema(repairCount, qType) },
     input: [
       ...repairInput,
-      { role: "user", content: `${instruction}\n\n${structuralSourceGuidance}${requirementOptionsGuidance}${quantitySubjectGuidance}${repairFactualAnswerInstruction} ${repairSourceReferenceInstruction}` },
+      { role: "user", content: `${instruction}\n\n${structuralSourceGuidance}${requirementOptionsGuidance}${quantitySubjectGuidance}${circularTaskGuidance}${repairFactualAnswerInstruction} ${repairSourceReferenceInstruction}` },
     ],
   };
 }
@@ -2113,7 +2118,7 @@ module.exports = async function handler(req, res, internalContext = null) {
       });
     }
     let duplicateQuestionIds = gate.dropped
-      .filter((item) => item.issues.some(code => ["duplicate_question", "repeated_function_task"].includes(code)))
+      .filter((item) => item.issues.some(code => ["duplicate_question", "repeated_function_task", "repeated_energy_input_task"].includes(code)))
       .map((item) => item.id);
     if (["mix", "mixed"].includes(qType)) {
       const balanced = selectMixedQuestions(gate.questions, mixedTypeTargets(numQuestions));

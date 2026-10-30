@@ -762,7 +762,9 @@
       if (!msg || typeof msg.content !== 'string' || (msg.role !== 'user' && msg.role !== 'assistant')) return;
       var div = document.createElement('div');
       div.className = 'per-msg ' + (msg.role === 'user' ? 'user' : 'teacher');
-      div.textContent = msg.content;
+      div.textContent = msg.role === 'assistant'
+        ? msg.content.replace(/\s*\[(?:GOTO|CLARIFY):[^\]]+\]/g, '').trim()
+        : msg.content;
       msgs.appendChild(div);
     });
     if (!msgs.children.length) {

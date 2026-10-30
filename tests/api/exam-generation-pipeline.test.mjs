@@ -1542,3 +1542,53 @@ test("pipeline accumulation excludes repeated presented functions despite differ
     operations.checkpointPipelineJob = saved.checkpoint;
   }
 });
+
+test("generator-pruned energy-input repeats retain repair guidance through the real pipeline checkpoint", async () => {
+  const material = readFileSync(new URL("../fixtures/numbered-biology-notes.txt", import.meta.url), "utf8");
+  const quote = "Vid cellandning används glukos och syre.";
+  const a = { id: "energy-conversion", type: "mc", points: 2, cognitive_level: "förstå", concept_tag: "Cellandning",
+    question: "Vad omvandlas under cellandningen för att göra energi tillgänglig i form av ATP?",
+    options: ["Syre", "Koldioxid", "Glukos"], correct_index: 2, model_answer: quote,
+    source_references: [quote], validation_status: "verified" };
+  const b = { ...a, id: "energy-source", points: 1, concept_tag: "Energi",
+    question: "Vad används som energikälla under cellandningen?", options: ["Ljusenergi", "Koldioxid", "Glukos"] };
+  const other = { ...a, id: "distinct", question: "Vilken process producerar syre?", concept_tag: "Fotosyntes",
+    options: ["Fotosyntes", "Cellandning", "Osmos"], correct_index: 0, model_answer: "Fotosyntes" };
+  const job = { id: "11111111-1111-4111-8111-111111111111", user_id: "synthetic-energy-user",
+    idempotency_key: "22222222-2222-4222-8222-222222222222", request_hash: "a".repeat(64),
+    attempt_id: "33333333-3333-4333-8333-333333333333", lease_token: "44444444-4444-4444-8444-444444444444",
+    deadline_at: new Date(Date.now() + 300000).toISOString(), stage: "generate", requested_count: 3,
+    payload: { course: "Biologi 1", pastedText: material, qType: "mc", numQuestions: 3 },
+    accepted_questions: [], progress_current: 0 };
+  const saved = { generate: generation.generateVerifiedBatch, pipeline: operations.renewPipelineLease,
+    quota: operations.renewGenerationLease, checkpoint: operations.checkpointPipelineJob };
+  let checkpoint;
+  operations.renewPipelineLease = async () => true;
+  operations.renewGenerationLease = async () => true;
+  operations.checkpointPipelineJob = async input => {
+    checkpoint = input;
+    return { status: "checkpointed", stage: input.nextStage, progress_current: input.progressCurrent };
+  };
+  generation.generateVerifiedBatch = async () => {
+    const circular = { ...other, id: "circular", question: "Vad sker där cellandning äger rum?" };
+    const gate = require("../../api/_assessment.js").gateExam({ questions: [a, b, other, circular] },
+      { profile: "natural_sciences", sourceMaterial: material });
+    assert.deepEqual(gate.dropped.map(item => item.issues), [["repeated_energy_input_task"], ["circular_location_task"]]);
+    return { status: 200, body: { ok: true, questions: gate.questions,
+      qualityDiagnostics: { structuralIssueCounts: { repeated_energy_input_task: 1, circular_location_task: 1 } } } };
+  };
+  try {
+    assert.equal((await pipeline.advance(job)).status, "progress");
+    assert.equal(checkpoint.progressCurrent, 2);
+    assert.equal(checkpoint.nextStage, "repair");
+    assert.equal(checkpoint.repairFeedback.duplicateCount, 1);
+    assert.equal(checkpoint.repairFeedback.reviewFailureCounts.question_clarity, 1,
+      "the fixed circular-task signal survives through an existing allowlisted repair category");
+    assert.deepEqual(checkpoint.acceptedQuestions.map(q => q.id), [a, other].map(q => pipeline.batchQuestionId(job, q)));
+  } finally {
+    generation.generateVerifiedBatch = saved.generate;
+    operations.renewPipelineLease = saved.pipeline;
+    operations.renewGenerationLease = saved.quota;
+    operations.checkpointPipelineJob = saved.checkpoint;
+  }
+});
