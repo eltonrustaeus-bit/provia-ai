@@ -1121,6 +1121,7 @@ let verifierLanguageMismatchId = null;
 let verifierRejectComparisonDuplicate = false;
 let solverRejectQuestionId = null;
 let solverRejectNonsenseOption = true;
+let solverRejectOptionText = null;
 let solverAnswerIndexOverrides = new Map();
 let solverSourceCheckOverrides = new Map();
 let regenerationQuestions = null;
@@ -1384,7 +1385,8 @@ globalThis.fetch = async (input, init = {}) => {
           basis: "derived", evidence_quotes: [], option_matches: q.options.map((_, i) => i === solverIndex),
         },
         option_verdicts: q.options.map((_, i) => i === solverIndex),
-        option_plausibility: q.options.map((option) => !(solverRejectNonsenseOption && option === "Kesäkten")),
+        option_plausibility: q.options.map((option) =>
+          !((solverRejectNonsenseOption && option === "Kesäkten") || option === solverRejectOptionText)),
         index: solverIndex,
         confidence: 1, reason: "Syntetiskt kontrollsvar.",
         };
@@ -1864,11 +1866,16 @@ try {
     question.id === "biology-repair-1" && question.options.includes("Kloroplasterna")),
   "a source-supported repair candidate can replace the deterministically dropped outlier");
   verifierRejectOptionId = null;
-  solverRejectNonsenseOption = true;
+  solverRejectNonsenseOption = false;
+  solverRejectOptionText = "en blå resväska";
   regenerationQuestions = null;
 
-  activeQuestions = malformedBiology;
+  const solverMalformedBiology = biologyQuestions.map((question) => question.id === "biology-1"
+    ? { ...question, options: ["I cellkärnan", "I kloroplasterna", "en blå resväska"], correct_index: 1, model_answer: "I kloroplasterna" }
+    : question);
+  activeQuestions = solverMalformedBiology;
   regenerationQuestions = repairedBiology;
+  const verifierInputCountBeforeSolverRejection = verifierInputs.length;
   const solverInputCountBeforeSolverRejection = solverInputs.length;
   calls.length = 0;
   const solverRejectedNonsenseExam = await invoke(generateExam, {
@@ -1876,13 +1883,24 @@ try {
   });
   assert.equal(solverRejectedNonsenseExam.status, 200, JSON.stringify(solverRejectedNonsenseExam.body));
   assert.equal(solverRejectedNonsenseExam.body.exam.questions.length, 3);
+  assert.ok(verifierInputs.slice(verifierInputCountBeforeSolverRejection)
+    .some((review) => review.questions.some((question) => question.id === "biology-1"
+      && question.options.includes("en blå resväska"))),
+  "the candidate reaches the reviewer before the solver-only rejection");
   assert.equal(solverInputs.slice(solverInputCountBeforeSolverRejection)
-    .some((batch) => batch.some((question) => question.id === "biology-1" && question.options.includes("Kesäkten"))), false,
-  "an unsupported outlier does not reach the blind solver in the subsequent request either");
-  assert.equal(solverRejectedNonsenseExam.body.exam.questions.some((question) => question.options.includes("Kesäkten")), false,
+    .some((batch) => batch.some((question) => question.id === "biology-1" && question.options.includes("en blå resväska"))), true,
+  "a reviewer-approved candidate reaches the blind solver and is rejected for its implausible option");
+  assert.equal(solverRejectedNonsenseExam.body.exam.questions.some((question) => question.options.includes("en blå resväska")), false,
     "the solver's option-plausibility rejection triggers bounded replacement when the verifier does not flag the item");
   assert.ok(solverRejectedNonsenseExam.body.exam.questions.some((question) => question.id === "biology-repair-1"),
     "the solver-rejected item is replaced by an independently checked candidate");
+  assert.ok(verifierInputs.slice(verifierInputCountBeforeSolverRejection)
+    .some((review) => review.questions.some((question) => question.id === "biology-repair-1")),
+  "the replacement candidate is independently reviewed");
+  assert.ok(solverInputs.slice(solverInputCountBeforeSolverRejection)
+    .some((batch) => batch.some((question) => question.id === "biology-repair-1")),
+  "the replacement candidate also reaches the independent solver");
+  solverRejectOptionText = null;
   regenerationQuestions = null;
 
   const allWordNonsenseBiology = biologyQuestions.map((question) => question.id === "biology-1"

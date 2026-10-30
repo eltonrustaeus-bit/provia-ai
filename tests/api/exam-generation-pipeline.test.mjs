@@ -12,6 +12,22 @@ const mistakeTrainingGold = JSON.parse(readFileSync(
   new URL("../evals/exam-quality/mistake-training-gold.v1.json", import.meta.url), "utf8",
 ));
 
+test("mixed tied deficits alternate MC and short after a no-progress attempt", () => {
+  const targets = generation.mixedTypeTargets(12);
+  const accepted = [
+    ...Array.from({ length: 3 }, (_, index) => ({ id: `mc-${index}`, type: "mc" })),
+    ...Array.from({ length: 3 }, (_, index) => ({ id: `short-${index}`, type: "short" })),
+  ];
+  assert.equal(pipeline.nextBatchType(accepted, targets, 12, 1), "mc",
+    "the first tied batch preserves the existing MC-first preference");
+  assert.equal(pipeline.nextBatchType(accepted, targets, 12), "mc",
+    "missing retry metadata safely defaults to the original MC-first choice");
+  assert.equal(pipeline.nextBatchType(accepted, targets, 12, 2), "short",
+    "the second no-progress claim tries the other requested type");
+  assert.equal(pipeline.nextBatchType(accepted, targets, 12, 3), "mc");
+  assert.equal(pipeline.nextBatchType(accepted, targets, 12, 4), "short");
+});
+
 const original = {
   generateVerifiedBatch: generation.generateVerifiedBatch,
   finalizeVerifiedExam: generation.finalizeVerifiedExam,
@@ -914,15 +930,17 @@ test("short repairs may widen, but MC repairs retain the normal cap and exact ex
     checkpointPipelineJob: operations.checkpointPipelineJob,
   };
   try {
-    for (const { attempts, stage, existingCount, expectedBatch, expectedAccepted, qType = "short" } of [
+    for (const { attempts, stage, existingCount, expectedBatch, expectedAccepted, qType = "short", expectedType, existingTypes } of [
       { attempts: 1, stage: "repair", existingCount: 2, expectedBatch: 3, expectedAccepted: 3 },
       { attempts: 2, stage: "repair", existingCount: 2, expectedBatch: 5, expectedAccepted: 5 },
       { attempts: 2, stage: "repair", existingCount: 10, expectedBatch: 2, expectedAccepted: 2 },
       { attempts: 2, stage: "repair", existingCount: 11, expectedBatch: 2, expectedAccepted: 1 },
       { attempts: 2, stage: "generate", existingCount: 0, expectedBatch: 3, expectedAccepted: 3 },
       { attempts: 2, stage: "repair", existingCount: 0, expectedBatch: 3, expectedAccepted: 3, qType: "mc" },
-      { attempts: 2, stage: "repair", existingCount: 0, expectedBatch: 3, expectedAccepted: 3, qType: "mix" },
+      { attempts: 2, stage: "repair", existingCount: 0, expectedBatch: 5, expectedAccepted: 5, qType: "mix", expectedType: "short" },
       { attempts: 3, stage: "repair", existingCount: 0, expectedBatch: 3, expectedAccepted: 3, qType: "mix" },
+      { attempts: 1, stage: "repair", existingCount: 6, existingTypes: ["mc", "mc", "mc", "short", "short", "short"], expectedBatch: 3, expectedAccepted: 3, qType: "mix", expectedType: "mc" },
+      { attempts: 2, stage: "repair", existingCount: 6, existingTypes: ["mc", "mc", "mc", "short", "short", "short"], expectedBatch: 3, expectedAccepted: 3, qType: "mix", expectedType: "short" },
     ]) {
       const job = {
         id: "00000000-0000-4000-8000-000000000015",
@@ -937,7 +955,7 @@ test("short repairs may widen, but MC repairs retain the normal cap and exact ex
         requested_count: 12,
         payload: { qType, numQuestions: 12 },
         accepted_questions: Array.from({ length: existingCount }, (_, index) => ({
-          id: `approved-${index + 1}`, type: "short", question: `Approved ${index + 1}`,
+          id: `approved-${index + 1}`, type: existingTypes?.[index] || "short", question: `Approved ${index + 1}`,
           validation_status: "verified",
         })),
         progress_current: existingCount,
@@ -951,8 +969,8 @@ test("short repairs may widen, but MC repairs retain the normal cap and exact ex
       };
       generation.generateVerifiedBatch = async ({ payload }) => {
         requestedBatch = payload.numQuestions;
-        const expectedType = qType === "mix" ? "mc" : qType;
-        assert.equal(payload.qType, expectedType,
+        const expectedBatchType = expectedType || (qType === "mix" ? "mc" : qType);
+        assert.equal(payload.qType, expectedBatchType,
           "limiting MC work does not change the requested type or mixed-exam targets");
         return {
           status: 200,
@@ -960,9 +978,9 @@ test("short repairs may widen, but MC repairs retain the normal cap and exact ex
             ok: true,
             questions: Array.from({ length: payload.numQuestions }, (_, index) => ({
               id: `repair-${attempts}-${index + 1}`,
-              type: expectedType,
+              type: expectedBatchType,
               question: `Verified repair ${attempts}-${index + 1}`,
-              ...(expectedType === "mc" ? { options: ["A", "B", "C"], correct_index: 0 } : {}),
+              ...(expectedBatchType === "mc" ? { options: ["A", "B", "C"], correct_index: 0 } : {}),
               validation_status: "verified",
             })),
           },

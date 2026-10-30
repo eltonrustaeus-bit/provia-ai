@@ -1,5 +1,32 @@
 # 08 Current Status
 
+## Local reliability fixes — awaiting Preview acceptance — 2026-10-31
+
+- Mixed 12-question jobs now alternate the requested question type on tied
+  no-progress claims, instead of selecting MC indefinitely. The original
+  MC-first choice remains on the first attempt; per-type targets, the bounded
+  batch size, independent review and solver gates are unchanged.
+- Ordinary P.E.R answers that require review are buffered until the review
+  succeeds. A malformed review or a serious finding without a usable
+  correction returns a safe retry message; no unreviewed answer delta or
+  history is exposed. Answers that do not require review still stream, and
+  active-exam guidance keeps its separate restricted flow.
+- Verified results retain bounded custom course labels such as “Biologi
+  lokal” and “Kemi: syror och baser”. Instruction-like names, including
+  accented Swedish phrases, are rejected; the coaching prompt now describes
+  the same boundary.
+- Focused offline verification: exam pipeline plus generation pipeline
+  **35/35**; targeted P.E.R streaming safety **8/8**; custom-course handler
+  **1/1**; `tests/per/per-review.test.mjs` reports “Allt grönt”. Syntax checks
+  and `git diff --check` passed. The independent reviewer found no remaining
+  blocker in these scoped changes.
+- These are local/mocked results, not new model-quality evidence. The previous
+  live 12-question 0/12 failure remains unresolved until a fresh, bounded
+  staging run demonstrates relevant questions. User approved at most **$0.50
+  additional staging budget** for one synthetic end-to-end 12-question test;
+  verify the current counter and exact Preview before using it. No database,
+  account, quota, `main` or Production change was made for this checkpoint.
+
 ## Final acceptance stopped; bounded MC repair follow-up — 2026-10-31
 
 - The exact `9762b53` Preview was READY on the same authenticated feature

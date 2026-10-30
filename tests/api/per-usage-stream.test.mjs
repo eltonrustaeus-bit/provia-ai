@@ -31,8 +31,10 @@ let quotaCommitApplied = false;
 let failQuotaCommit = false;
 let waitForClientAbort = false;
 let disconnectBeforeFirstDelta = false;
+let disconnectAfterProviderDelta = false;
 let disconnectDuringQuotaCommit = false;
 let responseForDisconnect = null;
+let providerAborted = false;
 let failResponses = false;
 let providerAnswer = "Börja med begreppet och pröva ett eget exempel.";
 let streamAnswer = "Börja med att hitta ett begrepp i ditt material.";
@@ -88,7 +90,11 @@ globalThis.fetch = async (input, init = {}) => {
         start(controller) {
           if (disconnectBeforeFirstDelta) responseForDisconnect?.emit("close");
           controller.enqueue(new TextEncoder().encode(partial));
-          init.signal.addEventListener("abort", () => controller.error(new DOMException("Aborted", "AbortError")), { once: true });
+          if (disconnectAfterProviderDelta) setTimeout(() => responseForDisconnect?.emit("close"), 0);
+          init.signal.addEventListener("abort", () => {
+            providerAborted = true;
+            controller.error(new DOMException("Aborted", "AbortError"));
+          }, { once: true });
         },
       });
       return new Response(bodyStream, { status: 200 });
@@ -240,11 +246,12 @@ test("streaming P.E.R emits no model text when quota cannot be committed", async
   assert.ok(requests.some((request) => request.url.endsWith("/rpc/refund_per_chat_quota")));
 });
 
-test("streaming P.E.R aborts model work after a client disconnect", async () => {
+test("streaming P.E.R aborts model work when disconnect occurs while output is buffered for review", async () => {
   requests.length = 0;
   waitForClientAbort = true;
+  disconnectAfterProviderDelta = true;
+  providerAborted = false;
   const res = response();
-  res.closeAfterFirstDelta = true;
   responseForDisconnect = res;
   try {
     await handler({
@@ -252,10 +259,15 @@ test("streaming P.E.R aborts model work after a client disconnect", async () => 
       headers: { authorization: "Bearer synthetic-user-token", accept: "text/event-stream" },
       body: { userQuestion: "Hur börjar jag tänka?", pageContext: { page: "app" } },
     }, res);
-  } finally { waitForClientAbort = false; }
+  } finally {
+    waitForClientAbort = false;
+    disconnectAfterProviderDelta = false;
+  }
   assert.equal(res.ended, undefined);
-  assert.match(res.chunks.join(""), /Börja med en ledtråd/);
+  assert.doesNotMatch(res.chunks.join(""), /Börja med en ledtråd/,
+    "no answer text is emitted before the required review completes");
   assert.doesNotMatch(res.chunks.join(""), /P\.E\.R är tillfälligt otillgänglig/);
+  assert.equal(providerAborted, true, "the provider stream is cancelled after the client disconnects");
   assert.ok(requests.some((request) => request.url.endsWith("/rpc/commit_per_chat_quota")));
   assert.ok(!requests.some((request) => request.url.endsWith("/rpc/refund_per_chat_quota")));
 });
@@ -352,6 +364,10 @@ test("a serious ordinary-chat P.E.R correction replaces the answer without a sel
     assert.ok(correctionEvent);
     assert.equal(correctionEvent.reviewedAnswer, "Kontrollera insättningen: rätt värde är x = 4.");
     assert.equal(correctionEvent.history.at(-1).content, correctionEvent.reviewedAnswer);
+    assert.equal(events.some((event) => event.delta?.includes("x = 5")), false,
+      "ordinary chat never exposes the unreviewed incorrect primary answer");
+    assert.equal(events.some((event) => event.delta?.includes("x = 4")), false,
+      "reviewed corrections are delivered through the final-answer event only");
     assert.equal(events.find(event => event.done)?.history?.at(-1)?.content, correctionEvent.reviewedAnswer,
       "the terminal event must not overwrite the reviewed answer with the original history");
     assert.equal(events.some((event) => event.granskning), false,
@@ -361,6 +377,48 @@ test("a serious ordinary-chat P.E.R correction replaces the answer without a sel
     assert.equal(historyWrites.length, 1, "the flagged primary is never committed to history");
     assert.equal(historyWrites[0].body.p_messages.at(-1).content, correctionEvent.reviewedAnswer);
     assert.doesNotMatch(historyWrites[0].body.p_messages.at(-1).content, /P\.E\.R-kontroll|jag kontrollerade mitt svar/i);
+  } finally {
+    streamAnswer = "Börja med att hitta ett begrepp i ditt material.";
+    reviewAnswer = null;
+  }
+});
+
+test("ordinary-chat answer is withheld when a required review response is invalid", async () => {
+  requests.length = 0;
+  streamAnswer = "Ekvationen ger x = 5.";
+  reviewAnswer = JSON.stringify({ allvar: "allvarlig", fynd: "invalid", rättelse: "Rätt värde är x = 4." });
+  try {
+    const res = await invoke("text/event-stream", { userQuestion: "Hur löser jag ekvationen?" });
+    const events = res.chunks.filter((chunk) => chunk.startsWith("data: "))
+      .map((chunk) => JSON.parse(chunk.slice(6).trim()));
+    assert.equal(events.some((event) => event.delta?.includes("x = 5")), false,
+      "a malformed review contract never leaks the unreviewed answer");
+    const unavailable = events.find((event) => event.reviewUnavailable);
+    assert.ok(unavailable);
+    assert.match(unavailable.reviewUnavailable, /säkerställa svaret/i);
+    assert.equal(unavailable.history?.at(-1).content, unavailable.reviewUnavailable);
+    assert.equal(events.some((event) => event.granskning), false,
+      "ordinary chat still hides internal review details");
+  } finally {
+    streamAnswer = "Börja med att hitta ett begrepp i ditt material.";
+    reviewAnswer = null;
+  }
+});
+
+test("ordinary-chat answer is withheld when a serious review has no usable correction", async () => {
+  requests.length = 0;
+  streamAnswer = "Ekvationen ger x = 5.";
+  reviewAnswer = JSON.stringify({
+    allvar: "allvarlig", fynd: [{ typ: "räknefel", citat: "x = 5", varför: "Rätt svar saknas." }], rättelse: null,
+  });
+  try {
+    const res = await invoke("text/event-stream", { userQuestion: "Hur löser jag ekvationen?" });
+    const events = res.chunks.filter((chunk) => chunk.startsWith("data: "))
+      .map((chunk) => JSON.parse(chunk.slice(6).trim()));
+    assert.equal(events.some((event) => event.delta?.includes("x = 5")), false);
+    assert.ok(events.some((event) => event.reviewUnavailable),
+      "a serious review without a usable correction fails closed");
+    assert.equal(events.some((event) => event.reviewedAnswer), false);
   } finally {
     streamAnswer = "Börja med att hitta ett begrepp i ditt material.";
     reviewAnswer = null;
@@ -478,7 +536,8 @@ test("streaming P.E.R ends safely when the provider stream fails after a partial
   const payload = res.chunks.join("");
   assert.equal(res.statusCode, 200);
   assert.equal(res.ended, true);
-  assert.match(payload, /Börja med en ledtråd/);
+  assert.doesNotMatch(payload, /Börja med en ledtråd/,
+    "ordinary chat never exposes a partial answer from a failed provider stream");
   assert.match(payload, /P\.E\.R är tillfälligt otillgänglig/);
   assert.doesNotMatch(payload, /synthetic provider stream reset/);
   assert.ok(requests.some((request) => request.url.endsWith("/rpc/commit_per_chat_quota")),
@@ -498,7 +557,8 @@ test("streaming P.E.R does not commit a partial answer after clean EOF without a
 
   const payload = res.chunks.join("");
   assert.equal(res.ended, true);
-  assert.match(payload, /Börja med en ledtråd/);
+  assert.doesNotMatch(payload, /Börja med en ledtråd/,
+    "ordinary chat never exposes a partial answer from a stream without a terminal event");
   assert.match(payload, /Svaret avbröts innan det blev klart/);
   assert.doesNotMatch(payload, /"done":true/);
   assert.equal(requests.some((request) => request.url.endsWith("/rest/v1/rpc/save_per_session_if_epoch") && request.body?.p_messages?.at(-1)?.role === "assistant"), false);
@@ -516,6 +576,10 @@ test("streaming P.E.R rejects provider output explicitly truncated by its token 
 
   const payload = res.chunks.join("");
   assert.equal(res.ended, true);
+  const events = res.chunks.filter((chunk) => chunk.startsWith("data: "))
+    .map((chunk) => JSON.parse(chunk.slice(6).trim()));
+  assert.equal(events.some((event) => event.delta), false,
+    "ordinary chat never exposes any partial answer truncated by the provider");
   assert.match(payload, /Svaret avbröts innan det blev klart/);
   assert.doesNotMatch(payload, /"done":true/);
   assert.equal(requests.some((request) => request.url.endsWith("/rest/v1/rpc/save_per_session_if_epoch") && request.body?.p_messages?.at(-1)?.role === "assistant"), false);

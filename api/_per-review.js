@@ -6,17 +6,16 @@
 // spåret av att felet fanns. En som bara får poängsätta måste peka på texten.
 //
 // VARFÖR DEN INTE KÖR PÅ ALLT
-// Ett extra modellanrop per svar dubblar kostnaden och lägger sekunder på
-// väntetiden. needsReview() är därför en ren funktion som släpper igenom det
-// där ett fel faktiskt kostar eleven något — matematik, rättning, påståenden om
-// vad som gäller — och hoppar över "hej" och navigering.
+// Ett extra modellanrop per granskat svar kostar pengar och väntetid.
+// needsReview() är därför en ren funktion som prioriterar matematik, rättning,
+// påståenden om vad som gäller och långa ledtrådar, men hoppar över "hej" och
+// navigering.
 //
-// VARFÖR DEN INTE STOPPAR STRÖMNINGEN
-// Eleven ser svaret medan det skrivs. Att hålla tillbaka det tills granskningen
-// är klar hade fördubblat väntetiden och tagit bort känslan av att någon svarar
-// direkt. Granskningen körs efter att svaret är färdigt. Vid ett ALLVARLIGT
-// fynd ersätter vanlig chatt svaret med den korta rättelsen i samma bubbla;
-// provsidor behåller sin separata, pedagogiskt avgränsade rättelsevisning.
+// NÄR SVARET VISAS
+// Vanlig chatt håller tillbaka svaret tills en obligatorisk granskning är klar.
+// Vid ett allvarligt fynd visas den korta rättelsen i samma bubbla. Om granskaren
+// inte kan ge ett giltigt resultat visas en säker retry-text i stället för det
+// ogranskade svaret. Den aktiva provhjälpens separata pedagogiska flöde behålls.
 
 /** Vad granskaren får säga om allvaret. Ordningen är stigande. */
 export const ALLVAR = Object.freeze(["ingen", "mindre", "allvarlig"]);
@@ -159,25 +158,23 @@ ${svar}`;
 }
 
 /**
- * Läser granskarens svar. Fel vid tolkning betyder ALLTID "ingen anmärkning".
- *
- * Fail open, tvärtemot en säkerhetsgrind: ett trasigt granskningssvar får inte
- * göra att eleven ser en rättelse som inte finns täckning för. Det värsta en
- * utebliven granskning gör är att lämna svaret som det var — samma läge som
- * innan modulen fanns.
+ * Läser granskarens svar. `valid` skiljer ett giltigt "ingen anmärkning" från
+ * en trasig eller ofullständig granskning. Vanlig chatt håller tillbaka svar
+ * som kräver granskning när `valid` är falskt.
  */
 export function parseReview(data) {
-  const tomt = { allvar: "ingen", fynd: [], rättelse: null, visas: false };
+  const tomt = { allvar: "ingen", fynd: [], rättelse: null, visas: false, valid: false };
   try {
     const o = typeof data === "string" ? JSON.parse(data) : data;
-    if (!o || !ALLVAR.includes(o.allvar)) return tomt;
+    if (!o || typeof o !== "object" || Array.isArray(o) || !ALLVAR.includes(o.allvar)) return tomt;
 
     /* SCHEMABROTT SLÄCKER HELA SVARET.
        `fynd` som inte är en lista betyder att modellen inte följde kontraktet,
        och då går det inte att lita på `allvar` eller `rättelse` heller. Det är
        en annan sak än en lista med trasiga POSTER: där är kontraktet hållet och
        bara underlaget tunt, och rättelsen — det eleven behöver — står kvar. */
-    if (o.fynd !== undefined && !Array.isArray(o.fynd)) return tomt;
+    if (!Array.isArray(o.fynd) || !Object.hasOwn(o, "rättelse") ||
+        (o.rättelse !== null && typeof o.rättelse !== "string")) return tomt;
 
     const fynd = Array.isArray(o.fynd)
       ? o.fynd
@@ -195,9 +192,10 @@ export function parseReview(data) {
       ? o.rättelse.trim().slice(0, 600)
       : null;
 
-    /* "allvarlig" utan rättelse visas inte. En varning utan besked om vad som
-       gäller i stället lämnar eleven sämre ställd än ingen varning alls. */
-    return { allvar: o.allvar, fynd, rättelse, visas: !!rättelse };
+    /* En allvarlig varning utan rättelse är inte ett säkert godkännande.
+       Markera den som ogiltig så att vanliga svar hålls tillbaka. */
+    const valid = !(allvarlig && !rättelse);
+    return { allvar: o.allvar, fynd, rättelse, visas: !!rättelse, valid };
   } catch {
     return tomt;
   }

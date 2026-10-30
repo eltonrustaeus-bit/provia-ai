@@ -24,13 +24,17 @@ function missingForType(questions, type, targets, requested) {
   return Math.max(0, targets[type] - questions.filter((question) => question.type === type).length);
 }
 
-function nextBatchType(questions, targets, requested) {
+function nextBatchType(questions, targets, requested, stageAttempts = 1) {
   if (!targets) return null;
   const mcMissing = missingForType(questions, "mc", targets, requested);
   const shortMissing = missingForType(questions, "short", targets, requested);
   if (mcMissing === 0) return "short";
   if (shortMissing === 0) return "mc";
-  return mcMissing >= shortMissing ? "mc" : "short";
+  if (mcMissing !== shortMissing) return mcMissing > shortMissing ? "mc" : "short";
+  // Preserve the normal MC-first choice, but alternate tied mixed batches
+  // after no-progress retries so a weak MC path cannot starve short answers.
+  const attempt = Number(stageAttempts);
+  return Number.isInteger(attempt) && attempt > 0 && attempt % 2 === 0 ? "short" : "mc";
 }
 
 function noSemanticDuplicate(questions, candidate, options = {}) {
@@ -388,7 +392,7 @@ async function advance(job, { deadlineAt = null } = {}) {
   const uncoveredBefore = uncoveredTrainingFocusIds(job, acceptedBefore);
   const priorQuestions = Array.isArray(job.payload.priorQuestions) ? job.payload.priorQuestions : [];
   const targets = questionTargets(job);
-  const batchType = targets ? nextBatchType(existing, targets, job.requested_count) : job.payload.qType;
+  const batchType = targets ? nextBatchType(existing, targets, job.requested_count, job.stage_attempts) : job.payload.qType;
   const slots = missingForType(existing, batchType || "", targets, job.requested_count);
   // Claims increment stage_attempts; a checkpoint with progress resets it.
   // Only short-answer repairs may widen after no progress. MC candidates also
