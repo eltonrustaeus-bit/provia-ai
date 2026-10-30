@@ -22,10 +22,16 @@
   blocker in these scoped changes.
 - These are local/mocked results, not new model-quality evidence. The previous
   live 12-question 0/12 failure remains unresolved until a fresh, bounded
-  staging run demonstrates relevant questions. User approved at most **$0.50
-  additional staging budget** for one synthetic end-to-end 12-question test;
-  verify the current counter and exact Preview before using it. No database,
-  account, quota, `main` or Production change was made for this checkpoint.
+  staging run demonstrates relevant questions. Commit `e4af81f` is pushed on
+  the existing feature branch; Vercel Preview `dpl_9RUAsSj6S5WiVAVUJNz1T5b4hzEh`
+  is READY on that exact commit and the existing stable branch alias now points
+  to it. The already-open Preview session is authenticated, but its account
+  has a saved result and the app correctly disables creation of another exam.
+  That result was preserved, so no new paid test was run. The approved +$0.50
+  staging budget cap was briefly applied, then restored because the test could
+  not proceed; spend/reserved counters did not change (cap 3.379071, spent
+  3.064882, reserved 0.263628, available 0.050561 USD). No schema, account,
+  role, `main` or Production change was made for this checkpoint.
 
 ## Final acceptance stopped; bounded MC repair follow-up — 2026-10-31
 
