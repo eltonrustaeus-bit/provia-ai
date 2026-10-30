@@ -89,13 +89,34 @@ try {
     });
     if (name === "complete response") {
       assert.equal(outcome.callOk, true, name);
+      assert.equal(outcome.failureReason, null, name);
       assert.equal(outcome.perQuestion.size, questions.length, name);
     } else {
       assert.equal(outcome.callOk, false, name);
+      assert.equal(outcome.failureReason, "invalid_contract", name);
       assert.equal(outcome.perQuestion.size, 0, name);
     }
     assert.equal(outcome.model, "measured-solver-model", name);
     assert.deepEqual(outcome.usage, { input_tokens: 44, output_tokens: 9 }, name);
+  }
+  const sensitiveMarker = "synthetic-question-or-secret-must-not-appear";
+  for (const [name, respond, expectedReason] of [
+    ["http failure", async () => new Response(sensitiveMarker, { status: 429 }), "http_error"],
+    ["bad outer JSON", async () => new Response(sensitiveMarker), "invalid_response_json"],
+    ["no output", async () => new Response(JSON.stringify({ output: [] })), "missing_output"],
+    ["bad output JSON", async () => new Response(JSON.stringify({ output_text: sensitiveMarker })), "invalid_output_json"],
+    ["null output", async () => new Response(JSON.stringify({ output_text: "null" })), "invalid_contract"],
+    ["request exception", async () => { throw new Error(sensitiveMarker); }, "request_failed"],
+  ]) {
+    globalThis.fetch = respond;
+    const outcome = await solver.solveQuestions([questions[0]], {
+      apiKey: "test-only", model: "test-model", lang: "en", material: sensitiveMarker,
+    });
+    assert.equal(outcome.callOk, false, name);
+    assert.equal(outcome.perQuestion.size, 0, name);
+    assert.equal(outcome.failureReason, expectedReason, name);
+    assert.equal(JSON.stringify(outcome).includes(sensitiveMarker), false,
+      `${name}: diagnostic output never includes provider text or source content`);
   }
   let solverTimeoutSignal = null;
   const solverTimeoutKeeper = setTimeout(() => {}, 1_100);
@@ -111,6 +132,8 @@ try {
     apiKey: "test-only", model: "test-model", lang: "en", material: "test", timeoutMs: 1_000,
   });
   assert.equal(timedOut.callOk, false, "an actually expired retry solver signal fails closed");
+  assert.equal(timedOut.failureReason, "timeout");
+  assert.ok(timedOut.latencyMs >= 900, "failed requests retain their observed elapsed time");
   assert.equal(solverTimeoutSignal.aborted, true, "the bounded solver request is aborted at its timeout");
   clearTimeout(solverTimeoutKeeper);
 } finally {

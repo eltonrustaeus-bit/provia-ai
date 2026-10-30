@@ -282,7 +282,7 @@ async function solveQuestions(questions, opts) {
   const mcs = (questions || []).filter(
     q => q && q.type === "mc" && Array.isArray(q.options) && q.options.length >= 2
   );
-  const empty = { perQuestion: new Map(), callOk: false, solved: 0, model: solverModel(model), usage: null, latencyMs: 0 };
+  const empty = { perQuestion: new Map(), callOk: false, solved: 0, model: solverModel(model), usage: null, latencyMs: 0, failureReason: null };
   if (!mcs.length) return { ...empty, callOk: true };
 
   // Stem and options only. correct_index, model_answer, rubric and
@@ -292,7 +292,12 @@ async function solveQuestions(questions, opts) {
   const trimmedMaterial = materialInput.truncateMaterial(material, MATERIAL_CHAR_CAP);
 
   const startedAt = Date.now();
+  // Fixed diagnostic categories only: never retain provider errors, response
+  // text, question content or credentials. Failed calls still consume time.
+  const failed = (failureReason) => ({ ...empty, failureReason, latencyMs: Date.now() - startedAt });
+  let signal;
   try {
+    signal = AbortSignal.timeout(Math.max(1000, Number(timeoutMs) || 25_000));
     const r = await budgetedOpenAIFetch("https://api.openai.com/v1/responses", {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
@@ -304,25 +309,25 @@ async function solveQuestions(questions, opts) {
         ],
         text: { format: buildSolverSchema(mcs.length) },
       }),
-      signal: AbortSignal.timeout(Math.max(1000, Number(timeoutMs) || 25_000)),
+      signal,
     }, { userId });
-    if (!r.ok) return empty;
+    if (!r.ok) return failed("http_error");
     const raw = await r.text();
     let data;
-    try { data = JSON.parse(raw); } catch { return empty; }
+    try { data = JSON.parse(raw); } catch { return failed("invalid_response_json"); }
     empty.usage = data?.usage || null;
     empty.model = data?.model || empty.model;
     empty.latencyMs = Date.now() - startedAt;
     if (empty.usage) await settleAiSpend(r.aiSpendReservation, empty.usage);
     const outputText = extractOutputText(data);
-    if (!outputText) return empty;
+    if (!outputText) return failed("missing_output");
     let parsed;
-    try { parsed = JSON.parse(outputText); } catch { return empty; }
-    const perQuestion = parseSolverResults(parsed.results, mcs, trimmedMaterial);
-    if (!perQuestion) return empty;
-    return { perQuestion, callOk: true, solved: mcs.length, model: empty.model, usage: empty.usage, latencyMs: empty.latencyMs };
+    try { parsed = JSON.parse(outputText); } catch { return failed("invalid_output_json"); }
+    const perQuestion = parseSolverResults(parsed?.results, mcs, trimmedMaterial);
+    if (!perQuestion) return failed("invalid_contract");
+    return { perQuestion, callOk: true, solved: mcs.length, model: empty.model, usage: empty.usage, latencyMs: empty.latencyMs, failureReason: null };
   } catch {
-    return empty;
+    return failed(signal?.aborted ? "timeout" : "request_failed");
   }
 }
 

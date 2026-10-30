@@ -1603,13 +1603,13 @@ test("separate authenticated advance requests persist full 3/6/12 runs, retry sa
       console.info = originalBatchInfo;
     }
     assert.equal(widenedBatchResponse.statusCode, 202);
-    assert.equal(widenedBatchResponse.body.approved, 6,
-      "the five-candidate repair batch accepts only the three candidates that pass both independent gates");
+    assert.equal(widenedBatchResponse.body.approved, 4,
+      "the bounded three-candidate MC repair retains only the one candidate passing both independent gates");
     const widenedRepairCandidateStems = actualGenerationCandidateStems.slice(widenedRepairStemOffset);
-    assert.equal(widenedRepairCandidateStems.length, 5,
+    assert.equal(widenedRepairCandidateStems.length, 3,
       "the telemetry privacy check captures every generated repair candidate stem");
-    const widenedEvent = widenedBatchEvents.find(event => event.stage === "repair" && event.requested === 5);
-    assert.ok(widenedEvent, "sanitized batch telemetry confirms the requested five-candidate repair stage");
+    const widenedEvent = widenedBatchEvents.find(event => event.stage === "repair" && event.requested === 3 && event.acceptedAfter === 4);
+    assert.ok(widenedEvent, "MC repair stays capped at three after a persisted no-progress attempt");
     assert.ok(widenedEvent.verifierRejected >= 1, "the independent verifier rejection is recorded in batch diagnostics");
     assert.ok(widenedEvent.solverRejected >= 1, "the blind solver rejection is recorded in batch diagnostics");
     const widenedTelemetry = JSON.stringify(widenedBatchEvents);
@@ -1627,14 +1627,14 @@ test("separate authenticated advance requests persist full 3/6/12 runs, retry sa
       assert.equal(widenedTelemetry.includes(privateValue), false,
         "batch telemetry excludes source material, rejected question text and private candidate payloads");
     }
-    assert.deepEqual(actualGenerationRequests.at(-1), { minItems: 5, maxItems: 5, repair: true },
-      "the real generator receives an exact five-candidate repair schema after a persisted no-progress attempt");
-    assert.ok(actualVerifierPayloadLengths.at(-1) >= 54_000 && actualVerifierPayloadLengths.at(-1) < 60_000,
+    assert.deepEqual(actualGenerationRequests.at(-1), { minItems: 3, maxItems: 3, repair: true },
+      "the real generator receives an exact three-candidate MC repair schema after no progress");
+    assert.ok(actualVerifierPayloadLengths.at(-1) >= nearLimitMaterial.length && actualVerifierPayloadLengths.at(-1) < 60_000,
       `the actual verifier input stays near but below its 60,000-character ceiling (${actualVerifierPayloadLengths.at(-1)})`);
-    assert.equal(actualVerifierQuestionCounts.at(-1), 5,
-      "the near-ceiling payload is the actual verifier request for all five widened candidates");
+    assert.equal(actualVerifierQuestionCounts.at(-1), 3,
+      "the actual verifier receives all three bounded repair candidates and the full near-limit source");
     assert.ok(fakeNow - batchStartedAt >= 27_000 && fakeNow - batchStartedAt <= 33_000,
-      "the five-candidate generation and independent checks fit a simulated ~30-second request window");
+      "bounded generation and independent checks fit the simulated ~30-second request window");
     assert.ok(actualGenerationDeadlines.at(-1) - fakeNow >= 12_000,
       "the synthetic clock leaves at least 12 seconds before the actual route deadline after checkpoint work");
     assert.ok(rejectedActualStems.length === 1);
@@ -1642,7 +1642,7 @@ test("separate authenticated advance requests persist full 3/6/12 runs, retry sa
       "select accepted_questions,progress_current,stage_attempts from public.mock_exam_generation_pipeline_jobs where id=$1",
       [widenedJob.id],
     )).rows[0];
-    assert.equal(widenedCheckpoint.progress_current, 6);
+    assert.equal(widenedCheckpoint.progress_current, 4);
     assert.equal(widenedCheckpoint.stage_attempts, 0);
     assert.ok(widenedCheckpoint.accepted_questions.every(question => question.validation_status === "verified"));
     assert.equal(widenedCheckpoint.accepted_questions.some(question => rejectedActualStems.includes(question.question)), false,
@@ -1696,6 +1696,56 @@ test("separate authenticated advance requests persist full 3/6/12 runs, retry sa
       "select count(*)::int as n from public.exam_issuances where user_id=$1", [userId],
     )).rows[0].n, widenedIssuanceBaseline + 1,
     "completed widened repair replay does not create a second issuance");
+
+    const diagnosticJobId = testUuid(9921);
+    const diagnosticEvents = [];
+    const diagnosticFetch = globalThis.fetch;
+    const diagnosticInfo = console.info;
+    globalThis.fetch = async (input, init = {}) => {
+      if (String(input).startsWith("https://api.openai.com/") &&
+          JSON.parse(init.body || "{}").text?.format?.name === "exam_solver_schema") {
+        return new Response(JSON.stringify({ error: "synthetic private provider failure" }), {
+          status: 503, headers: { "Content-Type": "application/json" },
+        });
+      }
+      return diagnosticFetch(input, init);
+    };
+    console.info = (value) => {
+      try {
+        const event = JSON.parse(value);
+        if (event.event === "exam_independent_check_unavailable") diagnosticEvents.push(event);
+      } catch {}
+    };
+    try {
+      const unavailable = await originalGenerateBatch({
+        userId, pipelineJobId: diagnosticJobId, deadlineAt: Date.now() + 44_000,
+        payload: { lang: "sv", level: "C", course: "Aritmetik", qType: "mc", numQuestions: 3,
+          pastedText: source, idempotencyKey: testUuid(9922) },
+      });
+      assert.equal(unavailable.status, 503, JSON.stringify(unavailable.body));
+      assert.equal(unavailable.body.error, "independent_check_unavailable");
+      assert.deepEqual(diagnosticEvents.map(event => event.stage).sort(), ["initial_solver", "repair_solver"]);
+      for (const event of diagnosticEvents) {
+        assert.equal(event.requestId, `exam-pipeline:${diagnosticJobId}`,
+          "both unavailable checks correlate with the validated parent job, not the batch quota key");
+        assert.equal(event.failure, "http_error");
+        assert.ok(Number.isFinite(event.solverLatencyMs));
+        assert.deepEqual(Object.keys(event).sort(), [
+          "elapsedMs", "event", "failure", ...(event.stage === "initial_solver" ? ["generationMs"] : []),
+          "requestId", "solverLatencyMs", "stage",
+        ].sort());
+      }
+      const diagnostics = JSON.stringify(diagnosticEvents);
+      for (const privateValue of [source, "synthetic private provider failure", "synthetic-http-openai-key"]) {
+        assert.equal(diagnostics.includes(privateValue), false);
+      }
+      assert.equal((await db.query(
+        "select count(*)::int as n from public.exam_issuances where user_id=$1", [userId],
+      )).rows[0].n, widenedIssuanceBaseline + 1, "failed checks never issue a diagnostic test exam");
+    } finally {
+      globalThis.fetch = diagnosticFetch;
+      console.info = diagnosticInfo;
+    }
     mockActualProviderResponses = false;
 
     const timeoutJob = await seedJob(32, 12);

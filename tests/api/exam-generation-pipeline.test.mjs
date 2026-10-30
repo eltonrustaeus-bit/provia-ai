@@ -907,19 +907,22 @@ test("assembly fails closed after bounded retries for a legacy question with no 
   }
 });
 
-test("repair batches widen after no progress without overfilling the requested exam", async () => {
+test("short repairs may widen, but MC repairs retain the normal cap and exact exam size", async () => {
   const prior = {
     generateVerifiedBatch: generation.generateVerifiedBatch,
     renewGenerationLease: operations.renewGenerationLease,
     checkpointPipelineJob: operations.checkpointPipelineJob,
   };
   try {
-    for (const { attempts, stage, existingCount, expectedBatch, expectedAccepted } of [
+    for (const { attempts, stage, existingCount, expectedBatch, expectedAccepted, qType = "short" } of [
       { attempts: 1, stage: "repair", existingCount: 2, expectedBatch: 3, expectedAccepted: 3 },
       { attempts: 2, stage: "repair", existingCount: 2, expectedBatch: 5, expectedAccepted: 5 },
       { attempts: 2, stage: "repair", existingCount: 10, expectedBatch: 2, expectedAccepted: 2 },
       { attempts: 2, stage: "repair", existingCount: 11, expectedBatch: 2, expectedAccepted: 1 },
       { attempts: 2, stage: "generate", existingCount: 0, expectedBatch: 3, expectedAccepted: 3 },
+      { attempts: 2, stage: "repair", existingCount: 0, expectedBatch: 3, expectedAccepted: 3, qType: "mc" },
+      { attempts: 2, stage: "repair", existingCount: 0, expectedBatch: 3, expectedAccepted: 3, qType: "mix" },
+      { attempts: 3, stage: "repair", existingCount: 0, expectedBatch: 3, expectedAccepted: 3, qType: "mix" },
     ]) {
       const job = {
         id: "00000000-0000-4000-8000-000000000015",
@@ -932,7 +935,7 @@ test("repair batches widen after no progress without overfilling the requested e
         stage,
         stage_attempts: attempts,
         requested_count: 12,
-        payload: { qType: "short", numQuestions: 12 },
+        payload: { qType, numQuestions: 12 },
         accepted_questions: Array.from({ length: existingCount }, (_, index) => ({
           id: `approved-${index + 1}`, type: "short", question: `Approved ${index + 1}`,
           validation_status: "verified",
@@ -948,21 +951,25 @@ test("repair batches widen after no progress without overfilling the requested e
       };
       generation.generateVerifiedBatch = async ({ payload }) => {
         requestedBatch = payload.numQuestions;
+        const expectedType = qType === "mix" ? "mc" : qType;
+        assert.equal(payload.qType, expectedType,
+          "limiting MC work does not change the requested type or mixed-exam targets");
         return {
           status: 200,
           body: {
             ok: true,
             questions: Array.from({ length: payload.numQuestions }, (_, index) => ({
               id: `repair-${attempts}-${index + 1}`,
-              type: "short",
+              type: expectedType,
               question: `Verified repair ${attempts}-${index + 1}`,
+              ...(expectedType === "mc" ? { options: ["A", "B", "C"], correct_index: 0 } : {}),
               validation_status: "verified",
             })),
           },
         };
       };
 
-      const result = await pipeline.advance(job, { deadlineAt: Date.now() + 50_000 });
+      const result = await pipeline.advance(job, { deadlineAt: Date.now() + 44_000 });
 
       assert.equal(requestedBatch, expectedBatch);
       assert.equal(checkpointedQuestions.length, existingCount + expectedAccepted);

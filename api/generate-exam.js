@@ -2363,6 +2363,17 @@ module.exports = async function handler(req, res, internalContext = null) {
       solverOutcome.callOk = s1.callOk;
       solverOutcome.model = s1.model;
       verifierOutcome.callOk = v1.callOk;
+      if (!s1.callOk) {
+        console.info(JSON.stringify({
+          event: "exam_independent_check_unavailable",
+          requestId: pipelineJobId ? `exam-pipeline:${pipelineJobId}` : quotaRequestId,
+          stage: "initial_solver",
+          failure: s1.failureReason || "verification_failed",
+          solverLatencyMs: s1.latencyMs,
+          generationMs: gen.latencyMs,
+          elapsedMs: budget.elapsed(),
+        }));
+      }
       if (!v1.callOk) {
         console.log(JSON.stringify({
           event: "exam_quality_review_unavailable",
@@ -2564,6 +2575,16 @@ module.exports = async function handler(req, res, internalContext = null) {
                   ]);
                   const repairVerifierUsageEvent = recordUsage("verify_compare", v2.model, v2.usage, v2.latencyMs);
                   const repairSolverUsageEvent = recordUsage("verify_blind", s2.model, s2.usage, s2.latencyMs);
+                  if (!s2.callOk) {
+                    console.info(JSON.stringify({
+                      event: "exam_independent_check_unavailable",
+                      requestId: pipelineJobId ? `exam-pipeline:${pipelineJobId}` : quotaRequestId,
+                      stage: "repair_solver",
+                      failure: s2.failureReason || "verification_failed",
+                      solverLatencyMs: s2.latencyMs,
+                      elapsedMs: budget.elapsed(),
+                    }));
+                  }
                   repairVerifierCallOk = v2.callOk;
                   repairVerifierChecked = v2.callOk ? candidateQuestions.length : 0;
                   repairVerifierFailure = v2.failureReason || null;

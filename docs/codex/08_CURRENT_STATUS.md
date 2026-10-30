@@ -1,5 +1,46 @@
 # 08 Current Status
 
+## Final acceptance stopped; bounded MC repair follow-up — 2026-10-31
+
+- The exact `9762b53` Preview was READY on the same authenticated feature
+  alias. One subsequent synthetic 12-question biology job
+  `1d1658e6-d92a-460f-9bcc-492cae674378` terminated at **0/12**,
+  `STAGE_RETRY_LIMIT`, after three claims. UI explicitly says no exam was
+  delivered. Hosted metadata confirms zero active exams, scrubbed private job
+  payload and zero retained questions. No replacement test was started.
+- Sanitized first-batch diagnostics: 3 MC candidates reviewed, 1 reviewer
+  approval, all 3 rejected by the blind solver for implausible options; zero
+  structural drops. Optional repair did not recover enough unique candidates.
+  The two later repairs expanded to 5 MC candidates under the same roughly
+  44-second route remainder and ended `independent_check_unavailable` after
+  about 41 and 39 seconds. This proves unavailable independent checks, not
+  specifically a timeout; old diagnostics cannot distinguish the cause.
+- Code now limits MC repair batches to the normal maximum of 3, including
+  mixed jobs; short-answer widening remains. Final type targets, approval
+  gates, deadlines, retry limits, ownership, issuance and quota logic remain.
+  Solver failures now retain elapsed time and fixed, content-free failure
+  categories. Both initial and repair checks log the namespaced correlation
+  ID and safe timing/category fields, without provider text or learner data.
+- Offline focused pipeline/HTTP/budget/solver group **43/43**. The HTTP/PGlite
+  case follows a persisted no-progress repair through the real generator and
+  two mocked independent roles: 3 candidates, 1 rejected by each role,
+  1 accepted; it then resumes to exactly 12 with one issuance/quota commit and
+  safe replay. These provider responses are mocked, not new live acceptance.
+  Updated allocation matrix also passes **33/33** at a 44-second deadline.
+  Independent review found and resolved two diagnostic gaps: logs now use the
+  validated parent-job correlation key, and JSON null is invalid_contract.
+  Real mocked-handler coverage exercises both initial/repair failure events,
+  exact safe log fields and no issuance; final bounded review has no findings.
+- Full frontend regression finished **246 passed, 0 failed** on `9762b53`;
+  this is local browser-harness evidence. No frontend code changed afterward.
+  Production migration metadata was read again: canonical `20261020170419`
+  exists and temporary `20261028095505` does not; no repeat write was needed.
+- Fresh staging budget: spent **3.064882**, reserved **0.263628**, available
+  **0.050561 USD**, unchanged hard cap **3.379071**. No new paid test was
+  started for this patch; another full acceptance attempt is not assumed to
+  fit. The initial semantic option defects remain unproven fixed. PR #125
+  stays draft and main/Production release stays held pending content acceptance.
+
 ## Finished staging journey and energy-role follow-up — 2026-10-31
 
 - Resumed the same authenticated Preview tab and already-filled exam from
