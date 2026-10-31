@@ -985,10 +985,13 @@ function functionTaskSignature(question) {
   const text = String(question?.question || "").normalize("NFKC").toLowerCase()
     .replace(/[?.!]+$/u, "").replace(/\s+/gu, " ").trim();
   const action = text.match(/^vad gör (.+?)(?: i (.+))?$/u);
-  const functionName = text.match(/^vad är (.+?)(?::s|s) (?:främsta |huvudsakliga )?(?:funktion|roll)(?: i (.+))?$/u);
+  const functionName = text.match(/^vad är (.+?)(?::s|s) (?:främsta |huvudsakliga |primära )?(?:funktion|roll)(?: i (.+))?$/u);
   const role = text.match(/^vad är rollen (?:av|hos) (.+?)(?: i (.+))?$/u) ||
     text.match(/^vilken (?:funktion|roll) har (.+?)(?: i (.+))?$/u);
-  const match = action || functionName || role;
+  const usage = text.match(/^vad används (.+?) till(?: i (.+))?$/u) ||
+    text.match(/^vad används (.+?)(?: i (.+?))? till$/u);
+  const primary = text.match(/^vad är (?:den )?(?:primära |främsta |huvudsakliga )?(?:funktionen|rollen) (?:för|hos|av) (.+?)(?: i (.+))?$/u);
+  const match = action || functionName || role || usage || primary;
   if (!match || /\b(?:och|samt|and|inte|varför|hur|när|vid|under)\b/u.test(`${match[1]} ${match[2] || ""}`)) return "";
   const concept = semanticConceptTag(question);
   const entity = match[1].trim();
@@ -1412,13 +1415,41 @@ function questionPairConflict(left, right, options = {}) {
   if (options.profile === "natural_sciences" && repeatsEnergyInputTask(left, right, options.sourceMaterial)) {
     return "repeated_energy_input_task";
   }
-  if (options.profile !== "natural_sciences" || left?.type !== "short" || right?.type !== "short" ||
+  if (options.profile !== "natural_sciences" || ![left?.type, right?.type].every(type => type === "short" || type === "mc") ||
       !semanticConceptTag(left) || semanticConceptTag(left) !== semanticConceptTag(right)) return "";
   const signature = functionTaskSignature(left);
   if (!signature || signature !== functionTaskSignature(right)) return "";
   const material = normalizeSourceAnswer(options.sourceMaterial);
   if (!material || material.length > 12000) return "";
   const normalizedAnswer = value => normalizeSourceAnswer(value).replace(/[.!?]+$/u, "").trim();
+  const mcHasNoExtraChoiceDemand = (question, fact) => {
+    if (question.type !== "mc") return true;
+    const selected = question.options?.[question.correct_index];
+    // The new cross-format variation rule must not infer an assessed relation
+    // from partial token overlap in a multi-fact quotation.
+    if (typeof selected !== "string" || normalizedAnswer(selected) !== normalizedAnswer(fact) ||
+        !missingMcAssessesOnlyFact(question, fact)) return false;
+    const entityTerms = semanticQuestionTokens({ question: semanticConceptTag(question) });
+    const relationTerms = new Set([...semanticQuestionTokens({ question: fact })].filter(term => !entityTerms.has(term)));
+    // Shared relation words in distractors can make choosing the right option
+    // test a finer distinction (e.g. a template or input). Abstain even when a
+    // long source sentence makes their proportional overlap look small.
+    return question.options.every((option, index) => index === question.correct_index ||
+      [...semanticQuestionTokens({ question: option })].every(term => !relationTerms.has(term)));
+  };
+  // Identical, specific function stems are repetitious presented work even
+  // when generator-written rubric labels differ. Restrict this to MC pairs
+  // naming the tagged entity, with a shared source-verified anchor; generic
+  // stems, changed context and extra asked work cannot enter this branch.
+  if (left.type === "mc" && right.type === "mc" &&
+      JSON.parse(signature)[0] === semanticConceptTag(left) &&
+      normalizedAnswer(left.question) === normalizedAnswer(right.question)) {
+    const quotes = question => (Array.isArray(question.source_references) ? question.source_references : [])
+      .filter(quote => typeof quote === "string").map(normalizeSourceAnswer)
+      .filter(quote => quote.length >= 20 && material.includes(quote));
+    if (quotes(left).some(quote => quotes(right).includes(quote) &&
+        mcHasNoExtraChoiceDemand(left, quote) && mcHasNoExtraChoiceDemand(right, quote))) return "repeated_function_task";
+  }
   const answer = normalizedAnswer(left.model_answer);
   if (!answer || answer !== normalizedAnswer(right.model_answer)) return "";
   const segmenter = new Intl.Segmenter("sv", { granularity: "sentence" });
@@ -1430,7 +1461,8 @@ function questionPairConflict(left, right, options = {}) {
   const citesAnchor = question => Array.isArray(question.source_references) && question.source_references.some(quote =>
     typeof quote === "string" && material.includes(normalizeSourceAnswer(quote)) &&
     normalizeSourceAnswer(quote).includes(anchor));
-  return citesAnchor(left) && citesAnchor(right) ? "repeated_function_task" : "";
+  return citesAnchor(left) && citesAnchor(right) && mcHasNoExtraChoiceDemand(left, anchor) && mcHasNoExtraChoiceDemand(right, anchor)
+    ? "repeated_function_task" : "";
 }
 
 // Gate an exam. Keeps only questions safe to show; signs their answer keys.

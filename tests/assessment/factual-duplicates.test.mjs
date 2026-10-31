@@ -280,3 +280,69 @@ test("repeated presented function tasks are excluded separately from rubric equi
     payload: { lang: "sv", course: "Biologi 1", qType: "short", level: "C", numQuestions: 2, pastedText: source },
     questions: [left, right] }), /Final structural validation/);
 });
+
+test('observed function wording and MC repeats cannot hide behind changed rubric metadata', () => {
+  const options = { profile: 'natural_sciences', sourceMaterial: source };
+  const short = { ...first, question: 'Vilken roll har ribosomer i cellen?' };
+  const mc = { ...repeated, question: 'Vad används ribosomer till i en cell?', model_answer: source,
+    learning_objective: 'Identify a cell structure' };
+  // Natural Swedish places "till" before the context as well as after it.
+  assert.equal(questionPairConflict(short, mc, options), 'repeated_function_task');
+  const mitofact = 'Mitokondrierna gör energin i glukos tillgänglig genom cellandning.';
+  const mito = { ...mc, concept_tag: 'Mitokondrier', question: 'Vilken funktion har mitokondrier i celler?',
+    source_references: [mitofact], model_answer: mitofact, rubric: mitofact,
+    options: [mitofact, 'Utföra fotosyntes.', 'Lagra fett.'], correct_index: 0 };
+  const conflicting = { ...mito, scoring_rubric: rubric('En helt annan dold etikett.'),
+    model_answer: mitofact, options: ['Utföra fotosyntes.', mitofact, 'Lagra fett.'], correct_index: 1 };
+  const context = { ...options, sourceMaterial: mitofact };
+  assert.equal(questionPairConflict(mito, conflicting, context), 'repeated_function_task');
+  assert.equal(questionPairConflict(conflicting, mito, context), 'repeated_function_task');
+  assert.equal(questionPairConflict(mito, { ...mito, type: 'short', question: 'Vad är den primära funktionen för mitokondrier i celler?',
+    scoring_rubric: rubric(mitofact) }, context), 'repeated_function_task');
+  for (const question of [
+    'Vilken funktion har mitokondrier i växtceller?',
+    'Vilken funktion har mitokondrier i celler under syrebrist?',
+    'Vilken funktion har mitokondrier i celler och hur styrs processen?',
+    'Vilken funktion har mitokondrier i celler? Förklara varför.',
+  ]) assert.equal(questionPairConflict(mito, { ...conflicting, question }, context), '', question);
+  assert.equal(questionPairConflict({ ...mito, question: 'Vilket alternativ är rätt?' },
+    { ...conflicting, question: 'Vilket alternativ är rätt?' }, context), '', 'generic MC stems have no specific function target');
+  const extra = { ...mc, options: ['Bygger proteiner av aminosyror med mRNA som mall.', 'Bygger proteiner med DNA som mall.', 'Bygger proteiner med tRNA som mall.'] };
+  assert.equal(questionPairConflict(short, extra, options), '', 'an additional distinction in the choices stays distinct');
+  const identicalStem = { ...mc, question: 'Vilken funktion har ribosomer i celler?' };
+  assert.equal(questionPairConflict(identicalStem, { ...extra, question: identicalStem.question,
+    scoring_rubric: rubric('Identifiera mRNA som mall.') }, options), '',
+    'identical MC stems still preserve an extra template distinction in the options');
+  assert.equal(questionPairConflict(short, { ...mc, rubric: 'Förklara mitokondriernas roll i cellandning.' }, options), '',
+    'an unrelated rubric makes the bounded comparison abstain');
+});
+
+test('a shared source containing both production and template cannot collapse different choice targets', () => {
+  const fact = 'Ribosomerna bygger proteiner av aminosyror med mRNA som mall.';
+  const context = { profile: 'natural_sciences', sourceMaterial: fact };
+  const left = { type: 'mc', question: 'Vilken funktion har ribosomer i cellen?', concept_tag: 'Ribosomer',
+    learning_objective: 'Ribosomernas funktion', model_answer: fact, source_references: [fact],
+    rubric: 'Rätt alternativ ger full poäng.', correct_index: 0,
+    options: ['Bygger proteiner av aminosyror.', 'Lagrar fett.', 'Utför fotosyntes.'],
+    scoring_rubric: { parts: [], full_score_requirements: '' } };
+  const right = { ...left, options: ['Proteiner med mRNA som mall.', 'DNA som mall.', 'tRNA som mall.'],
+    scoring_rubric: { parts: [], full_score_requirements: 'Ange rätt mall.' } };
+  for (const other of [right, { ...right, type: 'short', scoring_rubric: rubric(fact, 'Ange rätt mall.') }]) {
+    assert.equal(questionPairConflict(left, other, context), '');
+    assert.equal(questionPairConflict(other, left, context), '');
+  }
+});
+
+
+test('long shared anchors cannot hide a finer distractor distinction', () => {
+  const fact = 'Ribosomerna bygger proteiner av aminosyror med mRNA som mall genom en process som kallas proteinsyntes.';
+  const context = { profile: 'natural_sciences', sourceMaterial: fact };
+  const left = { type: 'mc', question: 'Vilken funktion har ribosomer i cellen?', concept_tag: 'Ribosomer',
+    learning_objective: 'Ribosomernas funktion', model_answer: fact, source_references: [fact],
+    rubric: 'Rätt alternativ ger full poäng.', correct_index: 0,
+    options: [fact, 'Lagrar fett.', 'Utför fotosyntes.'], scoring_rubric: { parts: [], full_score_requirements: '' } };
+  const right = { ...left, options: [fact, 'Bygger proteiner med DNA som mall.', 'Bygger proteiner med tRNA som mall.'],
+    scoring_rubric: { parts: [], full_score_requirements: 'Ange rätt mall.' } };
+  assert.equal(questionPairConflict(left, right, context), '');
+  assert.equal(questionPairConflict(right, left, context), '');
+});

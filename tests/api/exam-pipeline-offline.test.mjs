@@ -1363,6 +1363,17 @@ globalThis.fetch = async (input, init = {}) => {
       const questionPayload = userContent.slice(userContent.indexOf(marker) + marker.length);
       const requestedQuestions = JSON.parse(questionPayload);
       solverInputs.push(requestedQuestions);
+      const units = JSON.parse(userContent.split("\n\nKällutdrag:\n")[1].split(marker)[0]);
+      const sourceOverride = (id) => {
+        const override = solverSourceCheckOverrides.get(id);
+        if (!override) return null;
+        const { evidence_quotes, ...rest } = override;
+        return { ...rest, evidence_source_ids: evidence_quotes.map(quote => {
+          const unit = units.find(unit => unit.text.includes(quote));
+          assert.ok(unit, "synthetic evidence must exist in the actual request catalogue");
+          return unit.id;
+        }) };
+      };
       if (solverThrowsForRetry && requestedQuestions.some((question) => question.id.startsWith("retry-"))) {
         throw new Error("synthetic retry solver timeout");
       }
@@ -1380,9 +1391,9 @@ globalThis.fetch = async (input, init = {}) => {
           : expectedIndex;
         return {
         id: q.id,
-        source_check: solverSourceCheckOverrides.get(q.id) || {
+        source_check: sourceOverride(q.id) || {
           premise_supported: true, independent_answer: q.options[solverIndex] || "No single answer",
-          basis: "derived", evidence_quotes: [], option_matches: q.options.map((_, i) => i === solverIndex),
+          basis: "derived", evidence_source_ids: [], option_matches: q.options.map((_, i) => i === solverIndex),
         },
         option_verdicts: q.options.map((_, i) => i === solverIndex),
         option_plausibility: q.options.map((option) =>

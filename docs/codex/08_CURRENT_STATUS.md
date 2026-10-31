@@ -1,5 +1,54 @@
 # 08 Current Status
 
+## Twelve delivered; content acceptance still held — 2026-10-31
+
+- The newly authorized single synthetic Biologi 1 C/mixed journey ran on
+  exact Preview `d8acf8205c9f5c36e44a9189a007e9b186b82926`, using the same
+  stable alias, authenticated tab and numbered biology fixture. Job
+  `6a565fc0-ff8b-4c6e-a7a3-319348411dcd` reached **12/12**, terminal succeeded;
+  hosted candidate/source payload was scrubbed. This is count delivery, not
+  content acceptance or evidence of acceptable end-to-end latency.
+- Manual inspection of all twelve exposed an ambiguous day/night MC
+  (respiration and diffusion are both defensible), repeated mitochondria and
+  ribosome function tasks, malformed distractor grammar, and mostly recall
+  demands despite requested C. The live exam FAILS content acceptance.
+  No P.E.R or grading call followed. Only this unanswered synthetic exam was
+  ended through the app; hosted active-exam count is now **0**.
+- Sanitized diagnostics pinpointed repeated
+  `source_quote_not_in_material_or_boundary` solver contract failures.
+  The follow-up replaces model-transcribed quotes with bounded immutable
+  source-unit IDs. Exact server slices are resolved and still pass the old
+  provenance validator. Unknown, repeated, missing or malformed IDs, duplicate
+  resolved quotations and legacy model-written quotes fail closed. Full capped
+  source context remains available, including whitespace-free data; no model,
+  confidence threshold, extra provider call, authentication or quota change.
+- Solver instructions explicitly require considering every defensible answer
+  and forbid treating an unmentioned option as false. This prompt change is
+  NOT proof that the provider will detect the observed ambiguity. A stronger
+  explicit per-option exclusion audit and C-demand enforcement remain work
+  to evaluate; no unsupported claim that all semantic errors are fixed.
+- Bounded function-task variation now recognizes the observed usage/primary-
+  function phrasing and cross-format repeats with a complete shared source
+  answer. MC comparisons require the entire selected choice to match that
+  anchor and no additional choice demand. Specific identical MC stems cannot
+  escape solely through changed hidden rubric labels. Generic stems, changed
+  conditions, extra requested work and template distinctions remain separate.
+  The live private rubrics were not reconstructed: fixtures use explicitly
+  synthetic metadata and do not prove every live duplicate is now caught.
+- Independent reviewers found and challenged compact-source coverage and
+  an overbroad MC match. Both were narrowed with regression counterexamples.
+  Final reviews found no remaining scoped blocker. The lexical variation rule
+  may still miss duplicates. Final offline group: **85/85**, including source references,
+  solver contracts, source catalogue, HTTP/PGlite and 3/6/12 pipeline cases.
+  Syntax checks for both production files and `git diff --check` passed.
+- This journey spent **0.097253 USD** (3.114597 -> **3.211850**).
+  Cap remains **3.879071**, reservations **0.263628**, available **0.403593**.
+  The one-test authorization is consumed. No automatic replacement, budget
+  increase, account, quota, model, secret, database-schema, main or Production
+  change. Follow-up is a feature-Preview checkpoint only; provider compatibility
+  and actual improved content require a separately authorized live test.
+
+
 ## One authorized staging journey; solver contract follow-up — 2026-10-31
 
 - Reused the same authenticated stable Preview tab. “Återställ resultatet”

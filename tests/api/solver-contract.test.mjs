@@ -24,6 +24,15 @@ const result = (id, overrides = {}) => ({
   ...overrides,
 });
 const valid = [result("q1"), result("q2")];
+// Provider wire format references the request catalogue; pure gate fixtures
+// above remain resolved, literal evidence to exercise the provenance boundary.
+const wire = item => {
+  if (!item?.source_check) return item;
+  const { evidence_quotes, ...check } = item.source_check;
+  assert.deepEqual(evidence_quotes, [], "wire helper only converts empty derived evidence");
+  return { ...item, source_check: { ...check, evidence_source_ids: [] } };
+};
+const wireValid = valid.map(wire);
 
 assert.equal(solver.parseSolverResults(valid, questions).size, 2);
 for (const [name, results] of [
@@ -82,7 +91,7 @@ try {
     globalThis.fetch = async () => new Response(JSON.stringify({
       model: "measured-solver-model",
       usage: { input_tokens: 44, output_tokens: 9 },
-      output_text: JSON.stringify({ results }),
+      output_text: JSON.stringify({ results: results.map(wire) }),
     }), { status: 200, headers: { "content-type": "application/json" } });
     const outcome = await solver.solveQuestions(questions, {
       apiKey: "test-only", model: "test-model", lang: "en", material: "test",
@@ -104,27 +113,28 @@ try {
   const source = "ATP driver aktiv transport. DNA finns i cellkärnan.";
   const sourceCheck = {
     premise_supported: true, independent_answer: "ATP", basis: "source_fact",
-    evidence_quotes: ["ATP driver aktiv transport."], option_matches: [false, true, false],
+    evidence_source_ids: [0], option_matches: [false, true, false],
   };
+  const wireResult = (id, overrides = {}) => ({ ...wire(result(id)), ...overrides });
   const diagnostics = [
-    ["result_count", [valid[0]]],
-    ["result_id", [valid[0], result("private-unknown-id")]],
-    ["duplicate_result_id", [valid[0], valid[0]]],
-    ["source_check_shape", [result("q1", {source_check: null}), valid[1]]],
-    ["option_matches_shape", [result("q1", {source_check: {...sourceCheck, option_matches: []}}), valid[1]]],
-    ["source_quotes_shape", [result("q1", {source_check: {...sourceCheck, evidence_quotes: [null]}}), valid[1]]],
-    ["source_quote_missing", [result("q1", {source_check: {...sourceCheck, evidence_quotes: []}}), valid[1]]],
-    ["source_quote_duplicate", [result("q1", {source_check: {...sourceCheck,
-      evidence_quotes: ["ATP driver aktiv transport.", "atp  driver aktiv transport."]}}), valid[1]]],
-    ["source_quote_not_in_material_or_boundary", [result("q1", {source_check: {...sourceCheck,
-      evidence_quotes: ["private invented quote"]}}), valid[1]]],
-    ["source_quote_not_in_material_or_boundary", [result("q1", {source_check: {...sourceCheck,
-      evidence_quotes: ["ransport"]}}), valid[1]]],
-    ["option_verdicts_shape", [result("q1", {option_verdicts: []}), valid[1]]],
-    ["option_plausibility_shape", [result("q1", {option_plausibility: []}), valid[1]]],
-    ["index_range", [result("q1", {index: 3}), valid[1]]],
-    ["confidence_range", [result("q1", {confidence: 2}), valid[1]]],
-    ["reason_shape", [result("q1", {reason: null}), valid[1]]],
+    ["result_count", [wireValid[0]]],
+    ["result_id", [wireValid[0], wireResult("private-unknown-id")]],
+    ["duplicate_result_id", [wireValid[0], wireValid[0]]],
+    ["source_check_shape", [wireResult("q1", {source_check: null}), wireValid[1]]],
+    ["option_matches_shape", [wireResult("q1", {source_check: {...sourceCheck, option_matches: []}}), wireValid[1]]],
+    ...[undefined, [null], ["0"], [0.5], [0, 0, 0, 0]].map(ids => ["source_ids_shape",
+      [wireResult("q1", {source_check: {...sourceCheck, evidence_source_ids: ids}}), wireValid[1]]]),
+    ["source_quote_missing", [wireResult("q1", {source_check: {...sourceCheck, evidence_source_ids: []}}), wireValid[1]]],
+    ["source_id_duplicate", [wireResult("q1", {source_check: {...sourceCheck, evidence_source_ids: [0, 0]}}), wireValid[1]]],
+    ...[[-1], [1], [999]].map(ids => ["source_id_range",
+      [wireResult("q1", {source_check: {...sourceCheck, evidence_source_ids: ids}}), wireValid[1]]]),
+    ["unexpected_source_quotes", [wireResult("q1", {source_check: {...sourceCheck,
+      evidence_quotes: ["private invented quote"]}}), wireValid[1]]],
+    ["option_verdicts_shape", [wireResult("q1", {option_verdicts: []}), wireValid[1]]],
+    ["option_plausibility_shape", [wireResult("q1", {option_plausibility: []}), wireValid[1]]],
+    ["index_range", [wireResult("q1", {index: 3}), wireValid[1]]],
+    ["confidence_range", [wireResult("q1", {confidence: 2}), wireValid[1]]],
+    ["reason_shape", [wireResult("q1", {reason: null}), wireValid[1]]],
   ];
   for (const [expectedIssue, results] of diagnostics) {
     globalThis.fetch = async () => new Response(JSON.stringify({output_text: JSON.stringify({results})}));
@@ -140,13 +150,15 @@ try {
     }
   }
   globalThis.fetch = async () => new Response(JSON.stringify({output_text: JSON.stringify({
-    results: [result("q1", {source_check: sourceCheck}), valid[1]],
+    results: [wireResult("q1", {source_check: sourceCheck}), wireValid[1]],
   })}));
   const supported = await solver.solveQuestions(questions, {
     apiKey: "test-only", model: "test-model", lang: "sv", material: source,
   });
   assert.equal(supported.callOk, true, "distinct literal evidence remains valid");
   assert.equal(supported.perQuestion.size, 2);
+  assert.deepEqual(supported.perQuestion.get("q1").source_check.evidence_quotes, [source],
+    "evidence is the exact request source unit, never a reconstructed quotation");
   const duplicateRequest = await solver.solveQuestions([questions[0], questions[0]], {
     apiKey: "test-only", model: "test-model", lang: "sv", material: source,
   });

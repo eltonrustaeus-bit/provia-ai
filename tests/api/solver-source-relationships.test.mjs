@@ -87,12 +87,16 @@ test("derived calculations keep their path while malformed or invented source au
 });
 
 test("the emitted schema puts the bounded source audit before option decisions", () => {
-  const schema = S.buildSolverSchema(1).schema;
+  const units = S.buildSourceUnits(material);
+  const schema = S.buildSolverSchema(1, units).schema;
   const validate = new Ajv({ strict: false }).compile(schema);
-  const valid = verdict(glucoseQuestion);
+  const resolved = verdict(glucoseQuestion);
+  const { evidence_quotes, ...check } = resolved.source_check;
+  const valid = { ...resolved, source_check: { ...check, evidence_source_ids: [0] } };
   assert.equal(validate({ results: [valid] }), true, JSON.stringify(validate.errors));
   assert.equal(validate({ results: [{ ...valid, source_check: undefined }] }), false);
   assert.equal(validate({ results: [{ ...valid, source_check: { ...valid.source_check, independent_answer: "x".repeat(301) } }] }), false);
+  assert.equal(validate({ results: [{ ...valid, source_check: { ...valid.source_check, evidence_source_ids: [units.length] } }] }), false);
   const keys = Object.keys(schema.properties.results.items.properties);
   assert.ok(keys.indexOf("source_check") < keys.indexOf("option_verdicts"));
 });
