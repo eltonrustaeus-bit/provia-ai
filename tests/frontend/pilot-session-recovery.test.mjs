@@ -42,13 +42,9 @@ test("pilot P.E.R preserves study data and restores its unsent question through 
           { role: "user", content: body.userQuestion },
           { role: "assistant", content: notice }
         ];
-        const initialHistory = [
-          { role: "user", content: body.userQuestion },
-          { role: "assistant", content: "Ett osäkert svar." }
-        ];
         res.write('data: {"delta":"Ett osäkert svar."}\n\n');
-        res.write(`data: ${JSON.stringify({ done: true, history: initialHistory, helpCap: 3 })}\n\n`);
         res.write(`data: ${JSON.stringify({ reviewUnavailable: notice, history })}\n\n`);
+        res.write(`data: ${JSON.stringify({ done: true, history, helpCap: 3 })}\n\n`);
         res.end();
         return;
       }

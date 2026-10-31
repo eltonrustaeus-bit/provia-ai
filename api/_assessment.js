@@ -12,6 +12,9 @@
 
 const crypto = require("crypto");
 const graphAnswers = require("./_graph.js");
+const { hasCoordinatedRequirementAmbiguity } = require("./_source-requirement-options.cjs");
+const { losesSourceQuantitySubject } = require("./_source-quantity-subject.cjs");
+const { repeatsEnergyInputTask } = require("./_energy-input-task.cjs");
 const MAX_MC_OPTIONS = 5;
 
 // ── Answer-key signing (integrity, not confidentiality) ─────────────────────
@@ -305,6 +308,28 @@ function generalQualityIssues(q, options) {
   if (!q || typeof q !== "object") return ["not_an_object"];
   if (!String(q.question || "").trim()) issues.push("empty_prompt");
   if (!(Number(q.points) > 0)) issues.push("nonpositive_points");
+  const circularTask = String(q.question || "").trim().match(/^vad sker där (?:stora delar av )?([\p{L}-]{3,70}) (?:äger rum|sker)[?.!]*$/iu);
+  if (circularTask && !/^(?:ingen|inget|inga|inte|aldrig|ibland|sällan|något|någon)$/iu.test(circularTask[1])) {
+    issues.push("circular_location_task");
+  }
+  if (options?.profile === "natural_sciences" && hasCoordinatedRequirementAmbiguity(q, options?.sourceMaterial)) {
+    issues.push("source_requirement_options_incomplete");
+  }
+  if (options?.profile === "natural_sciences" && losesSourceQuantitySubject(q, options?.sourceMaterial)) {
+    issues.push("source_quantity_subject_changed");
+  }
+  if (options?.outputLanguage === "sv") {
+    // A closed set of unambiguous noun genders catches common MC agreement
+    // defects. Unknown vocabulary stays with the independent language review.
+    const match = String(q.question || "").match(/^(vilken|vilket) av följande ([\p{L}]+)(?![\p{L}\p{N}_\p{Pd}])/iu);
+    if (match) {
+      const common = new Set("gaser atomer molekyler processer reaktioner metoder celler funktioner linjer grafer ekvationer".split(" "));
+      const neuter = new Set("ämnen alternativ påståenden tal uttryck begrepp organ proteiner".split(" "));
+      const noun = match[2].toLocaleLowerCase("sv-SE");
+      const expected = common.has(noun) ? "vilken" : neuter.has(noun) ? "vilket" : null;
+      if (expected && match[1].toLocaleLowerCase("sv-SE") !== expected) issues.push("language_quality");
+    }
+  }
 
   const cogLevel = String(q.cognitive_level || "").trim().toLowerCase();
   if (!cogLevel) issues.push("cognitive_level_missing");
@@ -608,6 +633,10 @@ const BLOCKING = new Set([
   "empty_option", "duplicate_options", "answer_key_out_of_range",
   "source_reference_missing", "requested_type_mismatch",
   "source_answer_not_extractable",
+  "language_quality",
+  "source_requirement_options_incomplete",
+  "source_quantity_subject_changed",
+  "circular_location_task",
   "open_question_ungradeable", "leaked_instructions", "corrupted_option_text", "math_options_numerically_equal", "math_option_type_mismatch",
   "unsupported_single_word_option_outlier",
   "cognitive_level_missing", "scoring_rubric_missing_for_open", "scoring_rubric_points_mismatch", "law_deprecated_terminology",
@@ -782,9 +811,224 @@ function repeatsSameObjectiveAndAnswer(left, right) {
   const leftObjective = exactComparisonTokens(left?.learning_objective).join(" ");
   const rightObjective = exactComparisonTokens(right?.learning_objective).join(" ");
   if (!leftObjective || leftObjective !== rightObjective) return false;
+  const leftScope = explicitScoringScope(left);
+  const rightScope = explicitScoringScope(right);
+  if (!leftScope || !rightScope || leftScope.key !== rightScope.key) return false;
   const leftAnswer = exactComparisonTokens(left?.model_answer).join(" ");
   const rightAnswer = exactComparisonTokens(right?.model_answer).join(" ");
   return leftAnswer.split(" ").filter(Boolean).length >= 4 && leftAnswer === rightAnswer;
+}
+
+function factualText(value) {
+  return String(value || "").normalize("NFKC").toLowerCase().replace(/\s+/gu, " ").replace(/[.!?]+$/u, "").trim();
+}
+
+// Only explicit factual requirements qualify for the relaxed matching path.
+// Unknown or paraphrased rubrics abstain; they are not treated as equivalent.
+function explicitScoringScope(question) {
+  const rubric = question?.scoring_rubric;
+  if (!rubric || !Array.isArray(rubric.parts) || rubric.parts.length === 0) return null;
+  const raw = rubric.parts.map((part) => part?.description);
+  if (typeof rubric.full_score_requirements === "string" && rubric.full_score_requirements.trim()) raw.push(rubric.full_score_requirements);
+  const requirements = [];
+  for (const value of raw) {
+    if (typeof value !== "string") return null;
+    const text = factualText(value);
+    const prefix = text.match(/^(ange|beskriv|förklara|state|describe|explain) (?:att |that )(.+)$/u);
+    const fact = prefix ? prefix[2] : text;
+    if (fact.split(" ").length < 4 || !/\b(?:använder|används|bildar|bildas|omvandlar|omvandlas|förändrar|förändra|påverkar|bygger|fångar|absorberar|binder|uses?|produces?|converts?|changes?|builds?)\b/u.test(fact)) return null;
+    const action = prefix ? prefix[1] : "state";
+    const requirement = { action, fact };
+    if (!requirements.some((entry) => entry.action === action && entry.fact === fact)) requirements.push(requirement);
+  }
+  return requirements.length ? { key: JSON.stringify(requirements), facts: requirements.map((entry) => entry.fact) } : null;
+}
+
+function factualDirections(text) {
+  const directions = [];
+  if (/\b(?:använder|används|reaktanter|ingångsämnen|uses?|inputs?|reactants?)\b/u.test(text)) directions.push("input");
+  if (/\b(?:bildar|bildas|producerar|produceras|produkter|produces?|outputs?|products?)\b/u.test(text)) directions.push("output");
+  return directions;
+}
+
+function objectTask(question) {
+  const text = factualText(question?.question);
+  const match = text.match(/^vad (fångar|absorberar|binder) ([\p{L}-]+)(?: upp)?(?: i ([\p{L}-]+))?$/u);
+  if (!match || match[2] !== semanticConceptTag(question)) return null;
+  return { action: match[1], entity: match[2], context: match[3] || "" };
+}
+
+function optionSuppliesWholeObjectFact(question, option, fact) {
+  const task = objectTask(question);
+  if (!task) return false;
+  const reconstructed = `${task.entity} ${task.action} ${factualText(option)}`;
+  // A one-word choice can complete the object's whole fact, but cannot inherit
+  // a downstream purpose, condition or second fact from the model answer.
+  return factualText(fact).replace(/\bfångar upp\b/u, "fångar") === reconstructed;
+}
+
+function missingMcAssessesOnlyFact(question, fact) {
+  const options = question?.options;
+  const correct = question?.correct_index;
+  if (!Array.isArray(options) || options.length < 2 || !Number.isInteger(correct) ||
+      correct < 0 || correct >= options.length) return false;
+  const factTokens = semanticQuestionTokens({ question: fact });
+  const knownTokens = new Set([...factTokens, ...semanticQuestionTokens(question)]);
+  const answerTokens = semanticQuestionTokens({ question: `${options[correct]} ${question.model_answer || ""}` });
+  // New information in the selected answer may itself distinguish the choices.
+  // Abstain rather than treating low distractor overlap as proof of no extra skill.
+  if ([...answerTokens].some(token => !knownTokens.has(token))) return false;
+  const genericRubric = semanticQuestionTokens({ question: "Rätt korrekt alternativ svar ger full poäng ange identifiera välj beskriva förklara funktion roll correct answer option full points identify select describe explain function role" });
+  const rubricTokens = semanticQuestionTokens({ question: question.rubric || "" });
+  if ([...rubricTokens].some(token => !factTokens.has(token) && !genericRubric.has(token) && !/^\d+$/u.test(token))) return false;
+  const minimumOverlap = Math.max(2, Math.ceil(factTokens.size / 2));
+  const covered = options.map(option => {
+    const terms = semanticQuestionTokens({ question: option });
+    return [...factTokens].filter(token => terms.has(token)).length >= minimumOverlap;
+  });
+  if (!covered[correct] && optionSuppliesWholeObjectFact(question, options[correct], fact)) {
+    const selectedTerms = semanticQuestionTokens({ question: options[correct] });
+    const optionsContainingAnswer = options.filter(option => {
+      const terms = semanticQuestionTokens({ question: option });
+      return selectedTerms.size > 0 && [...selectedTerms].every(token => terms.has(token));
+    });
+    return optionsContainingAnswer.length === 1;
+  }
+  // If two options share the known fact, distinguishing them tests something
+  // beyond that fact. An absent MC rubric cannot erase that extra skill.
+  return covered[correct] && covered.filter(Boolean).length === 1;
+}
+
+function compareAnchoredScoredFacts(left, right) {
+  const concept = semanticConceptTag(left);
+  const objective = exactComparisonTokens(left?.learning_objective).join(" ");
+  if (!concept || concept !== semanticConceptTag(right) || !objective ||
+      objective !== exactComparisonTokens(right?.learning_objective).join(" ") ||
+      ![left?.type, right?.type].every((type) => type === "short" || type === "mc")) return "unknown";
+  const leftText = factualText(left.question);
+  const rightText = factualText(right.question);
+  const leftDirections = factualDirections(leftText);
+  const rightDirections = factualDirections(rightText);
+  if (leftDirections.length === 1 && rightDirections.length === 1 && leftDirections[0] !== rightDirections[0]) return "conflict";
+  const rawRequirements = (question) => {
+    const rubric = question?.scoring_rubric;
+    const values = Array.isArray(rubric?.parts) ? rubric.parts.map((part) => part?.description) : [];
+    if (typeof rubric?.full_score_requirements === "string" && rubric.full_score_requirements.trim()) values.push(rubric.full_score_requirements);
+    return values.length ? JSON.stringify(values.map(factualText)) : null;
+  };
+  const leftRaw = rawRequirements(left);
+  const rightRaw = rawRequirements(right);
+  const missingMcRubric = leftRaw === null && left.type === "mc" && rightRaw !== null ? left
+    : rightRaw === null && right.type === "mc" && leftRaw !== null ? right : null;
+  let leftScope = explicitScoringScope(left);
+  let rightScope = explicitScoringScope(right);
+  // Preserve every scored requirement, including ones the bounded classifier
+  // cannot understand. Unknown additional skills must not fall through to a
+  // broad stem/answer shortcut. MC candidates normally have no rubric parts;
+  // that absence is not itself a contradictory requirement. Only a single
+  // source-anchored fact and a bounded equivalent task may bridge that shape.
+  if (leftRaw !== rightRaw && (leftRaw || rightRaw)) {
+    const knownScope = missingMcRubric === left ? rightScope : leftScope;
+    if (!missingMcRubric || !knownScope || knownScope.facts.length !== 1 ||
+        !missingMcAssessesOnlyFact(missingMcRubric, knownScope.facts[0])) return "conflict";
+    if (missingMcRubric === left) leftScope = knownScope;
+    else rightScope = knownScope;
+  }
+  if (!leftScope || !rightScope) return "unknown";
+  if (leftScope.key !== rightScope.key) return "conflict";
+  const direction = factualDirections(leftScope.facts.join(" "));
+  if ([leftDirections, rightDirections].some((directions) => directions.some((item) => !direction.includes(item)))) return "conflict";
+
+  const inputTask = (text) => {
+    const match = text.match(/^vad är ([\p{L} -]+) och (?:vilka ämnen används|vad ingår) i processen$/u);
+    return match && [concept, concept + "en", concept + "et"].includes(match[1]);
+  };
+  const inputFamily = [leftText, rightText].some((text) => /^vad är .+ och (?:vilka ämnen används|vad ingår) i processen(?:[.!?]|$)/u.test(text));
+  if (inputFamily && (!inputTask(leftText) || !inputTask(rightText))) return "conflict";
+  const temperatureTask = (text) => {
+    const match = text.match(/^hur påverkar temperatur ([\p{L}-]+(?: [\p{L}-]+){0,2}) funktion$/u) ||
+      text.match(/^hur påverkas ([\p{L}-]+(?: [\p{L}-]+){0,2}) aktivitet vid (?:mycket )?(?:hög|låg) temperatur$/u);
+    return match && !/\b(?:och|samt|and|när|vid|under|inte)\b/u.test(match[1]) ? match[1] : null;
+  };
+  const leftTemperatureTask = temperatureTask(leftText);
+  const rightTemperatureTask = temperatureTask(rightText);
+  const temperaturePair = /temperatur/u.test(leftText) || /temperatur/u.test(rightText);
+  if (temperaturePair && leftText !== rightText && (!leftTemperatureTask || !rightTemperatureTask ||
+      leftTemperatureTask !== rightTemperatureTask)) return "conflict";
+  if (temperaturePair && [left, right].some((question) => temperatureCondition(question) &&
+      !leftScope.facts.every((fact) => temperatureCondition({ question: fact }) === temperatureCondition(question)))) return "conflict";
+  const sameInputTask = direction.length === 1 && direction[0] === "input" && inputTask(leftText) && inputTask(rightText);
+  const sameTemperatureTask = leftTemperatureTask && leftTemperatureTask === rightTemperatureTask &&
+    leftScope.facts.every((fact) => /temperatur/u.test(fact)) &&
+    [left, right].every((question) => !temperatureCondition(question) ||
+      leftScope.facts.every((fact) => temperatureCondition({ question: fact }) === temperatureCondition(question)));
+  const sameFunctionTask = repeatsAnchoredFunctionTask(left, right);
+  const leftObject = objectTask(left);
+  const rightObject = objectTask(right);
+  const sameObjectTask = leftObject && rightObject && JSON.stringify(leftObject) === JSON.stringify(rightObject);
+  if (!sameInputTask && !sameTemperatureTask && !sameFunctionTask && !sameObjectTask) return missingMcRubric ? "conflict" : "unknown";
+  const segmenter = new Intl.Segmenter("sv", { granularity: "sentence" });
+  const sentences = (question) => (Array.isArray(question.source_references) ? question.source_references : [])
+    .flatMap((quote) => [...segmenter.segment(String(quote).replace(/\s+/gu, " ").trim())]
+      .map((entry) => entry.segment.trim()).filter((sentence) => /[.!?]$/u.test(sentence)))
+    .map(factualText).filter((sentence) => sentence.length >= 20);
+  const shared = sentences(left).filter((sentence) => sentences(right).includes(sentence));
+  const answers = [factualText(left.model_answer), factualText(right.model_answer)];
+  // Required source facts define the assessed target even when the exemplar
+  // paraphrases them. Factual correctness of either exemplar remains the
+  // independent reviewer's responsibility, not a lexical similarity claim.
+  return answers.every((answer) => answer.length >= 4) &&
+    leftScope.facts.every((fact) => shared.includes(fact)) ? "equal" : missingMcRubric ? "conflict" : "unknown";
+}
+
+function functionTaskSignature(question) {
+  const text = String(question?.question || "").normalize("NFKC").toLowerCase()
+    .replace(/[?.!]+$/u, "").replace(/\s+/gu, " ").trim();
+  const action = text.match(/^vad gör (.+?)(?: i (.+))?$/u);
+  const functionName = text.match(/^vad är (.+?)(?::s|s) (?:främsta |huvudsakliga |primära )?(?:funktion|roll)(?: i (.+))?$/u);
+  const role = text.match(/^vad är rollen (?:av|hos) (.+?)(?: i (.+))?$/u) ||
+    text.match(/^vilken (?:funktion|roll) har (.+?)(?: i (.+))?$/u);
+  const usage = text.match(/^vad används (.+?) till(?: i (.+))?$/u) ||
+    text.match(/^vad används (.+?)(?: i (.+?))? till$/u);
+  const primary = text.match(/^vad är (?:den )?(?:primära |främsta |huvudsakliga )?(?:funktionen|rollen) (?:för|hos|av) (.+?)(?: i (.+))?$/u);
+  const match = action || functionName || role || usage || primary;
+  if (!match || /\b(?:och|samt|and|inte|varför|hur|när|vid|under)\b/u.test(`${match[1]} ${match[2] || ""}`)) return "";
+  const concept = semanticConceptTag(question);
+  const entity = match[1].trim();
+  // Normalize only inflections of this tagged entity and generic cell context.
+  // Plant/animal cells, locations and additional modifiers stay distinct.
+  const entityForms = [concept, concept + "na", concept + "nas", concept + "s"];
+  const target = entityForms.includes(entity) ? concept : entity;
+  const rawContext = (match[2] || "").trim();
+  const context = /^(?:en cell|cellen|celler|cellerna|cell)$/u.test(rawContext) ? "cell" : rawContext;
+  return JSON.stringify([target, context]);
+}
+
+function repeatsAnchoredFunctionTask(left, right) {
+  const concept = semanticConceptTag(left);
+  const objective = exactComparisonTokens(left?.learning_objective).join(" ");
+  const target = functionTaskSignature(left);
+  if (!concept || concept !== semanticConceptTag(right) || !objective ||
+      objective !== exactComparisonTokens(right?.learning_objective).join(" ") ||
+      !target || target !== functionTaskSignature(right)) return false;
+  const normalizeQuote = (value) => typeof value === "string"
+    ? value.normalize("NFKC").replace(/\s+/gu, " ").trim().toLowerCase() : "";
+  const leftQuotes = new Set((Array.isArray(left?.source_references) ? left.source_references : [])
+    .map(normalizeQuote).filter((quote) => quote.length >= 16));
+  if (!(Array.isArray(right?.source_references) ? right.source_references : [])
+    .some((quote) => leftQuotes.has(normalizeQuote(quote)))) return false;
+  const leftAnswer = semanticQuestionTokens({ question: left?.model_answer || "" });
+  const rightAnswer = semanticQuestionTokens({ question: right?.model_answer || "" });
+  const shared = [...leftAnswer].filter((token) => rightAnswer.has(token)).length;
+  return leftAnswer.size >= 4 && rightAnswer.size >= 4 &&
+    shared / Math.min(leftAnswer.size, rightAnswer.size) >= 0.9;
+}
+
+function temperatureCondition(question) {
+  const text = String(question?.question || "").normalize("NFKC").toLowerCase();
+  const high = /\b(?:hög|höga|high)\s+temperatur(?:en|er|erna|e|es)?\b/u.test(text);
+  const low = /\b(?:låg|låga|low)\s+temperatur(?:en|er|erna|e|es)?\b/u.test(text);
+  return high !== low ? (high ? "high" : "low") : null;
 }
 
 function questionIntents(question) {
@@ -1121,11 +1365,25 @@ function isDuplicateQuestion(left, right) {
       (leftLogicalStructure.length !== rightLogicalStructure.length ||
         leftLogicalStructure.some((token, index) => token !== rightLogicalStructure[index]))) return false;
 
+  // Incidental factual context must not override an existing mathematical
+  // match for the same expression and assessed skill.
+  const leftIntent = mathQuestionIntent(left);
+  const expression = mathQuestionExpression(left);
+  if (leftIntent && expression && leftIntent === mathQuestionIntent(right) &&
+      expression === mathQuestionExpression(right)) return true;
+  const leftTemperature = temperatureCondition(left);
+  const rightTemperature = temperatureCondition(right);
+  if (leftTemperature && rightTemperature && leftTemperature !== rightTemperature) return false;
+  const factualScope = compareAnchoredScoredFacts(left, right);
+  if (factualScope === "conflict") return false;
+  if (factualScope === "equal") return true;
+
   // Question-stem overlap misses paraphrased factual questions. Treat a very
   // close repeated full-score answer as the same target, while requiring a
   // substantial token floor so short shared answers (for example "ATP") do
   // not collapse distinct questions.
-  if (repeatsNearIdenticalQuestionStem(left, right) || repeatsSameObjectiveAndAnswer(left, right)) return true;
+  if (repeatsNearIdenticalQuestionStem(left, right) || repeatsSameObjectiveAndAnswer(left, right) ||
+      repeatsAnchoredFunctionTask(left, right)) return true;
   if (repeatsHighConfidenceAnswerTarget(left, right)) return true;
 
   const signature = questionDedupeSignature(left);
@@ -1137,11 +1395,7 @@ function isDuplicateQuestion(left, right) {
         leftStructure.every((token, index) => token === rightStructure[index])) return true;
   }
   if (semanticDuplicateQuestion(left, right)) return true;
-  const leftIntent = mathQuestionIntent(left);
-  const expression = mathQuestionExpression(left);
-  return Boolean(leftIntent && expression
-    && leftIntent === mathQuestionIntent(right)
-    && expression === mathQuestionExpression(right));
+  return false;
 }
 // Non-blocking issues are flagged (soft warnings) but the question is kept —
 // they describe a weak or suspicious question, not an unanswerable one, and
@@ -1152,6 +1406,64 @@ function isDuplicateQuestion(left, right) {
 //   programming_unbalanced_code    — bracket heuristic, verifier decides
 //   catch_all_option               — "alla av ovanstående"-style option
 //   longest_option_is_answer       — the key is conspicuously the longest choice
+
+// A separate variation policy, not a relaxation of rubric-equivalence dedup.
+// Identical presented work and a complete, material-verified answer remain
+// repetitive even if metadata/rubrics assign different unasked requirements.
+function questionPairConflict(left, right, options = {}) {
+  if (isDuplicateQuestion(left, right)) return "duplicate_question";
+  if (options.profile === "natural_sciences" && repeatsEnergyInputTask(left, right, options.sourceMaterial)) {
+    return "repeated_energy_input_task";
+  }
+  if (options.profile !== "natural_sciences" || ![left?.type, right?.type].every(type => type === "short" || type === "mc") ||
+      !semanticConceptTag(left) || semanticConceptTag(left) !== semanticConceptTag(right)) return "";
+  const signature = functionTaskSignature(left);
+  if (!signature || signature !== functionTaskSignature(right)) return "";
+  const material = normalizeSourceAnswer(options.sourceMaterial);
+  if (!material || material.length > 12000) return "";
+  const normalizedAnswer = value => normalizeSourceAnswer(value).replace(/[.!?]+$/u, "").trim();
+  const mcHasNoExtraChoiceDemand = (question, fact) => {
+    if (question.type !== "mc") return true;
+    const selected = question.options?.[question.correct_index];
+    // The new cross-format variation rule must not infer an assessed relation
+    // from partial token overlap in a multi-fact quotation.
+    if (typeof selected !== "string" || normalizedAnswer(selected) !== normalizedAnswer(fact) ||
+        !missingMcAssessesOnlyFact(question, fact)) return false;
+    const entityTerms = semanticQuestionTokens({ question: semanticConceptTag(question) });
+    const relationTerms = new Set([...semanticQuestionTokens({ question: fact })].filter(term => !entityTerms.has(term)));
+    // Shared relation words in distractors can make choosing the right option
+    // test a finer distinction (e.g. a template or input). Abstain even when a
+    // long source sentence makes their proportional overlap look small.
+    return question.options.every((option, index) => index === question.correct_index ||
+      [...semanticQuestionTokens({ question: option })].every(term => !relationTerms.has(term)));
+  };
+  // Identical, specific function stems are repetitious presented work even
+  // when generator-written rubric labels differ. Restrict this to MC pairs
+  // naming the tagged entity, with a shared source-verified anchor; generic
+  // stems, changed context and extra asked work cannot enter this branch.
+  if (left.type === "mc" && right.type === "mc" &&
+      JSON.parse(signature)[0] === semanticConceptTag(left) &&
+      normalizedAnswer(left.question) === normalizedAnswer(right.question)) {
+    const quotes = question => (Array.isArray(question.source_references) ? question.source_references : [])
+      .filter(quote => typeof quote === "string").map(normalizeSourceAnswer)
+      .filter(quote => quote.length >= 20 && material.includes(quote));
+    if (quotes(left).some(quote => quotes(right).includes(quote) &&
+        mcHasNoExtraChoiceDemand(left, quote) && mcHasNoExtraChoiceDemand(right, quote))) return "repeated_function_task";
+  }
+  const answer = normalizedAnswer(left.model_answer);
+  if (!answer || answer !== normalizedAnswer(right.model_answer)) return "";
+  const segmenter = new Intl.Segmenter("sv", { granularity: "sentence" });
+  const sentences = String(options.sourceMaterial).split(/\n\s*\n|\n(?=\s*\d+[.)]\s)/u).flatMap(block =>
+    [...segmenter.segment(normalizeSourceAnswer(block.replace(/^\s*\d+[.)]\s*/u, "")))]
+      .map(({ segment }) => segment.trim()).filter(sentence => /[.!]$/u.test(sentence)));
+  const anchor = sentences.find(sentence => normalizedAnswer(sentence) === answer);
+  if (!anchor) return "";
+  const citesAnchor = question => Array.isArray(question.source_references) && question.source_references.some(quote =>
+    typeof quote === "string" && material.includes(normalizeSourceAnswer(quote)) &&
+    normalizeSourceAnswer(quote).includes(anchor));
+  return citesAnchor(left) && citesAnchor(right) && mcHasNoExtraChoiceDemand(left, anchor) && mcHasNoExtraChoiceDemand(right, anchor)
+    ? "repeated_function_task" : "";
+}
 
 // Gate an exam. Keeps only questions safe to show; signs their answer keys.
 function gateExam(exam, opts) {
@@ -1184,8 +1496,9 @@ function gateExam(exam, opts) {
       dropped.push({ id: String(q && q.id != null ? q.id : ""), issues: blocking });
       continue;
     }
-    if (kept.some((accepted) => isDuplicateQuestion(accepted, q))) {
-      dropped.push({ id: String(q && q.id != null ? q.id : ""), issues: ["duplicate_question"] });
+    const pairConflict = kept.map(accepted => questionPairConflict(accepted, q, options)).find(Boolean);
+    if (pairConflict) {
+      dropped.push({ id: String(q && q.id != null ? q.id : ""), issues: [pairConflict] });
       continue;
     }
     if (issues.length) flagged.push({ id: String(q && q.id != null ? q.id : ""), issues });
@@ -1213,5 +1526,6 @@ module.exports = {
   answerKeyString,
   questionDedupeSignature,
   isDuplicateQuestion,
+  questionPairConflict,
   COGNITIVE_VERBS,
 };

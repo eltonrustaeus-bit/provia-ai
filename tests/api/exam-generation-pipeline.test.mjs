@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import { createRequire } from "node:module";
 
@@ -7,6 +8,25 @@ const generation = require("../../api/generate-exam.js");
 const operations = require("../../api/_exam-generation-operations.cjs");
 const pipeline = require("../../api/_exam-generation-pipeline.cjs");
 const mistakeTraining = require("../../api/_mistake-training.cjs");
+const mistakeTrainingGold = JSON.parse(readFileSync(
+  new URL("../evals/exam-quality/mistake-training-gold.v1.json", import.meta.url), "utf8",
+));
+
+test("mixed tied deficits alternate MC and short after a no-progress attempt", () => {
+  const targets = generation.mixedTypeTargets(12);
+  const accepted = [
+    ...Array.from({ length: 3 }, (_, index) => ({ id: `mc-${index}`, type: "mc" })),
+    ...Array.from({ length: 3 }, (_, index) => ({ id: `short-${index}`, type: "short" })),
+  ];
+  assert.equal(pipeline.nextBatchType(accepted, targets, 12, 1), "mc",
+    "the first tied batch preserves the existing MC-first preference");
+  assert.equal(pipeline.nextBatchType(accepted, targets, 12), "mc",
+    "missing retry metadata safely defaults to the original MC-first choice");
+  assert.equal(pipeline.nextBatchType(accepted, targets, 12, 2), "short",
+    "the second no-progress claim tries the other requested type");
+  assert.equal(pipeline.nextBatchType(accepted, targets, 12, 3), "mc");
+  assert.equal(pipeline.nextBatchType(accepted, targets, 12, 4), "short");
+});
 
 const original = {
   generateVerifiedBatch: generation.generateVerifiedBatch,
@@ -20,28 +40,190 @@ const original = {
 
 test("a prior-mistake match must cite evidence from that focus source when available", () => {
   const trainingFocus = [
-    { focusId: "focus-1", sourceEvidence: ["Grafens lutning beskriver förändringen."] },
-    { focusId: "focus-2", sourceEvidence: ["Fotosyntesen sker i kloroplasterna."] },
+    { focusId: "focus-1", skill: "Tolka grafens lutning", sourceQuestion: "Vad beskriver grafens lutning?",
+      sourceEvidence: ["Grafens lutning beskriver förändringen."] },
+    { focusId: "focus-2", skill: "Lokalisera kloroplasterna", sourceQuestion: "Var sker fotosyntesen i växtcellen?",
+      sourceEvidence: ["Fotosyntesen sker i kloroplasterna."] },
   ];
   assert.deepEqual(pipeline.supportedTrainingFocusMatches({
+    question: "Hur beskriver grafens lutning förändringen?",
     source_references: ["Grafens lutning beskriver förändringen."],
   }, ["focus-1", "focus-2"], trainingFocus), ["focus-1"]);
   assert.deepEqual(pipeline.supportedTrainingFocusMatches({
+    question: "Var sker fotosyntesen i växtcellen?",
     source_references: ["Fotosyntesen sker i kloroplasterna."],
   }, ["focus-1", "focus-2"], trainingFocus), ["focus-2"],
   "a source citation from another same-course section cannot cover a focus with its own evidence");
   assert.deepEqual(pipeline.supportedTrainingFocusMatches({
+    question: "Beskriv grafens lutning.",
     source_references: ["Grafens lutning beskriver förändringen."],
-  }, ["focus-1", "focus-2"], [trainingFocus[0], { focusId: "focus-2" }]), ["focus-1", "focus-2"],
-  "legacy accepted foci without sourceEvidence preserve their prior coverage behavior");
+  }, ["focus-1", "focus-2"], [trainingFocus[0], { focusId: "focus-2" }]), ["focus-1"],
+  "a legacy focus without source material cannot be credited based only on the verifier claim");
   assert.deepEqual(pipeline.supportedTrainingFocusMatches({
+    question: "Beskriv grafens lutning.",
     source_references: ["Grafens lutning beskriver förändringen."],
   }, ["focus-1", "focus-2"], [trainingFocus[0], { focusId: "focus-2", sourceEvidence: [] }]), ["focus-1"],
   "a newly resolved focus with unavailable evidence fails closed rather than using the legacy bypass");
   assert.deepEqual(pipeline.uncoveredTrainingFocusIds({ payload: { trainingFocus } }, [{
+    question: "Hur beskriver grafens lutning förändringen?",
     source_references: ["Grafens lutning beskriver förändringen."],
     training_focus_matches: ["focus-1", "focus-2"],
   }]), ["focus-2"], "persisted model claims cannot cover a different source focus");
+  assert.deepEqual(pipeline.supportedTrainingFocusMatches({
+    question: "Vad bildas vid mitos?",
+    model_answer: "Två dotterceller.",
+    source_references: ["Fotosyntesen sker i kloroplasterna."],
+  }, ["focus-2"], trainingFocus), [],
+  "an unrelated question cannot consume a mistake focus by attaching its exact citation");
+  assert.deepEqual(pipeline.supportedTrainingFocusMatches({
+    question: "Vilka ämnen använder växten vid fotosyntesen?",
+    model_answer: "Vatten och koldioxid.",
+    source_references: ["Fotosyntesen sker i kloroplasterna."],
+  }, ["focus-2"], trainingFocus), ["focus-2"],
+  "a Swedish inflection and a focused source term retain valid evidence alignment");
+  const photosynthesisFocus = [{ focusId: "focus-3", concept: "Fotosyntes",
+    skill: "Identifiera ämnen växten använder", sourceQuestion: "Vilka ämnen använder växten i fotosyntesen?",
+    studentAnswer: "Syre", gradingFeedback: "Växten tar upp koldioxid och vatten.",
+    expectedAnswer: "Koldioxid och vatten", sourceEvidence: ["Fotosyntesen sker i kloroplasterna."] }];
+  assert.deepEqual(pipeline.supportedTrainingFocusMatches({ question: "Vad är fotosyntes?",
+    model_answer: "Växtens process för att omvandla ljusenergi.",
+    source_references: ["Fotosyntesen sker i kloroplasterna."] }, ["focus-3"], photosynthesisFocus), [],
+  "topic-only questions do not cover a more specific documented error");
+  assert.deepEqual(pipeline.supportedTrainingFocusMatches({ question: "Hur använder växten fotosyntesen?",
+    model_answer: "För att producera energi.",
+    source_references: ["Fotosyntesen sker i kloroplasterna."] }, ["focus-3"], photosynthesisFocus), [],
+  "generic action words and broad topic overlap do not cover the missed skill of identifying inputs");
+  assert.deepEqual(pipeline.supportedTrainingFocusMatches({ question: "Vilken gas bildas vid fotosyntesen?",
+    model_answer: "Syre.", source_references: ["Fotosyntesen sker i kloroplasterna."] },
+  ["focus-3"], photosynthesisFocus), [],
+  "the student's incorrect answer cannot serve as positive proof of a different skill");
+  assert.deepEqual(pipeline.supportedTrainingFocusMatches({ question: "Vilka ämnen tar växten upp vid fotosyntesen?",
+    model_answer: "Koldioxid och vatten.", source_references: ["Fotosyntesen sker i kloroplasterna."] },
+  ["focus-3"], photosynthesisFocus), ["focus-3"],
+  "specific questions that practise the missed objective retain coverage");
+  assert.deepEqual(pipeline.supportedTrainingFocusMatches({ question: "Vilka ämnen använder växten inte vid fotosyntesen?",
+    model_answer: "Syre.", source_references: ["Fotosyntesen sker i kloroplasterna."] },
+  ["focus-3"], photosynthesisFocus), [],
+  "a negated action cannot cover an affirmative documented mistake focus");
+  assert.deepEqual(pipeline.supportedTrainingFocusMatches({ question: "Vilka ämnen använder växten varken i ljus eller mörker vid fotosyntesen?",
+    model_answer: "Inga ämnen.", source_references: ["Fotosyntesen sker i kloroplasterna."] },
+  ["focus-3"], photosynthesisFocus), [],
+  "varken … eller cannot cover an affirmative documented mistake focus");
+  assert.deepEqual(pipeline.supportedTrainingFocusMatches({ question: "Vilka ämnen tar växten inte upp vid fotosyntesen?",
+    model_answer: "Inga ämnen.", source_references: ["Fotosyntesen sker i kloroplasterna."] },
+  ["focus-3"], photosynthesisFocus), [],
+  "negation remains attached when a particle verb is separated by the subject");
+  assert.deepEqual(pipeline.supportedTrainingFocusMatches({ question: "Vilka ämnen använder växten, inte syre utan koldioxid och vatten, vid fotosyntesen?",
+    model_answer: "Koldioxid och vatten.", source_references: ["Fotosyntesen sker i kloroplasterna."] },
+  ["focus-3"], photosynthesisFocus), ["focus-3"],
+  "a contrast correcting the object must not be mistaken for negating the action");
+  assert.deepEqual(pipeline.supportedTrainingFocusMatches({ question: "Vilka ämnen använder växten, inte syre men koldioxid och vatten, vid fotosyntesen?",
+    model_answer: "Koldioxid och vatten.", source_references: ["Fotosyntesen sker i kloroplasterna."] },
+  ["focus-3"], photosynthesisFocus), ["focus-3"],
+  "a contrast with men must not be mistaken for negating the action");
+  assert.deepEqual(pipeline.supportedTrainingFocusMatches({ question: "Vilka ämnen använder växten inte, utan producerar vid fotosyntesen?",
+    model_answer: "Koldioxid och vatten.", source_references: ["Fotosyntesen sker i kloroplasterna."] },
+  ["focus-3"], photosynthesisFocus), [],
+  "a contrast introducing a different action does not erase negation of the training action");
+  assert.deepEqual(pipeline.supportedTrainingFocusMatches({ question: "Vilka ämnen använder växten vid fotosyntesen? Förklara varför den inte producerar vatten.",
+    model_answer: "Koldioxid och vatten.", source_references: ["Fotosyntesen sker i kloroplasterna."] },
+  ["focus-3"], photosynthesisFocus), ["focus-3"],
+  "negation of a different output action must not negate the affirmative input target");
+  const photosynthesisProductFocus = [{ focusId: "focus-4", concept: "Fotosyntes",
+    skill: "Identifiera ämnen som bildas", sourceQuestion: "Vilka ämnen bildas vid fotosyntesen?",
+    sourceEvidence: ["Fotosyntesen sker i kloroplasterna."] }];
+  assert.deepEqual(pipeline.supportedTrainingFocusMatches({ question: "Vilka ämnen släpps inte ut vid fotosyntesen?",
+    model_answer: "Inga ämnen.", source_references: ["Fotosyntesen sker i kloroplasterna."] },
+  ["focus-4"], photosynthesisProductFocus), [],
+  "negation inside the compound output action släpps ut cannot cover a positive production focus");
+  assert.deepEqual(pipeline.supportedTrainingFocusMatches({
+    question: "Vilka ämnen bildas vid fotosyntesen?",
+    model_answer: "Syre och druvsocker.",
+    source_references: ["Fotosyntesen sker i kloroplasterna."],
+  }, ["focus-3"], photosynthesisFocus), [],
+  "a question about photosynthesis products cannot cover a documented mistake about its inputs");
+  assert.deepEqual(pipeline.supportedTrainingFocusMatches({
+    question: "Vilka ämnen släpps ut vid fotosyntesen?",
+    model_answer: "Syre och druvsocker.",
+    source_references: ["Fotosyntesen sker i kloroplasterna."],
+  }, ["focus-3"], photosynthesisFocus), [],
+  "an alternative product phrasing cannot cover a documented mistake about inputs");
+  assert.deepEqual(pipeline.supportedTrainingFocusMatches({
+    question: "Vilka ämnen tar växten upp vid fotosyntesen?",
+    model_answer: "Koldioxid och vatten.",
+    source_references: ["Fotosyntesen sker i kloroplasterna."],
+  }, ["focus-4"], [{ ...photosynthesisFocus[0], focusId: "focus-4",
+    skill: "Identifiera ämnen som bildas", sourceQuestion: "Vilka ämnen bildas vid fotosyntesen?" }]), [],
+  "a question about photosynthesis inputs cannot cover a documented mistake about its products");
+  assert.deepEqual(pipeline.supportedTrainingFocusMatches({
+    question: "Varför stänger växten klyvöppningarna vid torka?",
+    model_answer: "För att minska vattenförlusten.",
+    learning_objective: "Identifiera ämnen växten använder i fotosyntesen.",
+    source_references: ["Fotosyntesen sker i kloroplasterna."],
+  }, ["focus-3"], photosynthesisFocus), [],
+  "a misleading model-supplied objective cannot make an adjacent plant/water question cover photosynthesis inputs");
+  assert.deepEqual(pipeline.supportedTrainingFocusMatches({
+    question: "Vilka ämnen använder växten vid torka?",
+    model_answer: "Koldioxid och vatten används däremot i fotosyntesen.",
+    source_references: ["Fotosyntesen sker i kloroplasterna."],
+  }, ["focus-3"], photosynthesisFocus), [],
+  "the answer cannot provide source overlap for a question that is not grounded in the focus evidence");
+  const slopeFocus = [{ focusId: "focus-4", concept: "Linjär funktion", skill: "Tolka grafens lutning",
+    sourceQuestion: "Vad anger lutningen i en linjär graf?", studentAnswer: "k är skärningen med y-axeln",
+    gradingFeedback: "k anger riktningskoefficienten; m är skärningen.", expectedAnswer: "k anger lutningen.",
+    sourceEvidence: ["Lutningen i en graf visar förändring per x-enhet."] }];
+  assert.deepEqual(pipeline.supportedTrainingFocusMatches({
+    question: "Bestäm riktningskoefficienten för linjen genom (0, 2) och (1, 5).", model_answer: "3",
+    source_references: ["Lutningen i en graf visar förändring per x-enhet."],
+  }, ["focus-4"], slopeFocus), ["focus-4"],
+  "a common Swedish synonym for slope can satisfy the specific skill match");
+  assert.deepEqual(pipeline.supportedTrainingFocusMatches({
+    question: "Determine the k-value for the line through (0, 2) and (1, 5).", model_answer: "3",
+    source_references: ["Lutningen i en graf visar förändring per x-enhet."],
+  }, ["focus-4"], slopeFocus), ["focus-4"],
+  "k-value terminology maps to the verified slope skill");
+
+  const formulaFocus = [{ focusId: "focus-formula", concept: "Ohms lag",
+    skill: "Beräkna strömmen med formeln U = R · I",
+    sourceQuestion: "Hur beräknar man strömmen med formeln U = R · I?",
+    expectedAnswer: "I = U/R", sourceEvidence: ["Strömmen beräknas med formeln I = U/R."] }];
+  assert.deepEqual(pipeline.supportedTrainingFocusMatches({
+    question: "Beräkna strömmen genom resistorn med sambandet U = R · I.",
+    model_answer: "I = U/R.",
+    source_references: ["Strömmen beräknas med formeln I = U/R."],
+  }, ["focus-formula"], formulaFocus), ["focus-formula"],
+  "the noun formeln does not turn a valid calculation focus into an output-only action");
+
+  const legacyMaterial = "Fotosyntesen använder ljus, vatten och koldioxid för att bilda druvsocker och syre. Gröna växter tar upp koldioxid genom klyvöppningarna.";
+  const legacyFocus = [{ focusId: "focus-5", concept: "Fotosyntes",
+    skill: "Identifiera ämnen växten använder", sourceQuestion: "Vilka ämnen använder växten i fotosyntesen?",
+    studentAnswer: "Syre", gradingFeedback: "Växten tar upp koldioxid och vatten.",
+    expectedAnswer: "Koldioxid och vatten" }];
+  assert.deepEqual(pipeline.supportedTrainingFocusMatches({
+    question: "Vilka ämnen tar växten upp vid fotosyntesen?",
+    model_answer: "Koldioxid och vatten.",
+    source_references: ["Fotosyntesen använder ljus, vatten och koldioxid för att"],
+  }, ["focus-5"], legacyFocus, legacyMaterial), ["focus-5"],
+  "legacy jobs can recover exact focus evidence from their persisted course material and verified answer context");
+  assert.deepEqual(pipeline.supportedTrainingFocusMatches({
+    question: "Vilken gas bildas vid fotosyntesen?", model_answer: "Syre.",
+    source_references: ["Fotosyntesen använder ljus, vatten och koldioxid för att"],
+  }, ["focus-5"], legacyFocus, legacyMaterial), [],
+  "recovered legacy evidence does not let the student's incorrect answer cover the missed skill");
+  const separatedLegacyMaterial = "Fotosyntesen använder ljus, vatten och koldioxid för att bilda druvsocker och syre. Gröna växter tar upp koldioxid genom klyvöppningarna.";
+  assert.deepEqual(pipeline.supportedTrainingFocusMatches({
+    question: "Vilka ämnen tar gröna växter upp genom klyvöppningarna?",
+    model_answer: "Koldioxid.",
+    source_references: ["Gröna växter tar upp koldioxid genom klyvöppningarna."],
+  }, ["focus-5"], legacyFocus, separatedLegacyMaterial), ["focus-5"],
+  "legacy source-question and answer contexts can recover different literal passages from the saved material");
+  assert.deepEqual(pipeline.uncoveredTrainingFocusIds({ payload: {
+    pastedText: legacyMaterial, trainingFocus: legacyFocus,
+  } }, [{ question: "Vilka ämnen tar växten upp vid fotosyntesen?",
+    model_answer: "Koldioxid och vatten.",
+    source_references: ["Fotosyntesen använder ljus, vatten och koldioxid för att"],
+    training_focus_matches: ["focus-5"],
+  }]), [], "resumed legacy pipeline jobs use their stored course material to verify focus coverage");
 });
 
 test("step pipeline accumulates exactly 3, 6 and 12 verified questions in bounded batches", async (t) => {
@@ -272,7 +454,7 @@ test("candidate selection prefers a new learning objective without blocking appr
   }
 });
 
-test("mistake-training cannot replace an approved question at the same count when a focus is uncovered", async () => {
+test("mistake-training rejects an overclaimed product question despite a matching source citation", async () => {
   const job = {
     id: "00000000-0000-4000-8000-000000000018",
     user_id: "11111111-1111-4111-8111-111111111111",
@@ -285,14 +467,20 @@ test("mistake-training cannot replace an approved question at the same count whe
     requested_count: 3,
     payload: {
       qType: "short", numQuestions: 3,
+      pastedText: "Ekvationens båda led ska balanseras med samma operation så att likheten bevaras.",
       trainingFocus: [
-        { focusId: "focus-1", concept: "Ekvationer", skill: "Isolera variabeln" },
-        { focusId: "focus-2", concept: "Grafer", skill: "Tolka lutning",
-          sourceEvidence: ["Grafens lutning beskriver förändringen."] },
+        { focusId: "focus-1", concept: "Ekvationer", skill: "Balansera båda leden",
+          sourceQuestion: "Varför måste ekvationens båda led balanseras?",
+          expectedAnswer: "Samma operation på båda sidor bevarar likheten." },
+        { focusId: "focus-2", concept: "Fotosyntes", skill: "Identifiera ämnen som växten använder",
+          sourceQuestion: "Vilka ämnen använder växten vid fotosyntesen?",
+          sourceEvidence: ["Växten använder koldioxid och vatten i fotosyntesen."] },
       ],
     },
     accepted_questions: [1, 2, 3].map((n) => ({
-      id: `old-${n}`, type: "short", question: `Öva ekvation ${n}`,
+      id: `old-${n}`, type: "short", question: `Varför måste ekvationens båda led balanseras? Övning ${n}`,
+      model_answer: "Samma operation på båda sidor bevarar likheten.",
+      source_references: ["Ekvationens båda led ska balanseras med samma operation så att likheten"],
       training_focus_matches: ["focus-1"], validation_status: "verified",
     })),
     progress_current: 3,
@@ -321,8 +509,9 @@ test("mistake-training cannot replace an approved question at the same count whe
   generation.generateVerifiedBatch = async ({ payload }) => {
     requiredFocusIds = payload.trainingFocusRequiredIds;
     return { status: 200, body: { ok: true, questions: [{
-      id: "new-graph-skill", type: "short", question: "Tolka lutningen från två punkter.",
-      source_references: ["Fotosyntesen sker i kloroplasterna."],
+      id: "opposite-photosynthesis-action", type: "short", question: "Vilka ämnen bildas vid fotosyntesen?",
+      model_answer: "Syre och druvsocker.",
+      source_references: ["Växten använder koldioxid och vatten i fotosyntesen."],
       training_focus_matches: ["focus-2"], validation_status: "verified",
     }] } };
   };
@@ -359,12 +548,14 @@ test("resumed mistake-training does not let an unsupported stored focus claim co
     payload: {
       qType: "short", numQuestions: 3,
       trainingFocus: [
-        { focusId: "focus-1", concept: "Ekvationer", sourceEvidence: [focus1] },
-        { focusId: "focus-2", concept: "Grafer", sourceEvidence: [focus2] },
+        { focusId: "focus-1", concept: "Ekvationer", skill: "Balansera ekvationens båda led",
+          sourceQuestion: "Varför måste ekvationens båda led balanseras?", sourceEvidence: [focus1] },
+        { focusId: "focus-2", concept: "Grafer", skill: "Tolka grafens lutning",
+          sourceQuestion: "Vad visar grafens lutning?", sourceEvidence: [focus2] },
       ],
     },
     accepted_questions: [
-      { id: "old-supported", type: "short", question: "Förklara ekvationsbalans.",
+      { id: "old-supported", type: "short", question: "Förklara varför ekvationens båda led måste balanseras.",
         source_references: [focus1], training_focus_matches: ["focus-1"], validation_status: "verified" },
       { id: "old-overclaim", type: "short", question: "Beskriv ekvationsmetoden.",
         source_references: [focus1], training_focus_matches: ["focus-2"], validation_status: "verified" },
@@ -408,10 +599,78 @@ test("resumed mistake-training does not let an unsupported stored focus claim co
   }
 });
 
+test("resumed mistake-training rejects a negated action despite the verifier's focus claim", async () => {
+  const focus1 = "Ekvationens båda led ska balanseras.";
+  const focus2 = "Fotosyntesen sker i kloroplasterna.";
+  const job = {
+    id: "00000000-0000-4000-8000-000000000020",
+    user_id: "11111111-1111-4111-8111-111111111111",
+    idempotency_key: "22222222-2222-4222-8222-222222222222",
+    request_hash: "a".repeat(64),
+    attempt_id: "33333333-3333-4333-8333-333333333333",
+    lease_token: "44444444-4444-4444-8444-444444444444",
+    deadline_at: new Date(Date.now() + 5 * 60_000).toISOString(),
+    stage: "repair",
+    stage_attempts: 1,
+    requested_count: 3,
+    payload: {
+      qType: "short", numQuestions: 3,
+      trainingFocus: [
+        { focusId: "focus-1", concept: "Ekvationer", skill: "Balansera ekvationens båda led",
+          sourceQuestion: "Varför måste ekvationens båda led balanseras?", sourceEvidence: [focus1] },
+        { focusId: "focus-2", concept: "Fotosyntes", skill: "Identifiera ämnen växten använder",
+          sourceQuestion: "Vilka ämnen använder växten i fotosyntesen?", sourceEvidence: [focus2] },
+      ],
+    },
+    accepted_questions: [
+      { id: "old-supported", type: "short", question: "Förklara varför ekvationens båda led måste balanseras.",
+        source_references: [focus1], training_focus_matches: ["focus-1"], validation_status: "verified" },
+      { id: "old-overclaim", type: "short", question: "Beskriv ekvationsmetoden.",
+        source_references: [focus1], training_focus_matches: ["focus-2"], validation_status: "verified" },
+    ],
+    progress_current: 2,
+  };
+  const prior = {
+    generateVerifiedBatch: generation.generateVerifiedBatch,
+    renewPipelineLease: operations.renewPipelineLease,
+    renewGenerationLease: operations.renewGenerationLease,
+    checkpointPipelineJob: operations.checkpointPipelineJob,
+  };
+  let requiredFocusIds;
+  operations.renewPipelineLease = async () => true;
+  operations.renewGenerationLease = async () => true;
+  operations.checkpointPipelineJob = async (input) => {
+    assert.deepEqual(input.acceptedQuestions, job.accepted_questions,
+      "a negated question must not consume the missing focus slot despite the verifier claim");
+    assert.equal(input.progressCurrent, 2);
+    assert.equal(input.nextStage, "repair");
+    return { status: "retry_queued" };
+  };
+  generation.generateVerifiedBatch = async ({ payload }) => {
+    requiredFocusIds = payload.trainingFocusRequiredIds;
+    return { status: 200, body: { ok: true, questions: [{
+      id: "new-negated", type: "short", question: "Vilka ämnen använder växten inte vid fotosyntesen?",
+      model_answer: "Syre.", source_references: [focus2], training_focus_matches: ["focus-2"], validation_status: "verified",
+    }] } };
+  };
+  try {
+    const result = await pipeline.advance(job);
+    assert.deepEqual(requiredFocusIds, ["focus-2"]);
+    assert.equal(job.accepted_questions.length, 2);
+    assert.equal(result.status, "retry");
+    assert.equal(result.error, "NO_NEW_APPROVED_QUESTIONS");
+  } finally {
+    generation.generateVerifiedBatch = prior.generateVerifiedBatch;
+    operations.renewPipelineLease = prior.renewPipelineLease;
+    operations.renewGenerationLease = prior.renewGenerationLease;
+    operations.checkpointPipelineJob = prior.checkpointPipelineJob;
+  }
+});
+
 test("mistake-training covers every selected focus before reaching assembly for 3, 6 and 12 questions", async (t) => {
   for (const requested of [3, 6, 12]) {
     await t.test(`${requested} questions`, async () => {
-      const focusIds = ["focus-1", "focus-2", "focus-3"];
+      const focusIds = mistakeTrainingGold.cases.map((fixture) => fixture.focus.focusId);
       const job = {
         id: `00000000-0000-4000-8000-${String(requested + 40).padStart(12, "0")}`,
         user_id: "11111111-1111-4111-8111-111111111111",
@@ -422,19 +681,21 @@ test("mistake-training covers every selected focus before reaching assembly for 
         stage: "generate", requested_count: requested,
         payload: {
           qType: "short", numQuestions: requested,
-          trainingFocus: focusIds.map((focusId) => ({ focusId, concept: `Begrepp ${focusId}`,
-            skill: `Färdighet ${focusId}`, sourceEvidence: [`Källbelägg ${focusId} styr dess färdighet.`] })),
+          trainingFocus: mistakeTrainingGold.cases.map((fixture) => fixture.focus),
           priorQuestions: [{ id: "old", question: "Lös ekvationen 2x + 4 = 10.", concept_tag: "Ekvationslösning" }],
         },
         accepted_questions: [], progress_current: 0,
       };
       const prior = {
         generateVerifiedBatch: generation.generateVerifiedBatch,
+        finalizeVerifiedExam: generation.finalizeVerifiedExam,
         renewPipelineLease: operations.renewPipelineLease,
         renewGenerationLease: operations.renewGenerationLease,
         checkpointPipelineJob: operations.checkpointPipelineJob,
+        completePipelineJob: operations.completePipelineJob,
       };
       let sequence = 0;
+      let finalizedQuestions = [];
       operations.renewPipelineLease = async () => true;
       operations.renewGenerationLease = async () => true;
       operations.checkpointPipelineJob = async (input) => {
@@ -447,16 +708,27 @@ test("mistake-training covers every selected focus before reaching assembly for 
         ok: true,
         questions: Array.from({ length: Math.min(2, payload.numQuestions) }, () => {
           sequence++;
-          const focusId = focusIds[(sequence - 1) % focusIds.length];
+          const focusIndex = (sequence - 1) % mistakeTrainingGold.cases.length;
+          const variantIndex = Math.floor((sequence - 1) / mistakeTrainingGold.cases.length);
+          const fixture = mistakeTrainingGold.cases[focusIndex];
+          const candidate = fixture.relevant[variantIndex];
           return {
             id: `training-${sequence}`, type: "short",
-            question: `Utred unik deluppgift ${sequence} med metod ${String.fromCharCode(96 + sequence)} och exempel ${sequence * 17}.`,
-            source_references: [`Källbelägg ${focusId} styr dess färdighet.`],
-            training_focus_matches: focusIds,
+            ...candidate,
+            source_references: fixture.focus.sourceEvidence,
+            training_focus_matches: [fixture.focus.focusId],
             validation_status: "verified",
           };
         }),
       } });
+      generation.finalizeVerifiedExam = async ({ questions }) => {
+        finalizedQuestions = questions;
+        return {
+          submissionId: "55555555-5555-4555-8555-555555555555",
+          response: { exam: { questions }, meta: { requested, partial: false } },
+        };
+      };
+      operations.completePipelineJob = async ({ response }) => ({ status: "completed", response });
       try {
         let advances = 0;
         while (job.stage !== "assemble") {
@@ -470,13 +742,96 @@ test("mistake-training covers every selected focus before reaching assembly for 
         assert.deepEqual(new Set(job.accepted_questions.flatMap((question) => question.training_focus_matches)), new Set(focusIds));
         assert.ok(job.accepted_questions.every((question) => question.training_focus_matches.length === 1),
           "the pipeline persists only source-supported focus IDs, not the model's overclaimed set");
+        assert.ok(job.accepted_questions.every((question) =>
+          pipeline.supportedTrainingFocusMatches(question, question.training_focus_matches,
+            job.payload.trainingFocus).length === 1),
+        "every issued synthetic question must be grounded in one of the realistic verified mistakes");
+        const completed = await pipeline.advance(job);
+        assert.equal(completed.status, "completed");
+        assert.equal(finalizedQuestions.length, requested);
+        assert.equal(completed.response.exam.questions.length, requested);
+        assert.equal(completed.response.meta.partial, false);
+        assert.ok(finalizedQuestions.every((question) =>
+          pipeline.supportedTrainingFocusMatches(question, question.training_focus_matches,
+            job.payload.trainingFocus).length === 1),
+        "each question remains grounded through final assembly");
       } finally {
         generation.generateVerifiedBatch = prior.generateVerifiedBatch;
+        generation.finalizeVerifiedExam = prior.finalizeVerifiedExam;
         operations.renewPipelineLease = prior.renewPipelineLease;
         operations.renewGenerationLease = prior.renewGenerationLease;
         operations.checkpointPipelineJob = prior.checkpointPipelineJob;
+        operations.completePipelineJob = prior.completePipelineJob;
       }
     });
+  }
+});
+
+test("mistake-training never fills remaining slots with a question unrelated to all verified foci", async () => {
+  const focus1Evidence = "I y=kx+m anger k lutningen och m skärningen med y-axeln.";
+  const focus2Evidence = "Växten använder koldioxid och vatten i fotosyntesen. Fotosyntesen bildar druvsocker och syre.";
+  const job = {
+    id: "00000000-0000-4000-8000-000000000021",
+    user_id: "11111111-1111-4111-8111-111111111111",
+    idempotency_key: "22222222-2222-4222-8222-222222222222",
+    request_hash: "a".repeat(64),
+    attempt_id: "33333333-3333-4333-8333-333333333333",
+    lease_token: "44444444-4444-4444-8444-444444444444",
+    deadline_at: new Date(Date.now() + 5 * 60_000).toISOString(),
+    stage: "repair",
+    requested_count: 3,
+    payload: {
+      qType: "short", numQuestions: 3,
+      trainingFocus: [
+        { focusId: "focus-1", concept: "Linjär funktion", skill: "Skilja lutningen från skärningen med y-axeln",
+          sourceQuestion: "Vad visar k och m i y=kx+m?", sourceEvidence: [focus1Evidence] },
+        { focusId: "focus-2", concept: "Fotosyntes", skill: "Skilja ämnen växten använder från ämnen som bildas",
+          sourceQuestion: "Vilka ämnen använder växten och vilka bildas vid fotosyntesen?", sourceEvidence: [focus2Evidence] },
+      ],
+    },
+    accepted_questions: [
+      { id: "math-supported", type: "short",
+        question: "Vilken parameter anger lutningen respektive skärningen med y-axeln i y=4x+2?",
+        model_answer: "k anger lutningen och m skärningen med y-axeln.", source_references: [focus1Evidence],
+        training_focus_matches: ["focus-1"], validation_status: "verified" },
+      { id: "biology-supported", type: "short",
+        question: "Sortera ämnena växten använder och de som bildas vid fotosyntesen.",
+        model_answer: "Koldioxid och vatten används; druvsocker och syre bildas.", source_references: [focus2Evidence],
+        training_focus_matches: ["focus-2"], validation_status: "verified" },
+    ],
+    progress_current: 2,
+  };
+  const prior = {
+    generateVerifiedBatch: generation.generateVerifiedBatch,
+    renewPipelineLease: operations.renewPipelineLease,
+    renewGenerationLease: operations.renewGenerationLease,
+    checkpointPipelineJob: operations.checkpointPipelineJob,
+  };
+  let checkpointInput;
+  operations.renewPipelineLease = async () => true;
+  operations.renewGenerationLease = async () => true;
+  operations.checkpointPipelineJob = async (input) => { checkpointInput = input; return { status: "retry_queued" }; };
+  generation.generateVerifiedBatch = async () => ({ status: 200, body: {
+    ok: true,
+    questions: [{
+      id: "unrelated-algebra", type: "short",
+      question: "Beräkna y när x=3 i y=4x+2.", model_answer: "14",
+      learning_objective: "Sätta in x-värde i en funktion", concept_tag: "Linjär funktion",
+      source_references: [focus1Evidence], training_focus_matches: ["focus-1"], validation_status: "verified",
+    }],
+  } });
+  try {
+    const result = await pipeline.advance(job);
+    assert.equal(checkpointInput.acceptedQuestions.length, 2,
+      "an unrelated question must not consume a requested question slot after all focus IDs are already covered");
+    assert.equal(checkpointInput.nextStage, "repair");
+    assert.equal(result.status, "retry");
+    assert.equal(result.error, "NO_NEW_APPROVED_QUESTIONS");
+  } finally {
+    generation.generateVerifiedBatch = prior.generateVerifiedBatch;
+    operations.renewPipelineLease = prior.renewPipelineLease;
+    operations.renewGenerationLease = prior.renewGenerationLease;
+    operations.checkpointPipelineJob = prior.checkpointPipelineJob;
   }
 });
 
@@ -516,19 +871,76 @@ test("assembly rechecks stored focus matches against their source before issuing
   }
 });
 
-test("repair batches widen after no progress without overfilling the requested exam", async () => {
+test("assembly fails closed after bounded retries for a legacy question with no source-supported focus", async () => {
+  const mathEvidence = "I y=kx+m anger k lutningen och m skärningen med y-axeln.";
+  const biologyEvidence = "Växten använder koldioxid och vatten i fotosyntesen. Fotosyntesen bildar druvsocker och syre.";
+  const job = {
+    id: "00000000-0000-4000-8000-000000000022",
+    user_id: "11111111-1111-4111-8111-111111111111",
+    lease_token: "44444444-4444-4444-8444-444444444444",
+    stage: "assemble",
+    requested_count: 3,
+    payload: { trainingFocus: [
+      { focusId: "focus-1", concept: "Linjär funktion", skill: "Skilja lutningen från skärningen med y-axeln",
+        sourceQuestion: "Vad visar k och m i y=kx+m?", sourceEvidence: [mathEvidence] },
+      { focusId: "focus-2", concept: "Fotosyntes", skill: "Skilja ämnen växten använder från ämnen som bildas",
+        sourceQuestion: "Vilka ämnen använder växten och vilka bildas vid fotosyntesen?", sourceEvidence: [biologyEvidence] },
+    ] },
+    accepted_questions: [
+      { id: "supported-math", question: "Vilken parameter anger lutningen respektive skärningen med y-axeln i y=4x+2?",
+        source_references: [mathEvidence], training_focus_matches: ["focus-1"], validation_status: "verified" },
+      { id: "supported-biology", question: "Sortera ämnena växten använder och de som bildas vid fotosyntesen.",
+        source_references: [biologyEvidence], training_focus_matches: ["focus-2"], validation_status: "verified" },
+      { id: "stale-unrelated", question: "Beräkna y när x=3 i y=4x+2.", model_answer: "14",
+        source_references: [mathEvidence], training_focus_matches: ["focus-1"], validation_status: "verified" },
+    ],
+  };
+  const prior = {
+    finalizeVerifiedExam: generation.finalizeVerifiedExam,
+    retryPipelineStep: operations.retryPipelineStep,
+  };
+  let finalizeCalls = 0;
+  let retryInput;
+  let retryCalls = 0;
+  generation.finalizeVerifiedExam = async () => { finalizeCalls++; throw new Error("must not finalize"); };
+  operations.retryPipelineStep = async (input) => {
+    retryInput = input;
+    retryCalls++;
+    return retryCalls < 3 ? "retry_queued" : "retry_limit";
+  };
+  try {
+    const first = await pipeline.advance(job);
+    const second = await pipeline.advance(job);
+    const result = await pipeline.advance(job);
+    assert.equal(finalizeCalls, 0, "legacy unsupported question must never reach finalization");
+    assert.deepEqual([first.status, second.status, result.status], ["retry", "retry", "retry_limit"]);
+    assert.equal(retryCalls, 3, "the existing server retry limit bounds the fail-closed assembly path");
+    assert.equal(retryInput.errorCode, "TRAINING_QUESTION_UNGROUNDED");
+    assert.equal(result.error, "TRAINING_QUESTION_UNGROUNDED");
+  } finally {
+    generation.finalizeVerifiedExam = prior.finalizeVerifiedExam;
+    operations.retryPipelineStep = prior.retryPipelineStep;
+  }
+});
+
+test("short repairs may widen, but MC repairs retain the normal cap and exact exam size", async () => {
   const prior = {
     generateVerifiedBatch: generation.generateVerifiedBatch,
     renewGenerationLease: operations.renewGenerationLease,
     checkpointPipelineJob: operations.checkpointPipelineJob,
   };
   try {
-    for (const { attempts, stage, existingCount, expectedBatch, expectedAccepted } of [
+    for (const { attempts, stage, existingCount, expectedBatch, expectedAccepted, qType = "short", expectedType, existingTypes } of [
       { attempts: 1, stage: "repair", existingCount: 2, expectedBatch: 3, expectedAccepted: 3 },
       { attempts: 2, stage: "repair", existingCount: 2, expectedBatch: 5, expectedAccepted: 5 },
       { attempts: 2, stage: "repair", existingCount: 10, expectedBatch: 2, expectedAccepted: 2 },
       { attempts: 2, stage: "repair", existingCount: 11, expectedBatch: 2, expectedAccepted: 1 },
       { attempts: 2, stage: "generate", existingCount: 0, expectedBatch: 3, expectedAccepted: 3 },
+      { attempts: 2, stage: "repair", existingCount: 0, expectedBatch: 3, expectedAccepted: 3, qType: "mc" },
+      { attempts: 2, stage: "repair", existingCount: 0, expectedBatch: 5, expectedAccepted: 5, qType: "mix", expectedType: "short" },
+      { attempts: 3, stage: "repair", existingCount: 0, expectedBatch: 3, expectedAccepted: 3, qType: "mix" },
+      { attempts: 1, stage: "repair", existingCount: 6, existingTypes: ["mc", "mc", "mc", "short", "short", "short"], expectedBatch: 3, expectedAccepted: 3, qType: "mix", expectedType: "mc" },
+      { attempts: 2, stage: "repair", existingCount: 6, existingTypes: ["mc", "mc", "mc", "short", "short", "short"], expectedBatch: 3, expectedAccepted: 3, qType: "mix", expectedType: "short" },
     ]) {
       const job = {
         id: "00000000-0000-4000-8000-000000000015",
@@ -541,9 +953,9 @@ test("repair batches widen after no progress without overfilling the requested e
         stage,
         stage_attempts: attempts,
         requested_count: 12,
-        payload: { qType: "short", numQuestions: 12 },
+        payload: { qType, numQuestions: 12 },
         accepted_questions: Array.from({ length: existingCount }, (_, index) => ({
-          id: `approved-${index + 1}`, type: "short", question: `Approved ${index + 1}`,
+          id: `approved-${index + 1}`, type: existingTypes?.[index] || "short", question: `Approved ${index + 1}`,
           validation_status: "verified",
         })),
         progress_current: existingCount,
@@ -557,21 +969,25 @@ test("repair batches widen after no progress without overfilling the requested e
       };
       generation.generateVerifiedBatch = async ({ payload }) => {
         requestedBatch = payload.numQuestions;
+        const expectedBatchType = expectedType || (qType === "mix" ? "mc" : qType);
+        assert.equal(payload.qType, expectedBatchType,
+          "limiting MC work does not change the requested type or mixed-exam targets");
         return {
           status: 200,
           body: {
             ok: true,
             questions: Array.from({ length: payload.numQuestions }, (_, index) => ({
               id: `repair-${attempts}-${index + 1}`,
-              type: "short",
+              type: expectedBatchType,
               question: `Verified repair ${attempts}-${index + 1}`,
+              ...(expectedBatchType === "mc" ? { options: ["A", "B", "C"], correct_index: 0 } : {}),
               validation_status: "verified",
             })),
           },
         };
       };
 
-      const result = await pipeline.advance(job, { deadlineAt: Date.now() + 50_000 });
+      const result = await pipeline.advance(job, { deadlineAt: Date.now() + 44_000 });
 
       assert.equal(requestedBatch, expectedBatch);
       assert.equal(checkpointedQuestions.length, existingCount + expectedAccepted);
@@ -1092,4 +1508,112 @@ test.after(() => {
   operations.checkpointPipelineJob = original.checkpointPipelineJob;
   operations.retryPipelineStep = original.retryPipelineStep;
   operations.completePipelineJob = original.completePipelineJob;
+});
+
+test("pipeline accumulation excludes repeated presented functions despite differing unasked rubrics", async () => {
+  const fact = "Ribosomerna bygger proteiner av aminosyror.";
+  const first = { id: "first-function", type: "short", question: "Vad gör ribosomerna i en cell?",
+    concept_tag: "Ribosomer", learning_objective: "Ribosomernas funktion", model_answer: fact,
+    source_references: [fact], scoring_rubric: { parts: [{ description: fact, points: 1 }] }, validation_status: "verified" };
+  const job = { id: "11111111-1111-4111-8111-111111111111", user_id: "synthetic-function-user",
+    idempotency_key: "22222222-2222-4222-8222-222222222222", request_hash: "a".repeat(64),
+    attempt_id: "33333333-3333-4333-8333-333333333333", lease_token: "44444444-4444-4444-8444-444444444444",
+    deadline_at: new Date(Date.now() + 300000).toISOString(), stage: "generate", requested_count: 3,
+    payload: { course: "Biologi 1", pastedText: fact, qType: "short", numQuestions: 3 },
+    accepted_questions: [first], progress_current: 1 };
+  const saved = { generate: generation.generateVerifiedBatch, pipeline: operations.renewPipelineLease,
+    quota: operations.renewGenerationLease, checkpoint: operations.checkpointPipelineJob };
+  let checkpoint;
+  operations.renewPipelineLease = async () => true;
+  operations.renewGenerationLease = async () => true;
+  operations.checkpointPipelineJob = async input => {
+    checkpoint = input;
+    return { status: "checkpointed", stage: input.nextStage, progress_current: input.progressCurrent };
+  };
+  generation.generateVerifiedBatch = async () => ({ status: 200, body: { ok: true, questions: [
+    { ...first, id: "repeat", question: "Vilken funktion har ribosomer i cellen?",
+      scoring_rubric: { parts: [{ description: fact, points: 1 }, { description: "Förklara sambandet med DNA.", points: 1 }] } },
+    { id: "distinct", type: "short", question: "Vad innehåller cellkärnan?", model_answer: "DNA", validation_status: "verified" },
+  ] } });
+  try {
+    const result = await pipeline.advance(job);
+    assert.equal(result.status, "progress");
+    assert.equal(checkpoint.progressCurrent, 2);
+    assert.equal(checkpoint.nextStage, "repair");
+    assert.deepEqual(checkpoint.acceptedQuestions.map(q => q.id), [first.id, pipeline.batchQuestionId(job, { id: "distinct" })]);
+    assert.equal(checkpoint.repairFeedback.duplicateCount, 1);
+    job.accepted_questions = [];
+    job.progress_current = 0;
+    generation.generateVerifiedBatch = async () => {
+      const left = { ...first, points: 1, cognitive_level: "förstå" };
+      const right = { ...left, id: "repeat", points: 2, question: "Vilken funktion har ribosomer i cellen?",
+        scoring_rubric: { parts: [{ description: fact, points: 1 }, { description: "Förklara sambandet med DNA.", points: 1 }] } };
+      const different = { ...left, id: "distinct", question: "Vad innehåller cellkärnan?", concept_tag: "DNA", model_answer: "DNA." };
+      const gate = require("../../api/_assessment.js").gateExam({ questions: [left, right, different] },
+        { profile: "natural_sciences", sourceMaterial: fact });
+      assert.deepEqual(gate.dropped.map(item => item.issues), [["repeated_function_task"]]);
+      return { status: 200, body: { ok: true, questions: gate.questions,
+        qualityDiagnostics: { structuralIssueCounts: { repeated_function_task: gate.dropped.length } } } };
+    };
+    await pipeline.advance(job);
+    assert.equal(checkpoint.progressCurrent, 2);
+    assert.equal(checkpoint.nextStage, "repair");
+    assert.equal(checkpoint.repairFeedback.duplicateCount, 1,
+      "generator-pruned repeats still guide the next repair through the existing bounded field");
+  } finally {
+    generation.generateVerifiedBatch = saved.generate;
+    operations.renewPipelineLease = saved.pipeline;
+    operations.renewGenerationLease = saved.quota;
+    operations.checkpointPipelineJob = saved.checkpoint;
+  }
+});
+
+test("generator-pruned energy-input repeats retain repair guidance through the real pipeline checkpoint", async () => {
+  const material = readFileSync(new URL("../fixtures/numbered-biology-notes.txt", import.meta.url), "utf8");
+  const quote = "Vid cellandning används glukos och syre.";
+  const a = { id: "energy-conversion", type: "mc", points: 2, cognitive_level: "förstå", concept_tag: "Cellandning",
+    question: "Vad omvandlas under cellandningen för att göra energi tillgänglig i form av ATP?",
+    options: ["Syre", "Koldioxid", "Glukos"], correct_index: 2, model_answer: quote,
+    source_references: [quote], validation_status: "verified" };
+  const b = { ...a, id: "energy-source", points: 1, concept_tag: "Energi",
+    question: "Vad används som energikälla under cellandningen?", options: ["Ljusenergi", "Koldioxid", "Glukos"] };
+  const other = { ...a, id: "distinct", question: "Vilken process producerar syre?", concept_tag: "Fotosyntes",
+    options: ["Fotosyntes", "Cellandning", "Osmos"], correct_index: 0, model_answer: "Fotosyntes" };
+  const job = { id: "11111111-1111-4111-8111-111111111111", user_id: "synthetic-energy-user",
+    idempotency_key: "22222222-2222-4222-8222-222222222222", request_hash: "a".repeat(64),
+    attempt_id: "33333333-3333-4333-8333-333333333333", lease_token: "44444444-4444-4444-8444-444444444444",
+    deadline_at: new Date(Date.now() + 300000).toISOString(), stage: "generate", requested_count: 3,
+    payload: { course: "Biologi 1", pastedText: material, qType: "mc", numQuestions: 3 },
+    accepted_questions: [], progress_current: 0 };
+  const saved = { generate: generation.generateVerifiedBatch, pipeline: operations.renewPipelineLease,
+    quota: operations.renewGenerationLease, checkpoint: operations.checkpointPipelineJob };
+  let checkpoint;
+  operations.renewPipelineLease = async () => true;
+  operations.renewGenerationLease = async () => true;
+  operations.checkpointPipelineJob = async input => {
+    checkpoint = input;
+    return { status: "checkpointed", stage: input.nextStage, progress_current: input.progressCurrent };
+  };
+  generation.generateVerifiedBatch = async () => {
+    const circular = { ...other, id: "circular", question: "Vad sker där cellandning äger rum?" };
+    const gate = require("../../api/_assessment.js").gateExam({ questions: [a, b, other, circular] },
+      { profile: "natural_sciences", sourceMaterial: material });
+    assert.deepEqual(gate.dropped.map(item => item.issues), [["repeated_energy_input_task"], ["circular_location_task"]]);
+    return { status: 200, body: { ok: true, questions: gate.questions,
+      qualityDiagnostics: { structuralIssueCounts: { repeated_energy_input_task: 1, circular_location_task: 1 } } } };
+  };
+  try {
+    assert.equal((await pipeline.advance(job)).status, "progress");
+    assert.equal(checkpoint.progressCurrent, 2);
+    assert.equal(checkpoint.nextStage, "repair");
+    assert.equal(checkpoint.repairFeedback.duplicateCount, 1);
+    assert.equal(checkpoint.repairFeedback.reviewFailureCounts.question_clarity, 1,
+      "the fixed circular-task signal survives through an existing allowlisted repair category");
+    assert.deepEqual(checkpoint.acceptedQuestions.map(q => q.id), [a, other].map(q => pipeline.batchQuestionId(job, q)));
+  } finally {
+    generation.generateVerifiedBatch = saved.generate;
+    operations.renewPipelineLease = saved.pipeline;
+    operations.renewGenerationLease = saved.quota;
+    operations.checkpointPipelineJob = saved.checkpoint;
+  }
 });

@@ -29,9 +29,6 @@
   var LS_MISTAKES = "proviaai_mistakes";
   var LS_TRAIN_PICK = "proviaai_train_pick";
 
-  // Ett övergivet utkast slutar vara till hjälp och börjar bli förvirrande.
-  var DRAFT_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
-
   var MAX_NUDGES = 3;
   var NUDGE_GAP_MS = 45000;
   var STUCK_MS = 90000;
@@ -313,7 +310,8 @@
     var actions = el("div", "xf-next-actions");
     var train = el("a", "xf-btn primary", tx("Träna misstagen", "Practise these topics"));
     train.href = "app.html#train";
-    train.addEventListener("click", function () {
+    train.addEventListener("click", function (event) {
+      if (!releaseViewedResultForTraining()) { event.preventDefault(); return; }
       var last = lsGet("proviaai_last_result", null);
       var batchId = last && last.training_batch_id ? String(last.training_batch_id) : "";
       lsSet(LS_TRAIN_PICK, {
@@ -487,12 +485,31 @@
 
   function draftKey(userId) { return LS_DRAFT_BASE + "_" + String(userId || uid()); }
   function progressKey(userId) { return LS_PROGRESS_BASE + "_" + String(userId || uid()); }
-  function clearDraft(userId) {
+  function draftSnapshot(userId) {
+    try { return { draft: localStorage.getItem(draftKey(userId)), progress: localStorage.getItem(progressKey(userId)) }; }
+    catch (_) { return null; }
+  }
+  function clearDraft(userId, expectedManifest, expectedSnapshot) {
     var ownerId = String(userId || S.draftOwnerId || uid());
     if (ownerId !== uid()) return false;
-    lsDel(draftKey(ownerId));
-    lsDel(progressKey(ownerId));
-    return true;
+    var before = draftSnapshot(ownerId);
+    var saved = lsGet(draftKey(ownerId), null);
+    if (expectedManifest && before && before.draft !== null &&
+        (!saved || !saved.exam || saved.exam.exam_manifest !== expectedManifest)) return false;
+    if (!before || (expectedSnapshot && (before.draft !== expectedSnapshot.draft || before.progress !== expectedSnapshot.progress))) return false;
+    try {
+      localStorage.removeItem(progressKey(ownerId));
+      localStorage.removeItem(draftKey(ownerId));
+      var after = draftSnapshot(ownerId);
+      return !!after && after.draft === null && after.progress === null;
+    } catch (_) {
+      try {
+        if (before.progress !== null && localStorage.getItem(progressKey(ownerId)) === null) {
+          localStorage.setItem(progressKey(ownerId), before.progress);
+        }
+      } catch (_) {}
+      return false;
+    }
   }
 
   function questionState(source) {
@@ -520,12 +537,15 @@
     answers: questionState(),   // qid -> svar
     helped: questionState(),    // qid -> true om P.E.R öppnades på just den frågan
     draftOwnerId: "",
+    draftSnapshot: null,
+    draftStorageConflict: false,
     idx: 0,
     startedAt: 0,
     nudges: 0,
     lastNudge: 0,
     generating: false,  // spärr mot dubbel generering (kostar kvot)
-    submitting: false   // spärr mot dubbel inlämning
+    submitting: false,   // spärr mot dubbel inlämning
+    gradingError: ""
   };
 
   window.__getPerStudyContext = function () {
@@ -542,9 +562,37 @@
   var examInertState = null;
   var typing = null;    // pågående skrivanimation
   var startVersion = 0;
+  var recoveryInFlight = null;
+  var recoveryRefreshDeferred = false;
   var stuckTimer = null;
   var draftTimer = null;
   var prevOverflow = null;   // body-overflow som gällde innan vi låste den
+
+  function releaseViewedResultForTraining() {
+    var draft = readDraft();
+    if (!draft) return true;
+    if (!draft.exam.exam_manifest || !S.exam || draft.phase !== "result-recovery" ||
+        draft.exam.exam_manifest !== S.exam.exam_manifest) {
+      showResultDraftConflict();
+      return false;
+    }
+    if (!window.confirm(tx(
+      "Ta bort den lokala återställningskopian för det visade resultatet och fortsätta till felträning? Ett resultat som redan sparats på kontot påverkas inte.",
+      "Remove the local recovery copy of this result and continue to mistake practice? A result already saved to your account is unaffected."
+    ))) return false;
+    if (!clearDraft(S.draftOwnerId, draft.exam.exam_manifest, S.draftSnapshot)) {
+      showResultDraftConflict();
+      return false;
+    }
+    return true;
+  }
+
+  function showResultDraftConflict() {
+    var message = tx("Ett annat sparat prov har ändrats eller kunde inte tas bort. Återgå till startsidan för att hantera det.", "Another saved exam changed or could not be removed. Return to the start page to manage it.");
+    var error = document.getElementById("xfResultDraftConflict");
+    if (error) error.textContent = message;
+    else nudge(message, true);
+  }
 
   // ── Prov-DNA ─────────────────────────────────────────────────────────────
   /* Allt P.E.R "vet sedan tidigare" kommer härifrån: samma historik och
@@ -681,6 +729,7 @@
   }
 
   function screen(name, focusHeading = true) {
+    if (name !== "start") { recoveryInFlight = null; recoveryRefreshDeferred = false; }
     if (name === "contract") {
       var panel = document.getElementById("perPanel");
       var bubble = document.getElementById("perBubble");
@@ -762,6 +811,33 @@
     // Ett halvfärdigt prov ska aldrig gå förlorat för att mobilen låste sig
     // eller täckningen försvann på bussen.
     var draft = readDraft();
+    var displayedDraftSnapshot = draftSnapshot(draft && draft.uid);
+    var draftNotice = null;
+    if (draft && draft.exam && draft.exam.exam_manifest) {
+      go.disabled = true;
+      draftNotice = el("p", "xf-sub", tx(
+        "Du har ett sparat prov eller resultat. Fortsätt eller återställ det innan du skapar ett nytt.",
+        "You have a saved exam or result. Continue or restore it before creating another one."
+      ));
+      draftNotice.setAttribute("role", "status");
+      act.appendChild(draftNotice);
+      var discardRecovery = el("button", "xf-btn quiet", tx("Ta bort lokal återställning", "Remove local recovery copy"));
+      discardRecovery.classList.add("xf-recovery-discard");
+      discardRecovery.type = "button";
+      discardRecovery.hidden = draft.phase !== "result-recovery";
+      discardRecovery.addEventListener("click", function () {
+        if (!window.confirm(tx(
+          "Ta bort den lokala återställningskopian? Om resultatet inte finns i provhistoriken kan det inte återställas här efteråt.",
+          "Remove the local recovery copy? If the result is not in your exam history, it cannot be recovered here afterwards."
+        ))) return;
+        if (!clearDraft(draft.uid, draft.exam.exam_manifest, displayedDraftSnapshot)) {
+          draftNotice.textContent = tx("Ett annat sparat prov har tillkommit. Ladda om sidan för att se det.", "Another saved exam appeared. Reload the page to see it.");
+          return;
+        }
+        stepStart();
+      });
+      act.appendChild(discardRecovery);
+    }
     if (window.ExGenEngine && window.ExGenEngine.getPendingGenerations) {
       Promise.resolve(window.ExGenEngine.getPendingGenerations()).then(function (pending) {
         if (renderVersion !== startVersion || !act.isConnected || !Array.isArray(pending) || !pending.length) return;
@@ -821,36 +897,105 @@
           ? tx("Återställ resultatet", "Restore the result")
           : tx("Fortsätt provet du började", "Continue your exam"));
       back.type = "button";
+      back.classList.add("xf-recovery-resume");
       var resumeStatus = el("p", "xf-sub");
+      resumeStatus.classList.add("xf-recovery-status");
       resumeStatus.hidden = true;
       resumeStatus.setAttribute("role", "status");
       if (!legacyDraft) act.appendChild(resumeStatus);
       back.addEventListener("click", async function () {
+        S.draftSnapshot = displayedDraftSnapshot;
+        S.draftStorageConflict = false;
+        var recoveryToken = null;
+        function recoveryCurrent() {
+          return recoveryToken && recoveryInFlight === recoveryToken && renderVersion === startVersion &&
+            UI.screens.start.classList.contains("on") && uid() === String(draft.uid || "");
+        }
+        function releaseRecovery() {
+          if (recoveryInFlight !== recoveryToken) return;
+          recoveryInFlight = null;
+          if (!recoveryRefreshDeferred) return;
+          recoveryRefreshDeferred = false;
+          setTimeout(function () {
+            if (recoveryInFlight || !UI.screens.start.classList.contains("on") || UI.exam.classList.contains("on")) return;
+            var beforeRefresh = draftSnapshot(draft.uid);
+            var sameDraft = uid() === String(draft.uid || "") && beforeRefresh && displayedDraftSnapshot &&
+              beforeRefresh.draft === displayedDraftSnapshot.draft && beforeRefresh.progress === displayedDraftSnapshot.progress;
+            var statusText = resumeStatus.textContent;
+            var statusHidden = resumeStatus.hidden;
+            var showDiscard = discardRecovery && !discardRecovery.hidden;
+            var expired = back.dataset.expired === "true";
+            stepStart(false);
+            var afterRefresh = draftSnapshot(draft.uid);
+            if (!sameDraft || uid() !== String(draft.uid || "") || !afterRefresh || afterRefresh.draft !== displayedDraftSnapshot.draft ||
+                afterRefresh.progress !== displayedDraftSnapshot.progress) return;
+            var nextStatus = UI.screens.start.querySelector(".xf-recovery-status");
+            var nextDiscard = UI.screens.start.querySelector(".xf-recovery-discard");
+            var nextBack = UI.screens.start.querySelector(".xf-recovery-resume");
+            if (nextStatus) { nextStatus.textContent = statusText; nextStatus.hidden = statusHidden; }
+            if (nextDiscard && showDiscard) nextDiscard.hidden = false;
+            if (nextBack && expired) {
+              nextBack.dataset.expired = "true";
+              nextBack.textContent = tx("Skapa nytt prov av materialet", "Create a new exam from this material");
+            }
+          }, 0);
+        }
+        if (!legacyDraft && back.dataset.expired === "true") {
+          if (!window.confirm(tx(
+            "Ta bort den lokala kopian av det avslutade provet? De sparade svaren tas bort, men materialet behålls.",
+            "Remove the local copy of the ended exam? Saved answers will be removed, but the material will be kept."
+          ))) return;
+          if (!clearDraft(draft.uid, draft.exam.exam_manifest, displayedDraftSnapshot)) {
+            resumeStatus.textContent = tx("Den sparade provkopian kunde inte tas bort. Ladda om sidan och försök igen.", "The saved exam copy could not be removed. Reload the page and try again.");
+            return;
+          }
+          S.draftOwnerId = String(draft.uid || uid());
+          S.course = draft.course || "";
+          S.level = draft.level || "C";
+          S.qType = draft.qType || "mix";
+          S.num = draft.num || 12;
+          S.nonGraphNum = clamp(Number(draft.nonGraphNum) || (S.qType === "graph" ? 12 : S.num), 2, 20);
+          S.material = draft.material || "";
+          releasePerHistoryIfNoActiveExams();
+          stepMaterial();
+          return;
+        }
         if (!legacyDraft && back.dataset.expired !== "true") {
+          recoveryToken = {};
+          recoveryInFlight = recoveryToken;
           back.disabled = true;
+          if (discardRecovery) discardRecovery.disabled = true;
           resumeStatus.hidden = false;
           resumeStatus.textContent = tx("Kontrollerar att provet fortfarande är aktivt…", "Checking that the exam is still active…");
-          var issuance = await window.ExGenEngine.examState(draft.exam.exam_manifest, {
-            course: draft.course || "",
-            pastedText: draft.material || "",
-            questions: draft.exam.questions,
-          });
+          var issuance = null;
+          try {
+            issuance = await window.ExGenEngine.examState(draft.exam.exam_manifest, {
+              course: draft.course || "",
+              pastedText: draft.material || "",
+              questions: draft.exam.questions,
+            });
+          } catch (_) {}
+          if (!recoveryCurrent()) { releaseRecovery(); return; }
           var issuanceState = issuance && issuance.state;
           if (issuance && /^[a-f0-9]{32}$/.test(issuance.submissionId || "")) {
             draft.exam.submission_id = issuance.submissionId;
           }
           if (issuanceState !== "active") {
             back.disabled = false;
+            if (discardRecovery) discardRecovery.disabled = false;
             if (issuanceState === null) {
+              releaseRecovery();
               resumeStatus.textContent = tx("Provet kunde inte verifieras just nu. Kontrollera anslutningen och försök igen.", "The exam could not be verified. Check your connection and try again.");
               return;
             }
             if (issuanceState === "grading") {
+              releaseRecovery();
               resumeStatus.textContent = tx("Provet håller på att rättas. Vänta tills rättningen är klar innan du fortsätter.", "The exam is being graded. Wait until grading is complete before continuing.");
               return;
             }
             if (issuanceState === "completed") {
               back.disabled = true;
+              if (discardRecovery) discardRecovery.disabled = true;
               S.draftOwnerId = String(draft.uid || uid());
               S.course = draft.course || "";
               S.level = draft.level || "C";
@@ -869,6 +1014,7 @@
               window.ExGenEngine.setInputs({ course: S.course, level: S.level, qType: S.qType, num: S.num, material: S.material });
               window.ExGenEngine.adoptExam(S.exam);
               saveDraft();
+              if (!S.draftStorageConflict && S.draftSnapshot) displayedDraftSnapshot = S.draftSnapshot;
               resumeStatus.textContent = tx("Provet är inlämnat. Hämtar det verifierade resultatet…", "The exam was submitted. Recovering the verified result…");
               var answers = S.exam.questions.map(function (q, n) {
                 var id = qid(q, n);
@@ -876,27 +1022,37 @@
               });
               try {
                 var recovered = await window.ExGenEngine.grade(answers);
+                if (!recoveryCurrent()) { releaseRecovery(); return; }
                 if (!recovered || !recovered.ok || !recovered.result || uid() !== S.draftOwnerId) {
+                  releaseRecovery();
                   resumeStatus.textContent = tx("Resultatet kunde inte verifieras just nu. Dina svar finns kvar; försök igen när anslutningen fungerar.", "The result could not be verified right now. Your answers are saved; try again when your connection is working.");
                   back.disabled = false;
+                  if (discardRecovery) { discardRecovery.hidden = false; discardRecovery.disabled = false; }
                   return;
                 }
-                stopMachine().then(function () { stepResult(recovered.result, recovered.persistence, recovered.examProof, answers); });
+                stopMachine().then(function () {
+                  if (recoveryCurrent()) {
+                    releaseRecovery();
+                    stepResult(recovered.result, recovered.persistence, recovered.examProof, answers);
+                  } else releaseRecovery();
+                });
               } catch (_) {
+                if (!recoveryCurrent()) { releaseRecovery(); return; }
+                releaseRecovery();
                 resumeStatus.textContent = tx("Resultatet kunde inte verifieras just nu. Dina svar finns kvar; försök igen när anslutningen fungerar.", "The result could not be verified right now. Your answers are saved; try again when your connection is working.");
                 back.disabled = false;
+                if (discardRecovery) { discardRecovery.hidden = false; discardRecovery.disabled = false; }
               }
               return;
             }
-            clearDraft();
-            S.material = draft.material || "";
-            releasePerHistoryIfNoActiveExams();
+            releaseRecovery();
             back.textContent = tx("Skapa nytt prov av materialet", "Create a new exam from this material");
-            resumeStatus.textContent = tx("Det tidigare provet har avslutats eller gått ut. Dina sparade svar tas bort, men materialet finns kvar. Skapa ett nytt prov för att fortsätta.", "The previous exam has ended or expired. Your saved answers are removed, but the material remains. Create a new exam to continue.");
+            resumeStatus.textContent = tx("Det tidigare provet har avslutats eller gått ut. Dina sparade svar finns kvar tills du väljer att ta bort den lokala kopian.", "The previous exam has ended or expired. Your saved answers remain until you choose to remove the local copy.");
             back.dataset.expired = "true";
             return;
           }
         }
+        releaseRecovery();
         S.draftOwnerId = String(draft.uid || uid());
         S.course = draft.course || "";
         S.level = draft.level || "C";
@@ -1717,6 +1873,24 @@
     // Varje generering drar ur elevens kvot. Ett dubbelklick, eller "Gör om"
     // tryckt två gånger, får inte kosta två prov.
     if (S.generating) return;
+    var savedDraft = readDraft();
+    var resultScreenActive = S.exam && UI.screens.result && UI.screens.result.classList.contains("on");
+    var viewingSameResult = savedDraft && savedDraft.phase === "result-recovery" && S.exam &&
+      savedDraft.exam.exam_manifest === S.exam.exam_manifest && resultScreenActive;
+    var requestDraftSnapshot = draftSnapshot(uid());
+    if (resultScreenActive && (!requestDraftSnapshot || !S.draftSnapshot ||
+        requestDraftSnapshot.draft !== S.draftSnapshot.draft ||
+        requestDraftSnapshot.progress !== S.draftSnapshot.progress)) {
+      err.textContent = tx("Den sparade provversionen har ändrats. Gå tillbaka till startsidan för att hantera den.", "The saved exam version has changed. Return to the start page to manage it.");
+      return;
+    }
+    if (savedDraft && savedDraft.exam.exam_manifest && !viewingSameResult) {
+      err.textContent = tx(
+        "Ett sparat prov eller resultat behöver hanteras först. Gå tillbaka till startsidan och fortsätt eller återställ det.",
+        "A saved exam or result needs attention first. Return to the start page and continue or restore it."
+      );
+      return;
+    }
     S.generating = true;
     var requestOwnerId = uid();
     if (!generationProgress) {
@@ -1798,7 +1972,10 @@
       }
       S.draftOwnerId = requestOwnerId;
       S.resumeRequest = null;
+      S.draftSnapshot = requestDraftSnapshot;
+      S.draftStorageConflict = false;
       S.exam = normalizeIds(r.exam);
+      S.gradingError = "";
       S.draftPhase = "active";
       var got = S.exam.questions.length;
       S.exam.requested_question_count = S.num;
@@ -1928,6 +2105,8 @@
   }
 
   function closeExam(restoreFocus) {
+    closePerPanel();
+    restorePerWidget();
     UI.exam.classList.remove("on");
     UI.exam.setAttribute("aria-hidden", "true");
     UI.exam.removeAttribute("aria-modal");
@@ -2250,7 +2429,7 @@
     // P.E.R:s svar gällde föregående fråga. Stäng bara vid frågebyte; en
     // språkväxling renderar om samma fråga och ska behålla den öppna hjälpen.
     if (!preservePerPanel) closePerPanel();
-    else restorePerWidget();
+    else restorePerWidget(true);
 
     // Prickraden: hela provets form på en gång, och en genväg till varje fråga.
     UI.dots.innerHTML = "";
@@ -2272,6 +2451,21 @@
     UI.count.textContent = questionProgressLabel(i, qs.length);
 
     var sheet = el("div", "xf-sheet");
+
+    if (S.gradingError) {
+      var gradingError = el("p", "xf-note", S.gradingError);
+      gradingError.setAttribute("role", "alert");
+      sheet.appendChild(gradingError);
+    }
+
+    if (S.draftStorageConflict) {
+      var storageConflict = el("p", "xf-note", tx(
+        "En sparad provversion har ändrats. Den versionen är kvar, men detta prov sparas inte på enheten. Lämna in det innan du stänger eller laddar om fliken.",
+        "A saved exam version has changed. That version is preserved, but this exam is not saved on this device. Submit it before closing or reloading this tab."
+      ));
+      storageConflict.setAttribute("role", "status");
+      sheet.appendChild(storageConflict);
+    }
 
     if (S.questionCountNote) {
       var qualityNote = el("div", "xf-question-quality-note");
@@ -2432,15 +2626,14 @@
   }
 
   function movePerWidgetIntoSheet() {
-    if (window.innerWidth > 600) return;
     var widget = document.getElementById("perWidget");
-    var dock = document.querySelector(".xf-exam.on .xf-per-dock");
+    var mobile = window.innerWidth <= 600;
+    var dock = mobile ? document.querySelector(".xf-exam.on .xf-per-dock") : examPerHost();
     if (!widget || !dock || dock.contains(widget)) return;
     perWidgetHome = perWidgetHome || { parent: widget.parentNode, next: widget.nextSibling };
-    widget.classList.add("xf-per-inline");
-    dock.appendChild(widget);
-    fitPerWidgetAboveExamNav(widget);
-    if (window.MutationObserver && !perMessageObserver) {
+    placePerWidget(widget, dock, mobile);
+    if (mobile) fitPerWidgetAboveExamNav(widget);
+    if (mobile && window.MutationObserver && !perMessageObserver) {
       perMessageObserver = new MutationObserver(function () {
         if (widget.isConnected && widget.classList.contains("xf-per-inline")) {
           requestAnimationFrame(function () { fitPerWidgetAboveExamNav(widget); });
@@ -2458,35 +2651,77 @@
     if (overflow > 0) wrap.scrollTop += overflow;
   }
 
-  function restorePerWidget() {
+  function examPerHost() {
+    var host = UI.exam.querySelector(".xf-per-host");
+    if (!host) { host = el("div", "xf-per-host"); UI.exam.appendChild(host); }
+    return host;
+  }
+
+  function placePerWidget(widget, parent, inline, next) {
+    var focused = document.activeElement;
+    var restoreFocus = widget.contains(focused);
+    var selection = restoreFocus && typeof focused.selectionStart === "number"
+      ? [focused.selectionStart, focused.selectionEnd, focused.selectionDirection] : null;
+    widget.classList.toggle("xf-per-inline", inline);
+    if (widget.parentNode !== parent) parent.insertBefore(widget, next && next.parentNode === parent ? next : null);
+    if (restoreFocus && focused.isConnected && document.activeElement !== focused) {
+      focused.focus({ preventScroll: true });
+      if (selection) focused.setSelectionRange(selection[0], selection[1], selection[2]);
+    }
+  }
+
+  function restorePerWidget(stayInExam) {
     var widget = document.getElementById("perWidget");
     if (!widget || !perWidgetHome) return;
     var home = perWidgetHome;
-    perWidgetHome = null;
     if (perMessageObserver) {
       perMessageObserver.disconnect();
       perMessageObserver = null;
     }
-    widget.classList.remove("xf-per-inline");
+    if (stayInExam) { placePerWidget(widget, examPerHost(), false); return; }
+    perWidgetHome = null;
     if (home.parent && home.parent.isConnected) {
-      home.parent.insertBefore(widget, home.next && home.next.parentNode === home.parent ? home.next : null);
+      placePerWidget(widget, home.parent, false, home.next);
     } else {
-      document.body.appendChild(widget);
+      placePerWidget(widget, document.body, false);
     }
   }
 
   window.addEventListener("resize", function () {
     var bubble = document.getElementById("perBubble");
     if (!bubble || !bubble.classList.contains("per-open") || !document.body.classList.contains("xf-in-exam")) return;
-    if (window.innerWidth <= 600) movePerWidgetIntoSheet();
-    else restorePerWidget();
+    movePerWidgetIntoSheet();
+  });
+
+  window.addEventListener("exgen:per-snapshot", function (event) {
+    if (event.detail && event.detail.page === "prov" && UI.exam && UI.exam.classList.contains("on")) {
+      clearTimeout(publishTimer); publish();
+    }
+  });
+
+  window.addEventListener("exgen:per-visibility", function (event) {
+    if (!UI.exam || !UI.exam.classList.contains("on")) return;
+    var open = event.detail && event.detail.open === true;
+    document.body.classList.toggle("xf-per-open", open);
+    if (open) {
+      clearTimeout(publishTimer);
+      publish();
+      movePerWidgetIntoSheet();
+      var q = S.exam && S.exam.questions[S.idx];
+      if (q) {
+        S.helped[qid(q, S.idx)] = true;
+        var ask = UI.exam.querySelector(".xf-ask");
+        if (ask) { ask.className = "xf-ask used"; ask.textContent = tx("✦ P.E.R öppnades här", "✦ P.E.R opened here"); }
+        saveDraft();
+      }
+    }
   });
 
   function closePerPanel() {
     var bubble = document.getElementById("perBubble");
     if (bubble && bubble.classList.contains("per-open")) bubble.click();
     document.body.classList.remove("xf-per-open");
-    restorePerWidget();
+    restorePerWidget(UI.exam && UI.exam.classList.contains("on"));
   }
 
   function next(focusQuestion) {
@@ -2559,7 +2794,7 @@
         return;
       }
       closeExam();
-      clearDraft();
+      clearDraft(S.draftOwnerId, S.exam && S.exam.exam_manifest, S.draftSnapshot);
       S.exam = null;
       S.answers = questionState();
       S.helped = questionState();
@@ -2616,6 +2851,7 @@
       }
     }
 
+    S.gradingError = "";
     var resumeAt = S.startedAt;
     closeExam(false);
     machine();
@@ -2627,15 +2863,15 @@
     });
 
     // Rättningen föll — lämna tillbaka eleven till provet med svaren kvar i
-    // stället för till en död skärm. S.nudges nollställs så att beskedet om
-    // felet aldrig tystas av inpasskvoten.
+    // stället för till en död skärm. Felet visas i frågeytan tills nästa
+    // inlämningsförsök, även om eleven navigerar mellan frågorna.
     function backToExam(msg) {
       stopMachine().then(function () {
         S.submitting = false;
         S.nudges = 0;
         S.lastNudge = 0;
+        S.gradingError = msg;
         openExam(resumeAt);
-        nudge(msg);
       });
     }
 
@@ -2743,6 +2979,16 @@
   // ── Resultat ─────────────────────────────────────────────────────────────
 
   function stepResult(r, persistence, examProof, submittedAnswers) {
+    var resultOwnerId = S.draftOwnerId;
+    var resultManifest = S.exam && S.exam.exam_manifest;
+    var rerenderResult = function () {
+      if (persistence && persistence.accountSaveInFlight) {
+        persistence.rerenderAfterAccountSave = true;
+        return;
+      }
+      stepResult(r, persistence, examProof, submittedAnswers);
+    };
+    UI.languageRerender = rerenderResult;
     closePerPanel();
     releasePerHistoryIfNoActiveExams();
     var b = mount("result");
@@ -2855,11 +3101,13 @@
         var retrySave = el("button", "xf-btn quiet", tx("Försök spara till kontot igen", "Try saving to your account again"));
         retrySave.type = "button";
         retrySave.addEventListener("click", function () {
-          if (retrySave.disabled) return;
+          if (retrySave.disabled || persistence.accountSaveInFlight) return;
+          persistence.accountSaveInFlight = true;
           retrySave.disabled = true;
           retrySave.textContent = tx("Sparar…", "Saving…");
           window.ExGenEngine.retryAccountSave(persistence.localId).then(function (saved) {
             if (saved && saved.ok) {
+              persistence.accountSaveFailed = false;
               saveMessage.textContent = tx("Resultatet är nu sparat till kontot och tillgängligt i lärarvyn.", "The result is now saved to your account and available in the teacher view.");
               retrySave.remove();
               saveWarning.classList.add("saved");
@@ -2872,6 +3120,13 @@
             retrySave.disabled = false;
             retrySave.textContent = tx("Försök spara till kontot igen", "Try saving to your account again");
             saveMessage.textContent = tx("Kontosparningen kunde inte bekräftas. Resultatet finns kvar på den här enheten.", "The account save could not be confirmed. The result is still on this device.");
+          }).finally(function () {
+            persistence.accountSaveInFlight = false;
+            var needsRerender = persistence.rerenderAfterAccountSave;
+            persistence.rerenderAfterAccountSave = false;
+            if (needsRerender && UI.languageRerender === rerenderResult &&
+                UI.screens.result.classList.contains("on") && uid() === resultOwnerId &&
+                S.exam && S.exam.exam_manifest === resultManifest) rerenderResult();
           });
         });
         saveWarning.appendChild(retrySave);
@@ -3006,6 +3261,9 @@
     // En felruta, återanvänd. Att skapa en ny per klick gav tre rader under
     // varandra efter tre misslyckade försök.
     var againErr = el("div", "xf-err");
+    var resultDraftErr = el("div", "xf-err");
+    resultDraftErr.id = "xfResultDraftConflict";
+    resultDraftErr.setAttribute("role", "alert");
 
     var again = el("button", "xf-btn primary", tx("Gör om — nya frågor, samma nivå", "Try again — new questions, same level"));
     again.type = "button";
@@ -3014,29 +3272,44 @@
 
     var toImprove = el("a", "xf-btn ghost", tx("Träna sparade misstag", "Practice saved mistakes"));
     toImprove.href = "app.html#train";
-    toImprove.addEventListener("click", function () { lsSet(LS_TRAIN_PICK, { keys: [], mode: "all", course: "" }); });
+    toImprove.addEventListener("click", function (event) {
+      if (!releaseViewedResultForTraining()) { event.preventDefault(); return; }
+      lsSet(LS_TRAIN_PICK, { keys: [], mode: "all", course: "" });
+    });
     act.appendChild(toImprove);
 
     var fresh = el("button", "xf-btn quiet", tx("Nytt ämne", "New topic"));
     fresh.type = "button";
     fresh.addEventListener("click", function () {
+      if (!clearDraft(S.draftOwnerId, S.exam && S.exam.exam_manifest, S.draftSnapshot)) {
+        againErr.textContent = tx("Ett annat sparat prov har tillkommit. Gå tillbaka till startsidan för att hantera det.", "Another saved exam appeared. Return to the start page to manage it.");
+        return;
+      }
       if (typeof window.clearMistakeTrainingContext === "function") window.clearMistakeTrainingContext();
       S.exam = null; S.answers = questionState(); S.helped = questionState(); S.material = "";
       S.draftPhase = "active";
       S.submitting = false;
       // Eleven har uttryckligen övergett provet. Låg utkastet kvar erbjöds det
       // tillbaka vid nästa sidladdning som "Fortsätt provet du började".
-      clearDraft();
       stepSubject();
     });
     act.appendChild(fresh);
     b.appendChild(act);
     b.appendChild(againErr);
+    b.appendChild(resultDraftErr);
 
     screen("result");
   }
 
   // ── Utkast ───────────────────────────────────────────────────────────────
+
+  function draftRevision() {
+    // Identity, not wall-clock ordering: equal timestamps and clock rollback
+    // must not attach a stale fallback to a later complete save.
+    var bytes = new Uint32Array(4);
+    window.crypto.getRandomValues(bytes);
+    return Array.from(bytes, function (n) { return n.toString(16).padStart(8, "0"); }).join("");
+  }
 
   function saveDraft() {
     clearTimeout(draftTimer);
@@ -3046,6 +3319,7 @@
     if (!ownerId || ownerId !== uid()) return;
     var draft = {
       ts: Date.now(),
+      revision: draftRevision(),
       uid: ownerId,
       phase: S.draftPhase === "result-recovery" ? "result-recovery" : "active",
       startedAt: S.startedAt,
@@ -3054,8 +3328,20 @@
       answers: S.answers, helped: S.helped, idx: S.idx
     };
 
+    var currentSnapshot = draftSnapshot(ownerId);
+    if (!currentSnapshot || !S.draftSnapshot || currentSnapshot.draft !== S.draftSnapshot.draft ||
+        currentSnapshot.progress !== S.draftSnapshot.progress) {
+      if (!S.draftStorageConflict) nudge(tx(
+        "Det sparade provet har ändrats eller kunde inte kontrolleras. Lämna in detta prov innan du stänger fliken; det sparas inte på enheten.",
+        "The saved exam changed or could not be checked. Submit this exam before closing the tab; it is not saved on this device."
+      ), true);
+      S.draftStorageConflict = true;
+      return;
+    }
     if (lsSet(draftKey(ownerId), draft)) {
       lsDel(progressKey(ownerId));
+      S.draftSnapshot = draftSnapshot(ownerId);
+      S.draftStorageConflict = false;
       return;
     }
 
@@ -3069,9 +3355,11 @@
       && saved.exam.exam_manifest === S.exam.exam_manifest;
     var progressSaved = resumableBase && lsSet(progressKey(ownerId), {
       ts: Date.now(), uid: ownerId, startedAt: S.startedAt,
+      baseRevision: typeof saved.revision === "string" ? saved.revision : null,
       examManifest: S.exam.exam_manifest,
       answers: S.answers, helped: S.helped, idx: S.idx
     });
+    if (progressSaved) S.draftSnapshot = draftSnapshot(ownerId);
     if (!progressSaved && !S.warnedStorage) {
       S.warnedStorage = true;
       nudge("Minnet i webbläsaren är fullt. Ditt senast sparade prov finns kvar, men de senaste svaren kunde inte sparas. Lämna in innan du stänger eller laddar om fliken.", true);
@@ -3119,18 +3407,19 @@
     var d = lsGet(draftKey(), null);
     if (!d || String(d.uid || "") !== uid() || !d.exam
         || !Array.isArray(d.exam.questions) || !d.exam.questions.length) {
-      lsDel(progressKey());
       return null;
     }
 
     var progress = lsGet(progressKey(), null);
     var progressTs = Number(progress && progress.ts);
     var progressIdx = Number(progress && progress.idx);
+    var revisionMatches = d.revision
+      ? progress && progress.baseRevision === d.revision
+      : progress && !progress.baseRevision;
     var progressMatches = progress && String(progress.uid || "") === uid()
+      && revisionMatches
       && progress.examManifest && progress.examManifest === d.exam.exam_manifest
       && Number.isFinite(progressTs) && progressTs > 0
-      && progressTs <= Date.now() + 5 * 60 * 1000
-      && Date.now() - progressTs <= DRAFT_MAX_AGE_MS
       && progress.answers && typeof progress.answers === "object" && !Array.isArray(progress.answers)
       && progress.helped && typeof progress.helped === "object" && !Array.isArray(progress.helped)
       && Number.isInteger(progressIdx) && progressIdx >= 0 && progressIdx < d.exam.questions.length;
@@ -3140,14 +3429,12 @@
       d.idx = progress.idx;
       d.startedAt = Number(progress.startedAt) || Number(d.startedAt) || 0;
       d.ts = progressTs;
-    } else if (progress) {
-      lsDel(progressKey());
     }
 
-    if (d.ts && Date.now() - Number(d.ts) > DRAFT_MAX_AGE_MS) {
-      clearDraft();
-      return null;
-    }
+    // Reading must not mutate storage or invalidate the caller's snapshot.
+    // Unmatched fallback data is ignored; explicit save/removal cleans it up.
+    // An old local copy can still contain the student's only saved answers.
+    // Server status and an explicit user choice decide when it can be removed.
     return d;
   }
 
@@ -3172,6 +3459,7 @@
     window.addEventListener("exgen:languagechange", function () {
       updateProgress(UI.progress && UI.progress.dataset.step);
       updateReviewActionLabels();
+      if (recoveryInFlight && UI.screens.start && UI.screens.start.classList.contains("on")) { recoveryRefreshDeferred = true; return; }
       var focusTarget = document.activeElement;
       if (typeof UI.languageRerender === "function") UI.languageRerender();
       if (focusTarget && focusTarget.isConnected && focusTarget.matches("#langBtnDesktop, #langBtn")) {
@@ -3304,6 +3592,7 @@
     window.addEventListener("exgen:history-updated", function () {
       var start = UI.screens.start;
       if (!start || !start.classList.contains("on")) return;
+      if (recoveryInFlight) { recoveryRefreshDeferred = true; return; }
       var active = document.activeElement;
       var restoreHeading = start.contains(active) && active.matches(".xf-say");
       var restoreControl = start.contains(active) && active.matches("button, a, input, select, textarea")

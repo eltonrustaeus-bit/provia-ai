@@ -350,7 +350,7 @@ async function runOnce(fixture, runIndex) {
         solverEnabled: SOLVER_ENABLED,
         solverCallOk: sv.callOk,
         solverResult: sv.perQuestion.get(String(q.id)),
-      }, V.decideApproval, S.decideKeep);
+      }, V.decideApproval, (verdict, question) => S.decideKeep(verdict, question, fixture.material));
       if (outcome.solverChecked) rec.solverChecked++;
       if (outcome.solverRejected) {
         rec.solverRejected++;

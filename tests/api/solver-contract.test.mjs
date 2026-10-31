@@ -14,6 +14,8 @@ const questions = [
 ];
 const result = (id, overrides = {}) => ({
   id,
+  source_check: { premise_supported: true, independent_answer: id === "q1" ? "b" : "yes",
+    basis: "derived", evidence_quotes: [], option_matches: id === "q1" ? [false, true, false] : [true, false] },
   option_verdicts: id === "q1" ? [false, true, false] : [true, false],
   option_plausibility: id === "q1" ? [true, true, true] : [true, true],
   index: id === "q1" ? 1 : 0,
@@ -22,6 +24,15 @@ const result = (id, overrides = {}) => ({
   ...overrides,
 });
 const valid = [result("q1"), result("q2")];
+// Provider wire format references the request catalogue; pure gate fixtures
+// above remain resolved, literal evidence to exercise the provenance boundary.
+const wire = item => {
+  if (!item?.source_check) return item;
+  const { evidence_quotes, ...check } = item.source_check;
+  assert.deepEqual(evidence_quotes, [], "wire helper only converts empty derived evidence");
+  return { ...item, source_check: { ...check, evidence_source_ids: [] } };
+};
+const wireValid = valid.map(wire);
 
 assert.equal(solver.parseSolverResults(valid, questions).size, 2);
 for (const [name, results] of [
@@ -80,20 +91,99 @@ try {
     globalThis.fetch = async () => new Response(JSON.stringify({
       model: "measured-solver-model",
       usage: { input_tokens: 44, output_tokens: 9 },
-      output_text: JSON.stringify({ results }),
+      output_text: JSON.stringify({ results: results.map(wire) }),
     }), { status: 200, headers: { "content-type": "application/json" } });
     const outcome = await solver.solveQuestions(questions, {
       apiKey: "test-only", model: "test-model", lang: "en", material: "test",
     });
     if (name === "complete response") {
       assert.equal(outcome.callOk, true, name);
+      assert.equal(outcome.failureReason, null, name);
       assert.equal(outcome.perQuestion.size, questions.length, name);
     } else {
       assert.equal(outcome.callOk, false, name);
+      assert.equal(outcome.failureReason, "invalid_contract", name);
       assert.equal(outcome.perQuestion.size, 0, name);
     }
     assert.equal(outcome.model, "measured-solver-model", name);
     assert.deepEqual(outcome.usage, { input_tokens: 44, output_tokens: 9 }, name);
+  }
+  // Exercise the real provider parser; diagnostics must remain content-free
+  // and the entire batch stays withheld, even if another result was valid.
+  const source = "ATP driver aktiv transport. DNA finns i cellkärnan.";
+  const sourceCheck = {
+    premise_supported: true, independent_answer: "ATP", basis: "source_fact",
+    evidence_source_ids: [0], option_matches: [false, true, false],
+  };
+  const wireResult = (id, overrides = {}) => ({ ...wire(result(id)), ...overrides });
+  const diagnostics = [
+    ["result_count", [wireValid[0]]],
+    ["result_id", [wireValid[0], wireResult("private-unknown-id")]],
+    ["duplicate_result_id", [wireValid[0], wireValid[0]]],
+    ["source_check_shape", [wireResult("q1", {source_check: null}), wireValid[1]]],
+    ["option_matches_shape", [wireResult("q1", {source_check: {...sourceCheck, option_matches: []}}), wireValid[1]]],
+    ...[undefined, [null], ["0"], [0.5], [0, 0, 0, 0]].map(ids => ["source_ids_shape",
+      [wireResult("q1", {source_check: {...sourceCheck, evidence_source_ids: ids}}), wireValid[1]]]),
+    ["source_quote_missing", [wireResult("q1", {source_check: {...sourceCheck, evidence_source_ids: []}}), wireValid[1]]],
+    ["source_id_duplicate", [wireResult("q1", {source_check: {...sourceCheck, evidence_source_ids: [0, 0]}}), wireValid[1]]],
+    ...[[-1], [1], [999]].map(ids => ["source_id_range",
+      [wireResult("q1", {source_check: {...sourceCheck, evidence_source_ids: ids}}), wireValid[1]]]),
+    ["unexpected_source_quotes", [wireResult("q1", {source_check: {...sourceCheck,
+      evidence_quotes: ["private invented quote"]}}), wireValid[1]]],
+    ["option_verdicts_shape", [wireResult("q1", {option_verdicts: []}), wireValid[1]]],
+    ["option_plausibility_shape", [wireResult("q1", {option_plausibility: []}), wireValid[1]]],
+    ["index_range", [wireResult("q1", {index: 3}), wireValid[1]]],
+    ["confidence_range", [wireResult("q1", {confidence: 2}), wireValid[1]]],
+    ["reason_shape", [wireResult("q1", {reason: null}), wireValid[1]]],
+  ];
+  for (const [expectedIssue, results] of diagnostics) {
+    globalThis.fetch = async () => new Response(JSON.stringify({output_text: JSON.stringify({results})}));
+    const outcome = await solver.solveQuestions(questions, {
+      apiKey: "private-test-key", model: "test-model", lang: "sv", material: source,
+    });
+    assert.equal(outcome.callOk, false, expectedIssue);
+    assert.equal(outcome.failureReason, "invalid_contract", expectedIssue);
+    assert.equal(outcome.contractFailure, expectedIssue);
+    assert.equal(outcome.perQuestion.size, 0, "no partial verdict batch is accepted");
+    for (const secret of [source, "private-unknown-id", "private invented quote", "private-test-key"]) {
+      assert.equal(JSON.stringify(outcome).includes(secret), false, expectedIssue);
+    }
+  }
+  globalThis.fetch = async () => new Response(JSON.stringify({output_text: JSON.stringify({
+    results: [wireResult("q1", {source_check: sourceCheck}), wireValid[1]],
+  })}));
+  const supported = await solver.solveQuestions(questions, {
+    apiKey: "test-only", model: "test-model", lang: "sv", material: source,
+  });
+  assert.equal(supported.callOk, true, "distinct literal evidence remains valid");
+  assert.equal(supported.perQuestion.size, 2);
+  assert.deepEqual(supported.perQuestion.get("q1").source_check.evidence_quotes, [source],
+    "evidence is the exact request source unit, never a reconstructed quotation");
+  const duplicateRequest = await solver.solveQuestions([questions[0], questions[0]], {
+    apiKey: "test-only", model: "test-model", lang: "sv", material: source,
+  });
+  assert.equal(duplicateRequest.callOk, false);
+  assert.equal(duplicateRequest.contractFailure, "request_id");
+  assert.equal(duplicateRequest.perQuestion.size, 0);
+
+  const sensitiveMarker = "synthetic-question-or-secret-must-not-appear";
+  for (const [name, respond, expectedReason] of [
+    ["http failure", async () => new Response(sensitiveMarker, { status: 429 }), "http_error"],
+    ["bad outer JSON", async () => new Response(sensitiveMarker), "invalid_response_json"],
+    ["no output", async () => new Response(JSON.stringify({ output: [] })), "missing_output"],
+    ["bad output JSON", async () => new Response(JSON.stringify({ output_text: sensitiveMarker })), "invalid_output_json"],
+    ["null output", async () => new Response(JSON.stringify({ output_text: "null" })), "invalid_contract"],
+    ["request exception", async () => { throw new Error(sensitiveMarker); }, "request_failed"],
+  ]) {
+    globalThis.fetch = respond;
+    const outcome = await solver.solveQuestions([questions[0]], {
+      apiKey: "test-only", model: "test-model", lang: "en", material: sensitiveMarker,
+    });
+    assert.equal(outcome.callOk, false, name);
+    assert.equal(outcome.perQuestion.size, 0, name);
+    assert.equal(outcome.failureReason, expectedReason, name);
+    assert.equal(JSON.stringify(outcome).includes(sensitiveMarker), false,
+      `${name}: diagnostic output never includes provider text or source content`);
   }
   let solverTimeoutSignal = null;
   const solverTimeoutKeeper = setTimeout(() => {}, 1_100);
@@ -109,6 +199,8 @@ try {
     apiKey: "test-only", model: "test-model", lang: "en", material: "test", timeoutMs: 1_000,
   });
   assert.equal(timedOut.callOk, false, "an actually expired retry solver signal fails closed");
+  assert.equal(timedOut.failureReason, "timeout");
+  assert.ok(timedOut.latencyMs >= 900, "failed requests retain their observed elapsed time");
   assert.equal(solverTimeoutSignal.aborted, true, "the bounded solver request is aborted at its timeout");
   clearTimeout(solverTimeoutKeeper);
 } finally {

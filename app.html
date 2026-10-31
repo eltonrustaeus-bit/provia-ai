@@ -2725,6 +2725,10 @@ try{
     const questionCount=res.data.exam?.questions?.length||0;
     const requestedCount=payload.numQuestions;
     const partialExam=questionCount<requestedCount;
+    // Keep the original request attached to the grading model so a partial
+    // exam stays partial in the result, local history, and saved account row.
+    currentExam.requested_question_count=requestedCount;
+    currentExam.partial_delivery=partialExam;
     const completionMessage=partialExam
       ?t.genPartial.replace("{received}",String(questionCount)).replace("{requested}",String(requestedCount))
       :t.genDone;

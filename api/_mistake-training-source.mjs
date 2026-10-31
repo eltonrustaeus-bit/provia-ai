@@ -6,6 +6,7 @@ import sourceReferenceTools from "./_source-references.cjs";
 const { verifyCompletion } = examCompletion;
 const { normalizePriorQuestionKey, normalizePriorQuestions, normalizeTrainingFocus, normalizeTrainingSources } = mistakeTraining;
 const { deriveSourceExcerpt, filterSourceReferences } = sourceReferenceTools;
+const EVIDENCE_STOP_WORDS = new Set(["att", "den", "det", "du", "en", "ett", "för", "i", "och", "som", "vad", "vilka", "vilket", "är"]);
 
 function fail(code, status = 409) {
   return Object.assign(new Error(code), { status });
@@ -13,6 +14,28 @@ function fail(code, status = 409) {
 
 function courseKey(value) {
   return String(value || "").trim().replace(/\s+/g, " ").toLocaleLowerCase("sv-SE");
+}
+
+function evidenceTerms(value) {
+  return new Set(String(value || "").normalize("NFKC").toLocaleLowerCase("sv-SE")
+    .match(/[\p{L}\p{N}]+/gu)?.filter((term) => !EVIDENCE_STOP_WORDS.has(term) && (term.length >= 3 || /^\d+$/u.test(term))) || []);
+}
+
+function matchesMistakeContext(excerpt, context, minimumMatches = 2) {
+  const excerptTerms = evidenceTerms(excerpt);
+  const contextTerms = new Set(context.flatMap((item) => [...evidenceTerms(item)]));
+  let matches = 0;
+  for (const term of excerptTerms) {
+    const overlaps = [...contextTerms].some((contextTerm) => {
+      if (contextTerm === term) return true;
+      if (!/^[\p{L}]+$/u.test(term) || !/^[\p{L}]+$/u.test(contextTerm) ||
+          term.length < 6 || contextTerm.length < 6) return false;
+      return term.slice(0, Math.min(term.length, contextTerm.length)) ===
+        contextTerm.slice(0, Math.min(term.length, contextTerm.length));
+    });
+    if (overlaps && ++matches >= minimumMatches) return true;
+  }
+  return false;
 }
 
 export async function resolveMistakeTrainingSource({
@@ -97,9 +120,14 @@ export async function resolveMistakeTrainingSource({
       const scored = verifiedScores.get(item.sourceQuestionId);
       if (!question || !scored) throw fail("MISTAKE_SOURCE_MISMATCH");
       const expectedAnswer = String(scored.model_answer || question.model_answer || "");
-      const citedEvidence = filterSourceReferences(material.text, question.source_references).slice(0, 3);
-      const sourceEvidence = citedEvidence.length ? citedEvidence :
-        deriveSourceExcerpt(material.text, [question.question, expectedAnswer, scored.feedback || ""]);
+      const citedEvidence = filterSourceReferences(material.text, question.source_references);
+      const mistakeContext = [question.question, expectedAnswer, scored.feedback || ""];
+      const focusedEvidence = deriveSourceExcerpt(material.text, mistakeContext);
+      const relevantCitedEvidence = citedEvidence.filter((excerpt) =>
+        excerpt.split(/\s+/u).length <= 12 &&
+        matchesMistakeContext(excerpt, mistakeContext, focusedEvidence.length ? 2 : 1));
+      const sourceEvidence = [...new Set([...focusedEvidence, ...relevantCitedEvidence])].slice(0, 3);
+      if (!sourceEvidence.length) throw fail("MISTAKE_TRAINING_FOCUS_UNAVAILABLE");
       verifiedFocus.push({
         focusId: `focus-${verifiedFocus.length + 1}`,
         sourceQuestionId: item.sourceQuestionId,

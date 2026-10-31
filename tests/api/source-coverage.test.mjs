@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createRequire } from "node:module";
+import { readFileSync } from "node:fs";
 
 const require = createRequire(import.meta.url);
 const { sourceSections, questionSectionIndex, questionSectionIndices, nextSourceSection } = require("../../api/_source-coverage.cjs");
@@ -19,6 +20,50 @@ Producenter bygger organiska ämnen från oorganiska ämnen. Konsumenter får en
 
 # Genetik
 DNA innehåller gener med instruktioner för hur proteiner byggs. Vid celldelning kopieras DNA så att nya celler får genetisk information.`;
+
+test("numbered factual paragraphs retain literal coverage without becoming exercise lists", () => {
+  const facts = Array.from({ length: 12 }, (_, index) =>
+    `${index + 1}. Celler använder olika strukturer för sitt arbete. Detta är avsnitt ${index + 1} med en egen beskrivning av cellens funktioner.`);
+  const notes = `Syntetiskt studieunderlag – Biologi 1: celler, energi och transport.\n\n${facts.join("\n")}`;
+  for (const input of [notes, notes.replace(/\n/g, "\r\n"), notes.replace(/^(\d+)\./gm, "$1)")]) {
+    const normalized = input.replace(/\r\n?/g, "\n");
+    const sections = sourceSections(input);
+    assert.equal(sections.length, 12);
+    assert.equal(sections[4].title, "Avsnitt 5");
+    for (let index = 0; index < sections.length; index++) {
+      const target = nextSourceSection(sections, [], index);
+      assert.ok(normalized.includes(target.excerpt), "the real generator's literal excerpt contract");
+    }
+    assert.equal(questionSectionIndex({ source_references: ["Detta är avsnitt 5 med en egen beskrivning av cellens funktioner."] }, sections), 4);
+    assert.deepEqual(questionSectionIndices({ source_references: ["Celler använder olika strukturer för sitt arbete."] }, sections), [],
+      "a shared sentence does not manufacture unique coverage");
+  }
+  const wrapped = `${facts[0]}\nEn fortsättning på samma anteckning.\n\n${facts[1]}`;
+  assert.equal(sourceSections(wrapped)[0].body, `${facts[0]}\nEn fortsättning på samma anteckning.`);
+  for (const input of [
+    facts[0], facts.slice(0, 2).join("\n").replace("2.", "3."),
+    facts.slice(0, 2).join("\n").replace("2.", "1."),
+    facts.slice(0, 2).join("\n").replace("2.", "2)"),
+    [...facts, facts[0].replace("1.", "13.")].join("\n"),
+    "1. Kort etikett\n2. Nästa korta etikett",
+    facts.slice(0, 2).join("\n").replace("1. Celler", "1. Beskriv hur celler"),
+    facts.slice(0, 2).join("\n").replace("arbete.", "arbete?"),
+    facts.slice(0, 2).join("\n").replace("1. ", "2026. "),
+    facts.slice(0, 2).join("\n").replace("1. ", "1.5 "),
+    `# Blandad rubrik\n${facts.slice(0, 2).join("\n")}`,
+    `Fotosyntes\n\n${facts.slice(0, 2).join("\n")}`,
+    `${facts[0]}\nGenetik:\nEn separat rubrik med en helt annan faktatext som inte ska räknas till den första punkten.\n${facts[1]}`,
+    `9.\n${facts.slice(0, 2).join("\n")}`,
+    `1.5 Inledning\n${facts.slice(0, 2).join("\n")}`,
+    `${facts.slice(0, 2).join("\n")}\n3: ${facts[0]}`,
+    ...["Svar", "Answer", "Task"].map(label => facts.slice(0, 2).join("\n").replace("1. Celler", `1. ${label}: Celler`)),
+  ]) assert.deepEqual(sourceSections(input), [], input);
+  const observed = readFileSync(new URL("../fixtures/numbered-biology-notes.txt", import.meta.url), "utf8");
+  const observedSections = sourceSections(observed);
+  assert.equal(observedSections.length, 12, "the complete synthetic source used in staging is recognized");
+  assert.equal(questionSectionIndex({ source_references: ["Fotosyntesen använder koldioxid och vatten samt ljusenergi."] }, observedSections), 4);
+  assert.ok(observedSections.every(section => observed.includes(section.body)));
+});
 
 test("only unique verbatim source references count toward section coverage", () => {
   const sections = sourceSections(source);
@@ -182,7 +227,8 @@ test("mistake training prioritizes verified misses over general source-section s
     payload: {
       qType: "short", numQuestions: 2, pastedText: source,
       trainingFocus: [
-        { focusId: "focus-1", concept: "Fotosyntes", skill: "Ange reaktanterna" },
+        { focusId: "focus-1", concept: "Fotosyntes", skill: "Ange vilka ämnen växter använder för att bilda glukos",
+          sourceEvidence: ["Växter använder ljus, vatten och koldioxid för att bilda glukos."] },
         { focusId: "focus-2", concept: "Cellandning", skill: "Förklara energifrigörelse" },
       ],
     },
@@ -196,7 +242,9 @@ test("mistake training prioritizes verified misses over general source-section s
       assert.deepEqual(payload.trainingFocusRequiredIds, ["focus-1", "focus-2"]);
       return { status: 200, body: { ok: true, questions: [
         { id: "unrelated", type: "short", question: "Vad innehåller DNA?", validation_status: "verified" },
-        { id: "focused", type: "short", question: "Vilka ämnen används vid fotosyntes?",
+        { id: "focused", type: "short", question: "Vilka ämnen använder växter för att bilda glukos?",
+          model_answer: "Växter använder ljus, vatten och koldioxid för att bilda glukos.",
+          source_references: ["Växter använder ljus, vatten och koldioxid för att bilda glukos."],
           validation_status: "verified", training_focus_matches: ["focus-1"] },
       ] } };
     };
@@ -208,7 +256,7 @@ test("mistake training prioritizes verified misses over general source-section s
     assert.equal(result.approved, 1);
     assert.equal(checkpoint.nextStage, "repair", "an uncovered selected mistake keeps the job in repair");
     assert.deepEqual(checkpoint.acceptedQuestions.map((question) => question.question), [
-      "Vilka ämnen används vid fotosyntes?",
+      "Vilka ämnen använder växter för att bilda glukos?",
     ], "a verified but unrelated question cannot enter mistake training");
   } finally {
     generation.generateVerifiedBatch = originalGenerate;

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
+const Ajv = require("ajv");
 const { verifyQuestions, buildVerifierSchema, buildVerifierPrompt, decideApproval, classifyReviewFindings } = require("../../api/_verifier.js");
 
 const question = (id) => ({ id, type: "short_answer", question: `Question ${id}` });
@@ -16,6 +17,13 @@ const sourceSupport = (quote, parts = 0, answers = 0) => ({
 
 async function runWithResults(results, questions = [question("q1"), question("q2")], material = "", timeoutMs, targetLevel, comparisonQuestions, lang = "en", reviewHintsById, trainingFocus, comparisonAnswerTargets) {
   const originalFetch = globalThis.fetch;
+  const originalConsoleInfo = console.info;
+  const sourceContractEvents = [];
+  console.info = (message) => {
+    if (typeof message === "string" && message.startsWith('{"event":"exam_verifier_source_contract"')) {
+      sourceContractEvents.push(JSON.parse(message));
+    }
+  };
   const originalAbortTimeout = AbortSignal.timeout;
   const boundAbortTimeout = originalAbortTimeout.bind(AbortSignal);
   let fetchCalls = 0;
@@ -32,9 +40,10 @@ async function runWithResults(results, questions = [question("q1"), question("q2
     });
   };
   try {
-    return { outcome: await verifyQuestions(questions, { apiKey: "synthetic", model: "synthetic", lang, material, timeoutMs, targetLevel, comparisonQuestions, comparisonAnswerTargets, reviewHintsById, trainingFocus }), fetchCalls, requestBody, requestTimeoutMs };
+    return { outcome: await verifyQuestions(questions, { apiKey: "synthetic", model: "synthetic", lang, material, timeoutMs, targetLevel, comparisonQuestions, comparisonAnswerTargets, reviewHintsById, trainingFocus }), fetchCalls, requestBody, requestTimeoutMs, sourceContractEvents };
   } finally {
     globalThis.fetch = originalFetch;
+    console.info = originalConsoleInfo;
     AbortSignal.timeout = originalAbortTimeout;
   }
 }
@@ -70,6 +79,8 @@ assert.equal(buildVerifierSchema().schema.properties.results.minItems, undefined
   "schema inspection without a question count remains backward compatible");
 assert.ok(!submittedReviewSchema.items.required.includes("training_focus_alignment"),
   "ordinary exams retain their existing review contract");
+assert.match(buildVerifierPrompt("sv", undefined, undefined, "A"), /ska difficulty_evidence innehålla exakta delsträngar/i);
+assert.match(buildVerifierPrompt("en", undefined, undefined, "A"), /a label or verb such as 'analyze' is not evidence/i);
 assert.match(valid.requestBody.input[0].content, /exactly 2 questions and return exactly one result/i);
 assert.match(valid.requestBody.input[0].content, /language_match=true only when every learner-facing field is in the selected output language/i);
 assert.match(buildVerifierPrompt("sv"), /language_match=true endast om alla elevriktade fält är på det valda provspråket/i);
@@ -90,6 +101,227 @@ assert.match(buildVerifierPrompt("sv"), /ett enda obestyrkt tillägg gör hela a
   "the reviewer must reject an otherwise correct exemplar with one unsupported clause");
 assert.match(buildVerifierPrompt("en"), /one unsupported addition makes the entire answer=false/i);
 assert.match(buildVerifierPrompt("sv"), /duplicate_of till id för en tidigare kandidat eller redan godkänd fråga/i);
+
+const aLevelMaterial = "Vid fotosyntesen tar växten upp koldioxid från luften och binder kolet i glukos. Vid cellandningen bryts glukos ned och kolet återgår till koldioxid.";
+const aLevelQuestion = {
+  id: "a-compare", type: "short_answer",
+  question: "Jämför hur fotosyntes och cellandning flyttar kol mellan luft och glukos och motivera en slutsats om sambandet.",
+  rubric: { criteria: "Jämför att fotosyntesen binder kol i glukos medan cellandningen frigör koldioxid; motivera slutsatsen med båda källfakta." },
+  scoring_rubric: { summary: "Jämför att fotosyntesen binder kol i glukos medan cellandningen frigör koldioxid; motivera slutsatsen med båda källfakta." },
+};
+const validALevelEvidence = {
+  task_evidence: "Jämför hur fotosyntes och cellandning flyttar kol mellan luft och glukos",
+  scoring_evidence: "Jämför att fotosyntesen binder kol i glukos medan cellandningen frigör koldioxid; motivera slutsatsen",
+  source_fact_evidence: [0, 1],
+  reasoning_operation: "compare", distinct_source_facts: 2,
+  rubric_rewards_reasoning: true, justified_conclusion_required: true,
+};
+const aLevelReviewResult = (difficulty_evidence, evidenceQuotes = [
+  "Vid fotosyntesen tar växten upp koldioxid från luften och binder kolet i glukos.",
+  "Vid cellandningen bryts glukos ned och kolet återgår till koldioxid.",
+]) => ({
+  ...result("a-compare", true), factual_accuracy: 1, ambiguity_score: 0,
+  difficulty_match: 1, source_alignment: 1, scoring_quality: 1, language_quality: 1,
+  option_quality: [], source_support: {
+    ...sourceSupport("Vid fotosyntesen tar växten upp koldioxid från luften och binder kolet i glukos"),
+    evidence_quotes: evidenceQuotes,
+    question_evidence: [0, 1], answer_evidence: [0, 1], rubric_evidence: [0, 1],
+  },
+  duplicate_of: "", issues: [], required_changes: [], difficulty_evidence,
+});
+async function reviewALevelQuestion(questionText, scoringText, lang = "sv", reasoningOperation = "compare") {
+  const candidate = {
+    ...aLevelQuestion,
+    question: questionText,
+    rubric: { criteria: scoringText },
+    scoring_rubric: { summary: scoringText },
+  };
+  const review = await runWithResults(
+    [aLevelReviewResult({
+      ...validALevelEvidence,
+      reasoning_operation: reasoningOperation,
+      task_evidence: questionText,
+      scoring_evidence: scoringText,
+    })], [candidate], aLevelMaterial, undefined, "A", undefined, lang);
+  return review.outcome.perQuestion.get("a-compare");
+}
+async function assertARejected(questionText, scoringText, lang = "sv", reasoningOperation = "analyze") {
+  const decision = await reviewALevelQuestion(questionText, scoringText, lang, reasoningOperation);
+  assert.equal(decideApproval(decision), false, `recall-only wording must not pass A-level: ${questionText}`);
+  return decision;
+}
+const supportedALevel = await runWithResults(
+  [aLevelReviewResult(validALevelEvidence)], [aLevelQuestion], aLevelMaterial,
+  undefined, "A", undefined, "sv");
+assert.equal(supportedALevel.outcome.callOk, true);
+assert.equal(decideApproval(supportedALevel.outcome.perQuestion.get("a-compare")), true,
+  "an A-level comparison with literal task/rubric evidence meets the added contract");
+assert.equal(supportedALevel.outcome.perQuestion.get("a-compare").difficulty_evidence_contract_ok, true);
+assert.ok(supportedALevel.requestBody.text.format.schema.properties.results.items.required.includes("difficulty_evidence"));
+
+const weakALevel = await runWithResults(
+  [aLevelReviewResult({
+    task_evidence: "Jämför hur fotosyntes och cellandning flyttar kol mellan luft och glukos",
+    scoring_evidence: "Jämför att fotosyntesen binder kol i glukos medan cellandningen frigör koldioxid; motivera slutsatsen",
+    source_fact_evidence: [0, 1],
+    reasoning_operation: "recall", distinct_source_facts: 1,
+    rubric_rewards_reasoning: false, justified_conclusion_required: false,
+  })], [aLevelQuestion], aLevelMaterial, undefined, "A", undefined, "sv");
+assert.equal(decideApproval(weakALevel.outcome.perQuestion.get("a-compare")), false,
+  "a recall-only claim cannot pass A-level even with a high difficulty score");
+assert.ok(weakALevel.outcome.perQuestion.get("a-compare").failure_categories.includes("difficulty_match"));
+
+const recallQuestion = {
+  ...aLevelQuestion,
+  question: "Beskriv vad fotosyntes binder och vad cellandning frigör.",
+  rubric: { criteria: "Beskriv två fakta och motivera slutsatsen." },
+  scoring_rubric: { summary: "Beskriv två fakta och motivera slutsatsen." },
+};
+const mislabelledA = await runWithResults(
+  [aLevelReviewResult({
+    ...validALevelEvidence,
+    task_evidence: "Beskriv vad fotosyntes binder och vad cellandning frigör",
+    scoring_evidence: "Beskriv två fakta och motivera slutsatsen",
+  })], [recallQuestion], aLevelMaterial, undefined, "A", undefined, "sv");
+assert.equal(decideApproval(mislabelledA.outcome.perQuestion.get("a-compare")), false,
+  "a recall task cannot be relabeled as comparison when its wording has no comparison operation");
+
+const contrastiveA = {
+  ...aLevelQuestion,
+  question: "Beskriv inte bara vad fotosyntesen binder, utan analysera också hur cellandningen flyttar kolet och motivera en slutsats.",
+  rubric: { criteria: "Poäng ges inte bara för återgivning, utan även för analys och en motiverad slutsats med båda källfakta." },
+  scoring_rubric: { summary: "Poäng ges inte bara för återgivning, utan även för analys och en motiverad slutsats med båda källfakta." },
+};
+const contrastiveReview = await runWithResults(
+  [aLevelReviewResult({
+    ...validALevelEvidence,
+    reasoning_operation: "analyze",
+    task_evidence: "analysera också hur cellandningen flyttar kolet och motivera en slutsats",
+    scoring_evidence: contrastiveA.rubric.criteria,
+  })], [contrastiveA], aLevelMaterial, undefined, "A", undefined, "sv");
+assert.equal(decideApproval(contrastiveReview.outcome.perQuestion.get("a-compare")), true,
+  "a reasoning operation after 'inte bara ..., utan ... också' remains affirmative");
+
+for (const [questionText, rubricText, lang] of [
+  ["Vilka skillnader finns mellan fotosyntes och cellandning när kolet flyttas mellan luft och glukos, och vilken slutsats kan du motivera?",
+    "Poäng för att förklara skillnaderna mellan processerna och motivera slutsatsen med båda källfakta."],
+  ["How do photosynthesis and cellular respiration differ in moving carbon between air and glucose, and what conclusion can you justify?",
+    "Credit for explaining the differences between the processes and justifying the conclusion with both source facts.", "en"],
+]) {
+  const decision = await reviewALevelQuestion(questionText, rubricText, lang);
+  assert.equal(decideApproval(decision), true, `affirmative comparison wording should pass A-level: ${questionText}`);
+}
+
+for (const [questionText, scoringText, lang, operation] of [
+  ["Discuss how photosynthesis and cellular respiration move carbon, and justify your conclusion using both source facts.",
+    "Credit for reasoning that supports your conclusion with evidence from both source facts.", "en", "analyze"],
+  ["What conclusion can we draw about carbon flow? Justify it using both source facts.",
+    "Credit for a justified conclusion based on both source facts.", "en", "infer"],
+  ["To what extent does photosynthesis bind carbon relative to cellular respiration? Draw a conclusion using both source facts.",
+    "Credit for evaluating the extent and supporting your conclusion with evidence from both source facts.", "en", "evaluate"],
+  ["Integrate both source facts into one model of carbon flow. Draw a conclusion from the model.",
+    "Credit for synthesis reasoning that supports a conclusion using both source facts.", "en", "synthesize"],
+  ["Analyze how the processes move carbon, and support your conclusion with evidence from both facts.",
+    "Credit for analysis and support your conclusion with evidence from both source facts.", "en", "analyze"],
+]) {
+  const decision = await reviewALevelQuestion(questionText, scoringText, lang, operation);
+  assert.equal(decideApproval(decision), true, `common affirmative ${operation} wording should pass A-level: ${questionText}`);
+}
+
+for (const [questionText, scoringText, lang] of [
+  ["Beskriv vad fotosyntes binder och vad cellandning frigör. Jämför inte processerna eller motivera någon slutsats; återge bara faktan.", "Poäng ges för korrekt återgivning, inte för resonemang, jämförelse eller motiverad slutsats."],
+  ["Beskriv vad fotosyntes binder och vad cellandning frigör. Analys och motiverad slutsats krävs inte; återge bara faktan.", "Resonemang ger inga poäng. Det krävs inte att eleven motiverar eller drar en slutsats."],
+  ["Analys av sambandet mellan processerna krävs inte; återge bara faktan.", "Resonemang om sambandet belönas inte."],
+  ["Beskriv inte bara fakta, utan analysera inte sambandet. Motivera inte slutsatsen.", "Poäng ges inte för analys eller motiverad slutsats; återgivning räcker."],
+  ["Not only list two facts, but do not analyze or justify a conclusion; simply repeat the source.", "Points are not awarded for analysis or a justified conclusion; recall is enough.", "en"],
+  ["Not only list two facts, but tell students to refrain from trying to analyze or justify a conclusion; simply repeat the source.", "Points are not awarded for analysis or a justified conclusion; recall is enough.", "en"],
+  ["Not only list two facts, but disallow students to analyze or justify a conclusion; simply repeat the source.", "Points are not awarded for analysis or a justified conclusion; recall is enough.", "en"],
+  ["Not only list two facts, but students needn't analyze or justify a conclusion; simply repeat the source.", "Points are not awarded for analysis or a justified conclusion; recall is enough.", "en"],
+  ["Not only list two facts, but students aren't supposed to analyze or justify a conclusion; simply repeat the source.", "Points are not awarded for analysis or a justified conclusion; recall is enough.", "en"],
+  ["Not only list two facts, but students are exempt from having to analyze or justify a conclusion; simply repeat the source.", "Points are not awarded for analysis or a justified conclusion; recall is enough.", "en"],
+]) {
+  await assertARejected(questionText, scoringText, lang);
+}
+await assertARejected(
+  "Jämför inte fotosyntes och cellandning, men motivera en slutsats om kolflödet.",
+  "Poäng för jämförelse och motiverad slutsats.", "sv", "compare");
+await assertARejected(
+  "Do not compare photosynthesis and cellular respiration, but justify a conclusion about carbon flow.",
+  "Credit for comparison and a justified conclusion.", "en", "compare");
+await assertARejected(
+  "Do not discuss how photosynthesis and cellular respiration move carbon; just recall both facts.",
+  "Credit for recall only; reasoning and a justified conclusion are not required.", "en", "analyze");
+await assertARejected(
+  "Do not draw a conclusion about carbon flow; just recall both facts.",
+  "Credit for recall only; a justified conclusion is not required.", "en", "infer");
+await assertARejected(
+  "Rather than discuss how the processes move carbon, list the two source facts and draw a conclusion.",
+  "Credit for reasoning and a justified conclusion using both source facts.", "en", "analyze");
+await assertARejected(
+  "Rather than ask students to discuss how the processes move carbon, list the two source facts and draw a conclusion.",
+  "Credit for reasoning and a justified conclusion using both source facts.", "en", "analyze");
+await assertARejected(
+  "To what extent does photosynthesis bind carbon relative to cellular respiration? Draw a conclusion using both source facts.",
+  "Evaluation is optional; credit for reasoning and a justified conclusion using both source facts.", "en", "evaluate");
+await assertARejected(
+  "To what extent does photosynthesis bind carbon relative to cellular respiration? Draw a conclusion using both source facts.",
+  "Evaluation isn't required; credit for reasoning and a justified conclusion using both source facts.", "en", "evaluate");
+await assertARejected(
+  "To what extent does photosynthesis bind carbon relative to cellular respiration? Draw a conclusion using both source facts.",
+  "Evaluation didn't count toward the score; credit for reasoning and a justified conclusion using both source facts.", "en", "evaluate");
+for (const rubric of [
+  "Evaluation is unnecessary; credit for reasoning and a justified conclusion using both source facts.",
+  "Evaluation needn't be scored; credit for reasoning and a justified conclusion using both source facts.",
+  "Evaluation may be omitted; credit for reasoning and a justified conclusion using both source facts.",
+  "Evaluation shouldn't be required; credit for reasoning and a justified conclusion using both source facts.",
+  "Evaluation won't count toward the score; credit for reasoning and a justified conclusion using both source facts.",
+  "Evaluation is waived; credit for reasoning and a justified conclusion using both source facts.",
+  "Evaluation is excluded from scoring; credit for reasoning and a justified conclusion using both source facts.",
+  "Evaluation may be skipped; credit for reasoning and a justified conclusion using both source facts.",
+  "Evaluation cannot be required; credit for reasoning and a justified conclusion using both source facts.",
+  "Evaluation can't be required; credit for reasoning and a justified conclusion using both source facts.",
+  "Evaluation mustn't be required; credit for reasoning and a justified conclusion using both source facts.",
+  "Evaluation shouldn't count toward the grade; credit for reasoning and a justified conclusion using both source facts.",
+  "Evaluation mustn't count toward the grade; credit for reasoning and a justified conclusion using both source facts.",
+  "No marks are awarded for evaluation; credit for reasoning and a justified conclusion using both source facts.",
+  "No points will be awarded for evaluation; credit for reasoning and a justified conclusion using both source facts.",
+]) {
+  await assertARejected(
+    "To what extent does photosynthesis bind carbon relative to cellular respiration? Draw a conclusion using both source facts.",
+    rubric, "en", "evaluate");
+}
+
+const sameFactQuotes = await runWithResults(
+  [aLevelReviewResult(validALevelEvidence, [
+    "Vid fotosyntesen tar växten upp koldioxid från luften och binder kolet i glukos.",
+    "Vid fotosyntesen tar växten upp koldioxid från luften och binder kolet i glukos.",
+  ])],
+  [aLevelQuestion], aLevelMaterial,
+  undefined, "A", undefined, "sv");
+assert.equal(decideApproval(sameFactQuotes.outcome.perQuestion.get("a-compare")), false,
+  "two indexes to the same quoted source fact do not satisfy the A-level evidence contract");
+
+const unsupportedALevel = await runWithResults(
+  [aLevelReviewResult({ ...validALevelEvidence, task_evidence: "analyze the whole ecosystem" })],
+  [aLevelQuestion], aLevelMaterial, undefined, "A", undefined, "sv");
+assert.equal(decideApproval(unsupportedALevel.outcome.perQuestion.get("a-compare")), false,
+  "A-level evidence that is not an exact task substring fails closed");
+
+const nounOnlyA = {
+  ...aLevelQuestion,
+  question: "Beskriv fotosyntesens och cellandningens samband och orsaker.",
+  rubric: { criteria: "Poäng för samband och en slutsats." },
+  scoring_rubric: { summary: "Poäng för samband och en slutsats." },
+};
+const overclaimedNounOnlyA = await runWithResults(
+  [aLevelReviewResult({
+    ...validALevelEvidence,
+    task_evidence: nounOnlyA.question,
+    scoring_evidence: nounOnlyA.rubric.criteria,
+  })], [nounOnlyA], aLevelMaterial, undefined, "A", undefined, "sv");
+assert.equal(decideApproval(overclaimedNounOnlyA.outcome.perQuestion.get("a-compare")), false,
+  "topic nouns such as 'relationship' and 'cause' are not proof that the task requires analysis");
+
 const outlierHintReview = await runWithResults(
   [{ ...result("q1", true), factual_accuracy: 1, ambiguity_score: 0, difficulty_match: 1, source_alignment: 1, scoring_quality: 1, language_quality: 1, language_match: true, option_quality: [true, true, true], source_support: sourceSupport("Stockholm är Sveriges huvudstad"), issues: [], required_changes: [] }],
   [{ id: "q1", type: "mc", question: "Vilken stad är huvudstad?", options: ["Stockholm", "En stad i norr", "En ort vid kusten"] }],
@@ -314,6 +546,158 @@ const unsupportedBiology = await runWithResults([{
 "Alleler är olika varianter av en gen.");
 assert.equal(decideApproval(unsupportedBiology.outcome.perQuestion.get(validOpenQuestion.id)), false,
   "a topical allele quote cannot override an explicit unsupported-claim verdict");
+
+const topicalButUnsupportedQuestion = {
+  id: "bio-topical-but-unsupported", type: "short_answer",
+  question: "Vilken roll har cellkärnan vid fotosyntesen?",
+  model_answer: "Cellkärnan omvandlar ljus till glukos.",
+  rubric: "Förklara cellkärnans roll.",
+};
+const topicalButUnsupportedReview = await runWithResults([{
+  ...result(topicalButUnsupportedQuestion.id, false),
+  factual_accuracy: 0.2, ambiguity_score: 0, difficulty_match: 1,
+  source_alignment: 0.2, scoring_quality: 0.2, language_quality: 1,
+  language_match: true, option_quality: [], issues: ["source_support"],
+  required_changes: ["Frågan och svaret stöds inte av den angivna källan."],
+  source_support: { ...sourceSupport("Fotosyntesen sker i kloroplasterna."),
+    question: false, answer: false, rubric: false },
+}], [topicalButUnsupportedQuestion], "Fotosyntesen sker i kloroplasterna.");
+const topicalReviewInput = JSON.parse(topicalButUnsupportedReview.requestBody.input.find((item) => item.role === "user").content);
+assert.equal(topicalButUnsupportedReview.outcome.callOk, true,
+  "a structured semantic rejection is parsed as a completed verifier response");
+assert.equal(topicalReviewInput.source_material, "Fotosyntesen sker i kloroplasterna.");
+assert.equal(topicalReviewInput.questions[0].question, topicalButUnsupportedQuestion.question);
+assert.equal(decideApproval(topicalButUnsupportedReview.outcome.perQuestion.get(topicalButUnsupportedQuestion.id)), false,
+  "the full verifier transport and approval contract fail closed for a topical but unsupported question");
+assert.deepEqual(topicalButUnsupportedReview.sourceContractEvents, [{
+  event: "exam_verifier_source_contract", evaluated: 1, failures: { unsupported_verdict: 1 },
+}], "semantic unsupported verdicts are distinguishable without logging their source or reviewer text");
+
+// The provider schema must express the exact lengths already required at
+// runtime, including empty MC parts and heterogeneous short-answer rubrics.
+const cardinalQuote = "Enzymer påskyndar kemiska reaktioner utan att själva förbrukas.";
+const cardinalQuestions = [0, 1, 2].map((index) => ({
+  id: `cardinality-${index}`, type: index === 1 ? "short" : "mc",
+  question: `Syntetisk strukturfråga ${index}`, model_answer: cardinalQuote, rubric: cardinalQuote,
+  options: index === 1 ? [] : ["A", "B", "C"], correct_index: index === 1 ? -1 : 0,
+  scoring_rubric: { parts: index === 1 ? [{ description: "Första delen", points: 1 }, { description: "Andra delen", points: 1 }] : [] },
+  accepted_answers: index === 1 ? ["Alternativ ett", "Alternativ två"] : [],
+  source_references: [cardinalQuote],
+}));
+const cardinalResults = cardinalQuestions.map((item) => ({
+  ...result(item.id, true), factual_accuracy: 1, ambiguity_score: 0, difficulty_match: 1,
+  source_alignment: 1, scoring_quality: 1, language_quality: 1, duplicate_of: "", issues: [], required_changes: [],
+  option_quality: item.options.map(() => true),
+  source_support: sourceSupport(cardinalQuote, item.scoring_rubric.parts.length, item.accepted_answers.length),
+}));
+const cardinalReview = await runWithResults(cardinalResults, cardinalQuestions, cardinalQuote);
+assert.ok(cardinalQuestions.every((item) => decideApproval(cardinalReview.outcome.perQuestion.get(item.id))));
+const cardinalSchema = cardinalReview.requestBody.text.format.schema;
+assert.equal(cardinalSchema.properties.results.items.anyOf.length, 2,
+  "equal array shapes share a branch rather than repeating the whole schema per question");
+const validateCardinality = new Ajv({ strict: true }).compile(cardinalSchema);
+assert.equal(validateCardinality({ results: cardinalResults }), true, JSON.stringify(validateCardinality.errors));
+assert.equal(validateCardinality({ results: [...cardinalResults].reverse() }), true,
+  "correct result order is not forced; runtime binds by question ID");
+for (const [index, field, value] of [
+  [0, "rubric_parts", [true]], [0, "rubric_part_evidence", [[0]]],
+  [0, "accepted_answers", [true]], [0, "accepted_answer_evidence", [[0]]],
+  [1, "rubric_parts", [true]], [1, "rubric_part_evidence", [[0]]],
+  [1, "accepted_answers", [true, true, true]], [1, "accepted_answer_evidence", [[0], [0], [0]]],
+]) {
+  const malformed = structuredClone(cardinalResults);
+  malformed[index].source_support[field] = value;
+  assert.equal(validateCardinality({ results: malformed }), false,
+    `the emitted schema rejects ${field} with the wrong length for ${malformed[index].id}`);
+  const ignoredSchema = await runWithResults(malformed, cardinalQuestions, cardinalQuote);
+  assert.equal(decideApproval(ignoredSchema.outcome.perQuestion.get(malformed[index].id)), false,
+    "the unchanged runtime check rejects bad part mapping even if a provider ignores the schema");
+}
+const wrongOptionShape = structuredClone(cardinalResults);
+wrongOptionShape[0].option_quality.pop();
+assert.equal(validateCardinality({ results: wrongOptionShape }), false);
+const unknownCardinalId = structuredClone(cardinalResults);
+unknownCardinalId[0].id = "foreign-question";
+assert.equal(validateCardinality({ results: unknownCardinalId }), false);
+const unsupportedCardinalAnswer = structuredClone(cardinalResults);
+unsupportedCardinalAnswer[1].source_support.answer = false;
+assert.equal(validateCardinality({ results: unsupportedCardinalAnswer }), true,
+  "the shape schema still permits a negative reviewer verdict");
+const negativeCardinalReview = await runWithResults(unsupportedCardinalAnswer, cardinalQuestions, cardinalQuote);
+assert.equal(decideApproval(negativeCardinalReview.outcome.perQuestion.get(cardinalQuestions[1].id)), false,
+  "schema alignment does not turn an unsupported answer into an approved one");
+const oversizedParts = await runWithResults([], [{ ...cardinalQuestions[1],
+  scoring_rubric: { parts: Array.from({ length: 21 }, () => ({ description: "Del", points: 1 })) },
+}], cardinalQuote);
+assert.equal(oversizedParts.fetchCalls, 0, "rubrics exceeding the existing 20-part contract are rejected before paid review");
+assert.equal(oversizedParts.outcome.failureReason, "invalid_review_input");
+
+// Source paragraph numbers must not be confused with positions in the reviewer's
+// per-question evidence array. This occurs even when the source fact is valid.
+const numberedQuote = "Enzymer påskyndar kemiska reaktioner utan att själva förbrukas.";
+const numberedQuestion = {
+  ...validOpenQuestion, id: "biology-paragraph-12", question: "Vad gör enzymer?",
+  model_answer: numberedQuote, rubric: numberedQuote,
+  scoring_rubric: { parts: [{ description: numberedQuote, points: 1 }],
+    full_score_requirements: numberedQuote, partial_credit_notes: "" },
+  source_references: [numberedQuote],
+};
+for (const index of [0, 1, 12]) {
+  const support = sourceSupport(numberedQuote, 1);
+  support.question_evidence = [index];
+  const checked = await runWithResults([{
+    ...validOpenReview, id: numberedQuestion.id, source_support: support,
+  }], [numberedQuestion], `12. ${numberedQuote}`, undefined, "C", undefined, "sv");
+  assert.equal(decideApproval(checked.outcome.perQuestion.get(numberedQuestion.id)), index === 0,
+    `a sole quote from source paragraph 12 needs local index 0, not ${index}`);
+  assert.deepEqual(checked.sourceContractEvents, index === 0 ? [] : [{
+    event: "exam_verifier_source_contract", evaluated: 1, failures: { invalid_index: 1 },
+  }], "invalid local indices produce only fixed diagnostic categories and counts");
+  const quoteSchema = checked.requestBody.text.format.schema.properties.results.items
+    .properties.source_support.properties.evidence_quotes.items;
+  const quotePattern = new RegExp(quoteSchema.pattern);
+  assert.equal(quotePattern.test("a".repeat(500)), true, "the emitted schema permits 500-character quotes");
+  assert.equal(quotePattern.test("a".repeat(501)), false, "the emitted schema rejects 501-character quotes");
+  assert.equal(quotePattern.test(""), false, "the emitted schema rejects empty quotes");
+}
+for (const length of [500, 501]) {
+  const quote = "a".repeat(length);
+  const checked = await runWithResults([{
+    ...validOpenReview, source_support: sourceSupport(quote, 1),
+  }], [validOpenQuestion], quote);
+  assert.equal(decideApproval(checked.outcome.perQuestion.get(validOpenQuestion.id)), length === 500,
+    "runtime keeps the same 500-character boundary even when a provider ignores schema constraints");
+}
+assert.match(buildVerifierPrompt("sv"), /Index börjar på 0.*inte i source_material/);
+assert.match(buildVerifierPrompt("sv"), /ett enda citat.*\[0\].*enda giltiga indexvalet/);
+assert.match(buildVerifierPrompt("en"), /zero-based indices.*own quote array, not source_material/);
+assert.match(buildVerifierPrompt("en"), /one quote, \[0\] is the only valid index choice/);
+assert.match(buildVerifierPrompt("sv"), /1–500 tecken/);
+assert.match(buildVerifierPrompt("en"), /1–500 characters/);
+const malformedSourceVerdict = await runWithResults([{
+  ...validOpenReview, source_support: { ...validOpenReview.source_support, rubric_parts: [1] },
+}], [validOpenQuestion], "Ekvationer: 2x = 4.");
+assert.equal(decideApproval(malformedSourceVerdict.outcome.perQuestion.get(validOpenQuestion.id)), false);
+assert.deepEqual(malformedSourceVerdict.sourceContractEvents, [{
+  event: "exam_verifier_source_contract", evaluated: 1, failures: { invalid_support_shape: 1 },
+}], "malformed part verdicts remain rejected and produce a bounded shape diagnostic");
+for (const includeMissingQuote of [false, true]) {
+  const quotes = [numberedQuote, numberedQuote];
+  if (includeMissingQuote) quotes.push("Den här meningen finns inte i källmaterialet.");
+  const checked = await runWithResults([{
+    ...validOpenReview, id: numberedQuestion.id,
+    source_support: { ...sourceSupport(numberedQuote, 1), evidence_quotes: quotes },
+  }], [numberedQuestion], numberedQuote);
+  assert.equal(decideApproval(checked.outcome.perQuestion.get(numberedQuestion.id)), false,
+    "duplicate quotes remain rejected by the existing evidence contract");
+  assert.deepEqual(checked.sourceContractEvents, [{
+    event: "exam_verifier_source_contract", evaluated: 1,
+    failures: includeMissingQuote ? { quote_not_in_source: 1, duplicate_quote: 1 } : { duplicate_quote: 1 },
+  }], "duplicate supported quotes are distinguished from genuinely absent evidence");
+}
+assert.match(buildVerifierPrompt("sv"), /varje källcitat bara en gång; återanvänd indexet/);
+assert.match(buildVerifierPrompt("en"), /source quote only once and reuse its index/);
+
 for (const source_support of [
   { ...validOpenReview.source_support, rubric_parts: [] },
   { ...validOpenReview.source_support, rubric_parts: [false] },
@@ -374,7 +758,9 @@ assert.equal(decideApproval(openResponse.outcome.perQuestion.get("open-1")), fal
 
 const focus = [{ concept: "Linjär funktion", skill: "Tolka lutning", errorTags: ["calculation_error"],
   sourceQuestion: "Vad beskriver k?", studentAnswer: "Skärningen med y-axeln",
-  gradingFeedback: "k anger lutningen, inte skärningen.", expectedAnswer: "Lutningen" }];
+  gradingFeedback: "k anger lutningen, inte skärningen.", expectedAnswer: "Lutningen",
+  sourceEvidence: ["y = 2x + 3 beskriver en linjär funktion."] }];
+const focusMaterial = "y = 2x + 3 beskriver en linjär funktion. Linjär funktion: y = 2x + 3.";
 const focusedResult = {
   ...result("q-focus", true), factual_accuracy: 1, ambiguity_score: 0,
   difficulty_match: 1, source_alignment: 1, scoring_quality: 1, language_quality: 1,
@@ -382,7 +768,7 @@ const focusedResult = {
   duplicate_of: "", source_support: sourceSupport("Linjär funktion: y = 2x + 3."),
   training_focus_alignment: true, training_focus_matches: ["focus-1"], training_focus_skill_matches: ["focus-1"], training_focus_error_matches: ["focus-1"],
 };
-const focusedReview = await runWithResults([focusedResult], [question("q-focus")], "Linjär funktion: y = 2x + 3.", undefined, "C", undefined, "sv", undefined, focus);
+const focusedReview = await runWithResults([focusedResult], [question("q-focus")], focusMaterial, undefined, "C", undefined, "sv", undefined, focus);
 const focusSchema = focusedReview.requestBody.text.format.schema.properties.results.items;
 const focusPayload = JSON.parse(focusedReview.requestBody.input.find((item) => item.role === "user").content);
 assert.ok(focusSchema.required.includes("training_focus_alignment"), "mistake-training requires an explicit alignment verdict");
@@ -393,8 +779,9 @@ assert.equal(focusSchema.properties.training_focus_matches.minItems, 0,
   "an explicit no-match review is representable so the server can reject only that candidate");
 assert.deepEqual(focusPayload.training_focus, [{ id: "focus-1", concept: "Linjär funktion", skill: "Tolka lutning", error_tags: ["calculation_error"],
   source_question: "Vad beskriver k?", student_answer: "Skärningen med y-axeln",
-  grading_feedback: "k anger lutningen, inte skärningen.", expected_answer: "Lutningen" }],
-  "reviewer receives the bounded source question, verified answer, and grading evidence without source identities");
+  grading_feedback: "k anger lutningen, inte skärningen.", expected_answer: "Lutningen",
+  source_evidence: ["y = 2x + 3 beskriver en linjär funktion."] }],
+  "reviewer receives bounded, verified source evidence alongside the documented mistake");
 assert.match(focusedReview.requestBody.input[0].content, /skill.*training_focus_skill_matches.*brett concept.*aldrig ersätta skill/i);
 assert.match(focusedReview.requestBody.input[0].content, /Generiska error_tags.*får aldrig ensamma räcka/i);
 assert.match(focusedReview.requestBody.input[0].content, /source_question, student_answer och grading_feedback.*training_focus_error_matches/i);
@@ -402,15 +789,62 @@ assert.equal(decideApproval({ ...focusedReview.outcome.perQuestion.get("q-focus"
   "a source-grounded question that misses the documented mistake cannot pass training review");
 assert.equal(decideApproval({ ...focusedReview.outcome.perQuestion.get("q-focus"), training_focus_alignment: true }), true,
   "a focused question can pass only when the existing quality checks also pass");
+const oversizedFocusEvidence = await runWithResults([focusedResult], [question("q-focus")], "material", undefined, undefined,
+  undefined, "sv", undefined, [{ ...focus[0], sourceEvidence: ["A", "B", "C", "D"] }]);
+assert.equal(oversizedFocusEvidence.outcome.callOk, false,
+  "more than three source excerpts is rejected before reviewer dispatch");
+assert.equal(oversizedFocusEvidence.outcome.failureReason, "invalid_review_input");
+assert.equal(oversizedFocusEvidence.fetchCalls, 0);
+const maxLengthFocusEvidence = await runWithResults([focusedResult], [question("q-focus")], "x".repeat(500), undefined, undefined,
+  undefined, "sv", undefined, [{ ...focus[0], sourceEvidence: ["x".repeat(500)] }]);
+assert.equal(maxLengthFocusEvidence.outcome.callOk, true,
+  "an excerpt at the documented 500-character limit is accepted");
+for (const sourceEvidence of [["x".repeat(501)], ["   "], [42]]) {
+  const malformedEvidence = await runWithResults([focusedResult], [question("q-focus")], focusMaterial, undefined, undefined,
+    undefined, "sv", undefined, [{ ...focus[0], sourceEvidence }]);
+  assert.equal(malformedEvidence.outcome.callOk, false,
+    "overlong, blank, or non-text excerpts fail before reviewer dispatch");
+  assert.equal(malformedEvidence.outcome.failureReason, "invalid_review_input");
+  assert.equal(malformedEvidence.fetchCalls, 0);
+}
+const staleFocusEvidence = await runWithResults([focusedResult], [question("q-focus")], "Aktuellt källmaterial.", undefined,
+  undefined, undefined, "sv", undefined, [{ ...focus[0], sourceEvidence: ["Ett utdrag från ett annat eller äldre material."] }]);
+assert.equal(staleFocusEvidence.outcome.callOk, false,
+  "a focus excerpt not present in the verifier's source material is rejected");
+assert.equal(staleFocusEvidence.outcome.failureReason, "invalid_review_input");
+assert.equal(staleFocusEvidence.fetchCalls, 0,
+  "unverifiable focus evidence is rejected before spending a reviewer call");
+const normalizedFocusEvidence = await runWithResults([focusedResult], [question("q-focus")], focusMaterial, undefined,
+  undefined, undefined, "sv", undefined, [{ ...focus[0], sourceEvidence: ["y = 2x + 3 beskriver en linja\u0308r\tfunktion."] }]);
+assert.equal(normalizedFocusEvidence.outcome.callOk, true,
+  "equivalent NFKC and whitespace-normalized excerpts remain verifiable");
+const partialWordFocusEvidence = await runWithResults([focusedResult], [question("q-focus")], "funktionslära är relevant.", undefined,
+  undefined, undefined, "sv", undefined, [{ ...focus[0], sourceEvidence: ["funktion"] }]);
+assert.equal(partialWordFocusEvidence.outcome.callOk, false,
+  "an excerpt that appears only inside a larger word is not treated as source evidence");
+assert.equal(partialWordFocusEvidence.fetchCalls, 0);
+const emojiExcerpt = "🙂".repeat(250);
+const maxUnicodeFocusEvidence = await runWithResults([focusedResult], [question("q-focus")], emojiExcerpt, undefined,
+  undefined, undefined, "sv", undefined, [{ ...focus[0], sourceEvidence: [emojiExcerpt] }]);
+assert.equal(emojiExcerpt.length, 500);
+assert.equal(maxUnicodeFocusEvidence.outcome.callOk, true,
+  "the 500 UTF-16 code-unit excerpt boundary remains accepted for supplementary Unicode");
+const overUnicodeFocusEvidence = "🙂".repeat(251);
+const overUnicodeFocusReview = await runWithResults([focusedResult], [question("q-focus")], overUnicodeFocusEvidence, undefined,
+  undefined, undefined, "sv", undefined, [{ ...focus[0], sourceEvidence: [overUnicodeFocusEvidence] }]);
+assert.equal(overUnicodeFocusEvidence.length, 502);
+assert.equal(overUnicodeFocusReview.outcome.failureReason, "invalid_review_input");
+assert.equal(overUnicodeFocusReview.fetchCalls, 0,
+  "supplementary characters cannot bypass the excerpt's code-unit limit");
 const genericOnlyReview = await runWithResults([{
   ...focusedResult, training_focus_alignment: true, training_focus_matches: [], training_focus_skill_matches: [], training_focus_error_matches: [],
-}], [question("q-focus")], "material", undefined, undefined, undefined, "sv", undefined, focus);
+}], [question("q-focus")], focusMaterial, undefined, undefined, undefined, "sv", undefined, focus);
 assert.equal(genericOnlyReview.outcome.callOk, true);
 assert.equal(decideApproval(genericOnlyReview.outcome.perQuestion.get("q-focus")), false,
   "a generic error label without a specific concept/skill match cannot pass training review");
 const broadConceptOnlyReview = await runWithResults([{
   ...focusedResult, training_focus_alignment: true, training_focus_matches: ["focus-1"], training_focus_skill_matches: [], training_focus_error_matches: ["focus-1"],
-}], [question("q-focus")], "material", undefined, undefined, undefined, "sv", undefined, focus);
+}], [question("q-focus")], focusMaterial, undefined, undefined, undefined, "sv", undefined, focus);
 assert.equal(broadConceptOnlyReview.outcome.callOk, true);
 assert.deepEqual(broadConceptOnlyReview.outcome.perQuestion.get("q-focus").training_focus_matches, [],
   "a broad concept match cannot claim coverage of a focus with a more specific documented failed skill");
@@ -418,30 +852,30 @@ assert.equal(decideApproval(broadConceptOnlyReview.outcome.perQuestion.get("q-fo
   "a question that only overlaps the broad topic is withheld from mistake training");
 const skillWithoutErrorMatch = await runWithResults([{
   ...focusedResult, training_focus_matches: ["focus-1"], training_focus_skill_matches: ["focus-1"], training_focus_error_matches: [],
-}], [question("q-focus")], "material", undefined, undefined, undefined, "sv", undefined, focus);
+}], [question("q-focus")], focusMaterial, undefined, undefined, undefined, "sv", undefined, focus);
 assert.deepEqual(skillWithoutErrorMatch.outcome.perQuestion.get("q-focus").training_focus_matches, [],
   "a broad skill match without explicit alignment to the verified missed component cannot pass");
 assert.equal(decideApproval(skillWithoutErrorMatch.outcome.perQuestion.get("q-focus")), false);
 const explicitNoMatch = await runWithResults([{
   ...focusedResult, approved: false, training_focus_alignment: false, training_focus_matches: [], training_focus_skill_matches: [], training_focus_error_matches: [],
   required_changes: ["Öva en dokumenterad färdighet."],
-}], [question("q-focus")], "material", undefined, undefined, undefined, "sv", undefined, focus);
+}], [question("q-focus")], focusMaterial, undefined, undefined, undefined, "sv", undefined, focus);
 assert.equal(explicitNoMatch.outcome.callOk, true,
   "the structured reviewer can return a valid explicit no-match decision");
 assert.equal(decideApproval(explicitNoMatch.outcome.perQuestion.get("q-focus")), false,
   "an explicit no-match remains rejected by deterministic approval");
 const inventedFocusReview = await runWithResults([{
   ...focusedResult, training_focus_matches: ["focus-999"],
-}], [question("q-focus")], "material", undefined, undefined, undefined, "sv", undefined, focus);
+}], [question("q-focus")], focusMaterial, undefined, undefined, undefined, "sv", undefined, focus);
 assert.equal(inventedFocusReview.outcome.callOk, false, "an invented focus ID invalidates the independent review response");
 assert.equal(inventedFocusReview.outcome.failureReason, "invalid_training_focus_matches");
-const missingFocusVerdict = await runWithResults([(({ training_focus_alignment: _omitted, ...rest }) => rest)(focusedResult)], [question("q-focus")], "material", undefined, undefined, undefined, "sv", undefined, focus);
+const missingFocusVerdict = await runWithResults([(({ training_focus_alignment: _omitted, ...rest }) => rest)(focusedResult)], [question("q-focus")], focusMaterial, undefined, undefined, undefined, "sv", undefined, focus);
 assert.equal(missingFocusVerdict.outcome.callOk, false, "missing focus verdict fails the complete review closed");
 assert.equal(missingFocusVerdict.outcome.failureReason, "missing_training_focus_alignment");
-const missingSkillVerdict = await runWithResults([(({ training_focus_skill_matches: _omitted, ...rest }) => rest)(focusedResult)], [question("q-focus")], "material", undefined, undefined, undefined, "sv", undefined, focus);
+const missingSkillVerdict = await runWithResults([(({ training_focus_skill_matches: _omitted, ...rest }) => rest)(focusedResult)], [question("q-focus")], focusMaterial, undefined, undefined, undefined, "sv", undefined, focus);
 assert.equal(missingSkillVerdict.outcome.callOk, false, "missing specific-skill verdict fails the complete review closed");
 assert.equal(missingSkillVerdict.outcome.failureReason, "missing_training_focus_skill_matches");
-const missingErrorVerdict = await runWithResults([(({ training_focus_error_matches: _omitted, ...rest }) => rest)(focusedResult)], [question("q-focus")], "material", undefined, undefined, undefined, "sv", undefined, focus);
+const missingErrorVerdict = await runWithResults([(({ training_focus_error_matches: _omitted, ...rest }) => rest)(focusedResult)], [question("q-focus")], focusMaterial, undefined, undefined, undefined, "sv", undefined, focus);
 assert.equal(missingErrorVerdict.outcome.callOk, false, "missing specific-error verdict fails the complete review closed");
 assert.equal(missingErrorVerdict.outcome.failureReason, "missing_training_focus_error_matches");
 const sanitizedFocus = await runWithResults([focusedResult], [question("q-focus")], "material", undefined, undefined, undefined, "sv", undefined,

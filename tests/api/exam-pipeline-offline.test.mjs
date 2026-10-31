@@ -4,6 +4,7 @@ import { Readable } from "node:stream";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
+const Ajv = require("ajv");
 const generateExam = require("../../api/generate-exam.js");
 const gradeExam = require("../../api/grade.js");
 const assessment = require("../../api/_assessment.js");
@@ -100,12 +101,12 @@ for (const lang of ["sv", "en"]) {
   const repairedUserPrompt = repair.input.find((item) => item.role === "user").content;
   const repairInstruction = repair.input.filter((item) => item.role === "user").at(-1).content;
   assert.match(repairInstruction, lang === "sv"
-    ? /model_answer innehålla ENDAST hela, sammanhängande meningar kopierade exakt ur materialet/
-    : /model_answer must contain ONLY complete, contiguous sentences copied exactly from the material/,
+    ? /en eller flera hela, sammanhängande källmeningar kopierade exakt/
+    : /one or more complete contiguous source sentences copied exactly/,
   `${lang} repair repeats the extractive-answer gate explicitly`);
   assert.match(repairInstruction, lang === "sv"
-    ? /utan inledning, etikett, förklaring eller omskrivning före eller efter citatet/
-    : /with no introduction, label, explanation, or paraphrase before or after/,
+    ? /parafrasera inte och lägg inte till fakta/
+    : /do not paraphrase or add facts/,
   `${lang} repair forbids non-source text around an extractive answer`);
   assert.match(repairInstruction, lang === "sv"
     ? /Matematik får ha en korrekt härledd lösning/
@@ -144,6 +145,11 @@ assert.equal(generateExam.buildMockExamSchema(1).schema.properties.questions.ite
 const biologyPrompt = generateExam.buildExamPrompts({
   lang: "sv", level: "C", course: "Biologi 1", qType: "mc", numQuestions: 3,
   pastedText: "Fotosyntes sker i kloroplasterna. Växten använder koldioxid och vatten.", isMath: false,
+});
+const biologyShortPrompt = generateExam.buildExamPrompts({
+  lang: "sv", level: "A", course: "Biologi 1", qType: "short", numQuestions: 3,
+  pastedText: "Fotosyntesen sker i kloroplasterna. Växten använder ljus, vatten och koldioxid för att bilda glukos och syre. Cellandning frigör energi ur glukos.",
+  isMath: false, requireExtractiveAnswers: true,
 });
 const batchWithNoveltyContext = generateExam.buildExamPrompts({
   lang: "sv", level: "C", course: "Biologi 1", qType: "short", numQuestions: 2,
@@ -200,7 +206,7 @@ assert.equal((await generateExam.readJsonBody(internalRequestStream(), 128 * 102
   "bounded internal batches can transport valid maximum-length material plus comparison context");
 await assert.rejects(() => generateExam.readJsonBody(internalRequestStream(), 64 * 1024), { code: "BODY_TOO_LARGE" },
   "the ordinary 64 KiB request envelope still rejects oversized public-style bodies");
-assert.match(biologyPrompt.systemPrompt, /ORDAGRANT utdrag kopierat direkt från materialet, inte en parafras/i,
+assert.match(biologyPrompt.systemPrompt, /source_references ska vara ordagrant kopierad direkt från materialet, inte en parafras/i,
   "the generator must use exact source excerpts that survive the server's literal-reference check");
 assert.match(biologyPrompt.systemPrompt, /Varje distraktor måste vara ett begripligt och ämnesrelevant begrepp/i,
   "multiple-choice distractors must stay plausible and in the same subject category");
@@ -218,12 +224,94 @@ assert.match(biologyPrompt.systemPrompt, /självständig, tydligt avgränsad upp
   "first-pass short answers have one clear and bounded answer target");
 assert.match(biologyPrompt.systemPrompt, /Bedöm bara arbetssteg som frågan uttryckligen efterfrågar/i,
   "the short-answer rubric cannot silently score unrequested work");
-assert.match(biologyPrompt.systemPrompt, /faktabaserade kortsvar måste model_answer dessutom bestå.*ordagranna meningar ur materialet/i,
-  "the generator keeps factual science answer keys extractive");
-assert.match(biologyPrompt.systemPrompt, /model_answer innehålla ENDAST hela, sammanhängande meningar kopierade exakt ur materialet.*ingen inledning, etikett, förklaring eller omskrivning/i,
-  "the generator forbids prefixes and paraphrases that would fail exact source extraction");
+assert.match(biologyShortPrompt.systemPrompt, /det kortaste sammanhängande, ordagranna utdraget som fullt besvarar frågan och behåller alla nödvändiga villkor, negationer, enheter och orsakssamband/i,
+  "the science-specific answer span retains every necessary qualifier");
+assert.match(biologyShortPrompt.systemPrompt, /source_references ska visa hela den relevanta källmeningen eller de källmeningar.*går före önskemålet om korta utdrag/i,
+  "science source references retain full context despite the general short-reference preference");
+const historyPrompt = generateExam.buildExamPrompts({
+  lang: "sv", level: "C", course: "Historia 1b", qType: "short", numQuestions: 3,
+  pastedText: "Industrialiseringen förändrade samhället.", isMath: false,
+  requireExtractiveAnswers: false,
+});
+assert.match(historyPrompt.systemPrompt, /För faktabaserade kortsvar ska model_answer bestå av en eller flera hela, sammanhängande meningar kopierade exakt ur materialet/i,
+  "concise extractive answers remain scoped to the natural-science profile");
+assert.match(historyPrompt.systemPrompt, /source_references ska innehålla ett kort ordagrant utdrag på helst 5–12 ord/i,
+  "non-science source-reference guidance retains its existing concise form");
 assert.match(biologyPrompt.systemPrompt, /Matematik får fortsatt ha en korrekt härledd lösning/i,
   "the extractive instruction preserves derived mathematical answers");
+assert.match(biologyShortPrompt.userPrompt, /Exakta källmeningar som möjliga svarankare/i,
+  "natural-science short answers receive exact source sentences as candidate answer anchors");
+assert.match(biologyShortPrompt.userPrompt, /En mening får stödja olika, tydligt avgränsade svarsmål bara om varje fråga har sitt eget ordagranna svarutdrag/i,
+  "the same source sentence can support distinct answer targets only with separate exact answer spans");
+assert.doesNotMatch(biologyShortPrompt.userPrompt, /ännu oanvänt ankare/i,
+  "the prompt no longer imposes a one-question-per-source-sentence ceiling");
+assert.match(biologyShortPrompt.userPrompt, /\["Fotosyntesen sker i kloroplasterna\.","Växten använder ljus, vatten och koldioxid för att bilda glukos och syre\.","Cellandning frigör energi ur glukos\."\]/,
+  "answer anchors are literal complete sentences copied from the supplied synthetic material");
+assert.match(biologyShortPrompt.systemPrompt, /Fråga inte efter en orsak, slutsats, jämförelse eller förklaring som källan inte stöder/i,
+  "natural-science short-answer questions cannot demand unsupported inference beyond their exact answer source");
+assert.match(biologyShortPrompt.systemPrompt, /På A-nivå får du bara skapa en fråga om materialet både stöder det exakta svaret och det självständiga resonemang som nivån kräver/i,
+  "A-level science items require both an extractive answer and source-supported independent reasoning");
+assert.doesNotMatch(biologyPrompt.userPrompt, /Exakta källmeningar som möjliga svarankare/i,
+  "anchor payloads are omitted when the chosen format has no short-answer items");
+const distributedSource = Array.from({ length: 18 }, (_, index) =>
+  `Källfaktum ${index + 1} beskriver en separat biologisk process i materialet.`).join(" ");
+const distributedBiologyPrompt = generateExam.buildExamPrompts({
+  lang: "sv", level: "C", course: "Biologi 1", qType: "short", numQuestions: 3, examQuestionCount: 12,
+  pastedText: distributedSource, isMath: false, requireExtractiveAnswers: true,
+});
+const serializedAnchors = distributedBiologyPrompt.userPrompt.match(/Exakta källmeningar som möjliga svarankare[^:]*: (\[[^\n]*\])\./)?.[1];
+assert.ok(serializedAnchors, "distributed science material is represented by a bounded anchor list");
+const distributedAnchors = JSON.parse(serializedAnchors);
+assert.equal(distributedAnchors.length, 12, "anchor count follows the full exam target rather than a small internal batch");
+assert.equal(distributedAnchors[0], "Källfaktum 1 beskriver en separat biologisk process i materialet.");
+assert.equal(distributedAnchors.at(-1), "Källfaktum 18 beskriver en separat biologisk process i materialet.",
+  "bounded anchors retain source coverage through the end of longer material");
+const sentenceBoundaryPrompt = generateExam.buildExamPrompts({
+  lang: "sv", level: "C", course: "Biologi 1", qType: "short", numQuestions: 3,
+  pastedText: "Vattnets pH 7.0 är neutralt. Ett pH under 7.0 är surt. Se t.ex. ett tydligt exempel här.\n• En punktanteckning utan avslutande mening\nFotosyntesen sker i kloroplasterna.\nVattnets pH-värde används för att\nbeskriva surhetsgraden.",
+  isMath: false, requireExtractiveAnswers: true,
+});
+const boundaryAnchorsText = sentenceBoundaryPrompt.userPrompt.match(/Exakta källmeningar som möjliga svarankare[^:]*: (\[[^\n]*\])\./)?.[1];
+assert.ok(boundaryAnchorsText, "sentence-aware source anchors are produced for punctuation edge cases");
+const boundaryAnchors = JSON.parse(boundaryAnchorsText);
+assert.deepEqual(boundaryAnchors, [
+  "Vattnets pH 7.0 är neutralt.",
+  "Ett pH under 7.0 är surt.",
+  "Se t.ex. ett tydligt exempel här.",
+  "Fotosyntesen sker i kloroplasterna.",
+  "Vattnets pH-värde används för att\nbeskriva surhetsgraden.",
+], "sentence segmentation preserves decimals and abbreviations while excluding an incomplete bullet note");
+assert.ok(boundaryAnchors.every((anchor) => sentenceBoundaryPrompt.userPrompt.includes(anchor)),
+  "each emitted anchor remains an exact contiguous substring of the original source text");
+const biologyRepair = generateExam.buildRepairPayload({
+  model: "synthetic-model",
+  input: [{ role: "system", content: biologyShortPrompt.systemPrompt }, { role: "user", content: biologyShortPrompt.userPrompt }],
+  text: { format: generateExam.buildMockExamSchema(3) },
+}, {
+  lang: "sv", numQuestions: 3, candidateCount: 4, qType: "short", requireExtractiveAnswers: true,
+  questionCountOffset: biologyShortPrompt.questionCountOffset,
+});
+assert.match(biologyRepair.input.at(-1).content, /NATURVETENSKAPLIGA KORTSVAR:.*På A-nivå/i,
+  "science-specific source-answer requirements persist through repair attempts");
+assert.match(biologyRepair.input.at(-1).content, /kortaste exakta källutdrag.*utan att tappa nödvändiga villkor/i,
+  "science repair uses concise exact answers while retaining meaning-critical qualifiers");
+assert.match(biologyRepair.input.at(-1).content, /utan att tappa nödvändiga villkor, negationer, enheter eller orsakssamband/i,
+  "science repair preserves qualifiers and conditions in short answer spans");
+assert.match(biologyRepair.input.at(-1).content, /source_references ska visa hela relevanta källmeningar/i,
+  "science repair keeps full source context in references");
+const historyRepair = generateExam.buildRepairPayload({
+  input: [{ role: "user", content: "Antal frågor: 3. Material: Exempel." }],
+  text: { format: generateExam.buildMockExamSchema(3) },
+}, {
+  lang: "sv", numQuestions: 3, existingQuestions: [], candidateCount: 3,
+  requireExtractiveAnswers: false, qType: "short",
+});
+assert.match(historyRepair.input.at(-1).content, /en eller flera hela, sammanhängande källmeningar kopierade exakt/i,
+  "non-science repair retains complete-sentence extraction");
+assert.doesNotMatch(historyRepair.input.at(-1).content, /kortaste.{0,100}(?:utdrag|excerpt)/i,
+  "non-science repair does not inherit the science-only shortest-answer rule");
+assert.match(biologyRepair.input.at(-1).content, /En källmening får stödja flera reparationsfrågor bara om varje uppgift har ett eget, tydligt avgränsat svarsmål med ett eget exakt svarutdrag/i,
+  "repair batches may reuse a source sentence only for distinct exact answer targets");
 const mathPrompt = generateExam.buildExamPrompts({
   lang: "sv", level: "A", course: "Matematik 2b", qType: "short", numQuestions: 3,
   pastedText: "En andragradsfunktion skrivs f(x)=ax²+bx+c. Exempel: x²-4x+3 har nollställena 1 och 3.", isMath: true,
@@ -276,8 +364,8 @@ assert.match(englishPrompt.systemPrompt, /Score only work explicitly requested b
   "English scoring criteria cannot silently require unrequested work");
 assert.match(englishPrompt.systemPrompt, /each task must be independently solvable from the material and question text/i,
   "math tasks retain the independent solvability requirement without extractive-only answers");
-assert.match(englishPrompt.systemPrompt, /model_answer must contain ONLY complete, contiguous sentences copied exactly from the material.*no introduction, label, explanation, or paraphrase/i,
-  "English factual short answers cannot add text around a source quotation");
+assert.match(englishPrompt.systemPrompt, /model_answer must consist of one or more complete, contiguous sentences copied exactly from the material/i,
+  "English non-science factual short answers retain complete-sentence grounding");
 assert.match(englishPrompt.systemPrompt, /the question must explicitly ask students to show or explain their method if method points are awarded/i,
   "English math prompts align method points with requested student work");
 assert.match(englishPrompt.systemPrompt, /the rubric scores only that answer/i,
@@ -326,7 +414,7 @@ assert.match(repairPayload.input.at(-1).content, /exakt 4 nya frågekandidater.*
 assert.match(repairPayload.input.at(-1).content, /konkreta uppgifter från materialet/i);
 assert.match(repairPayload.input.at(-1).content, /självständig, tydligt avgränsad uppgift.*klart svarsmål/i);
 assert.match(repairPayload.input.at(-1).content, /alla värden och villkor.*behövs för lösningen/i);
-assert.match(repairPayload.input.at(-1).content, /ORDAGRANT utdrag från materialet.*inte en parafras/i);
+assert.match(repairPayload.input.at(-1).content, /hela, sammanhängande källmeningar kopierade exakt; parafrasera inte/i);
 assert.match(repairPayload.input.at(-1).content, /rimliga, relevanta distraktorer.*samma kategori/i);
 assert.match(repairPayload.input.at(-1).content, /Behåll samma strikta kvalitetskrav/i);
 const categorizedRepairPayload = generateExam.buildRepairPayload({
@@ -508,6 +596,39 @@ const questions = [
   scoring_rubric: { parts: [], full_score_requirements: "", partial_credit_notes: "" },
 }));
 
+const schemaMc = { ...questions[0], graph_spec: null };
+const schemaShort = {
+  ...schemaMc, type: "short", options: [], correct_index: -1,
+  scoring_rubric: { parts: [{ description: "Ange summan", points: 1 }],
+    full_score_requirements: "Ange 5.", partial_credit_notes: "" },
+};
+for (const requested of [3, 6, 12]) {
+  const validateShortSchema = new Ajv({ strict: true }).compile(generateExam.buildMockExamSchema(requested, "short").schema);
+  const data = { title: "Syntetiskt schemaexempel", level: "C",
+    questions: Array.from({ length: requested }, (_, index) => ({ ...schemaShort, id: `schema-${index}` })) };
+  assert.equal(validateShortSchema(data), true, JSON.stringify(validateShortSchema.errors));
+  for (const parts of [[], [{ description: "", points: 1 }], [{ description: "   ", points: 1 }],
+    [{ description: "Ange summan", points: 0 }], [{ description: "Ange summan", points: -1 }]]) {
+    const malformed = structuredClone(data);
+    malformed.questions[0].scoring_rubric.parts = parts;
+    assert.equal(validateShortSchema(malformed), false,
+      `${requested}: generation schema rejects empty, blank or nonpositive short-answer scoring parts`);
+  }
+  const wrongType = structuredClone(data);
+  wrongType.questions[0] = schemaMc;
+  assert.equal(validateShortSchema(wrongType), false, "a short-only request cannot emit an MC candidate");
+}
+const validateMixedSchema = new Ajv({ strict: true }).compile(generateExam.buildMockExamSchema(3, "mix").schema);
+const mixedSchemaData = { title: "Syntetiskt blandat schema", level: "C", questions: [schemaMc, schemaShort, schemaMc] };
+assert.equal(validateMixedSchema(mixedSchemaData), true, JSON.stringify(validateMixedSchema.errors));
+const emptyMixedRubric = structuredClone(mixedSchemaData);
+emptyMixedRubric.questions[1].scoring_rubric.parts = [];
+assert.equal(validateMixedSchema(emptyMixedRubric), false,
+  "mixed generation cannot use the MC empty-rubric exception for a short-answer question");
+assert.deepEqual(generateExam.buildMockExamSchema(3, "mc").schema.properties.questions.items.properties.type.enum, ["mc"]);
+assert.deepEqual(generateExam.buildMockExamSchema(1).schema.properties.questions.items.properties.type.enum, ["mc", "short", "graph"],
+  "default schema inspection and graph callers keep the previous schema");
+
 const underfilledNormalization = generateExam.normalizeGeneratedExam({ questions: structuredClone(questions.slice(0, 2)) }, {
   qType: "mc", graphMode: null, pointTable: null, isMath: true, pastedText: "", lang: "sv", numQuestions: 3,
 });
@@ -555,6 +676,37 @@ const unsupportedAnswerGate = assessment.gateExam({ questions: [{
 assert.equal(unsupportedAnswerGate.questions.length, 0,
   "a source quote cannot license an unsupported addition to the full-score answer");
 assert.deepEqual(unsupportedAnswerGate.dropped[0].issues, ["source_answer_not_extractable"]);
+for (const lang of ["sv", "en"]) {
+  const source = "Vid cellandning bryts glukos ned. Koldioxid och vatten bildas.";
+  const base = generateExam.buildExamPrompts({
+    lang, level: "C", course: "Biologi 1", qType: "short", numQuestions: 3,
+    pastedText: source, isMath: false, requireExtractiveAnswers: true,
+  });
+  const payload = {
+    model: "synthetic", input: [{ role: "system", content: base.systemPrompt }, { role: "user", content: base.userPrompt }],
+    text: { format: generateExam.buildMockExamSchema(3) },
+  };
+  const repaired = generateExam.buildRepairPayload(payload, {
+    lang, numQuestions: 3, candidateCount: 4, qType: "short", requireExtractiveAnswers: true,
+    questionCountOffset: base.questionCountOffset,
+    structuralIssueCounts: {
+      source_answer_not_extractable: 999, source_reference_missing: 2,
+      private_candidate_text: 1, source_references_missing: 1, duplicate_question: 4,
+    },
+  });
+  const guidance = repaired.input.at(-1).content;
+  assert.match(guidance, /"source_answer_not_extractable":20/);
+  assert.match(guidance, /"source_reference_missing":2/);
+  assert.doesNotMatch(guidance, /private_candidate_text|source_references_missing|duplicate_question/);
+  assert.match(guidance, lang === "sv"
+    ? /Välj det exakta svarutdraget innan du skriver uppgiften/
+    : /Select the exact answer excerpt before writing the task/);
+  assert.match(guidance, lang === "sv"
+    ? /Inget användbart källutdrag återstod/
+    : /No usable source excerpt remained/);
+  assert.equal(repaired.input[0].content, payload.input[0].content);
+  assert.ok(repaired.input[1].content.endsWith(source), "structural feedback preserves the exact source material");
+}
 const contradictorySymbolGate = assessment.gateExam({ questions: [{
   ...extractiveAnswer, model_answer: "pH > 7 är surt.",
 }] }, {
@@ -969,7 +1121,9 @@ let verifierLanguageMismatchId = null;
 let verifierRejectComparisonDuplicate = false;
 let solverRejectQuestionId = null;
 let solverRejectNonsenseOption = true;
+let solverRejectOptionText = null;
 let solverAnswerIndexOverrides = new Map();
+let solverSourceCheckOverrides = new Map();
 let regenerationQuestions = null;
 let regenerationQuestionBatches = null;
 let throwOnRepair = false;
@@ -1209,6 +1363,17 @@ globalThis.fetch = async (input, init = {}) => {
       const questionPayload = userContent.slice(userContent.indexOf(marker) + marker.length);
       const requestedQuestions = JSON.parse(questionPayload);
       solverInputs.push(requestedQuestions);
+      const units = JSON.parse(userContent.split("\n\nKällutdrag:\n")[1].split(marker)[0]);
+      const sourceOverride = (id) => {
+        const override = solverSourceCheckOverrides.get(id);
+        if (!override) return null;
+        const { evidence_quotes, ...rest } = override;
+        return { ...rest, evidence_source_ids: evidence_quotes.map(quote => {
+          const unit = units.find(unit => unit.text.includes(quote));
+          assert.ok(unit, "synthetic evidence must exist in the actual request catalogue");
+          return unit.id;
+        }) };
+      };
       if (solverThrowsForRetry && requestedQuestions.some((question) => question.id.startsWith("retry-"))) {
         throw new Error("synthetic retry solver timeout");
       }
@@ -1225,8 +1390,14 @@ globalThis.fetch = async (input, init = {}) => {
           ? (expectedIndex + 1) % q.options.length
           : expectedIndex;
         return {
-        id: q.id, option_verdicts: q.options.map((_, i) => i === solverIndex),
-        option_plausibility: q.options.map((option) => !(solverRejectNonsenseOption && option === "Kesäkten")),
+        id: q.id,
+        source_check: sourceOverride(q.id) || {
+          premise_supported: true, independent_answer: q.options[solverIndex] || "No single answer",
+          basis: "derived", evidence_source_ids: [], option_matches: q.options.map((_, i) => i === solverIndex),
+        },
+        option_verdicts: q.options.map((_, i) => i === solverIndex),
+        option_plausibility: q.options.map((option) =>
+          !((solverRejectNonsenseOption && option === "Kesäkten") || option === solverRejectOptionText)),
         index: solverIndex,
         confidence: 1, reason: "Syntetiskt kontrollsvar.",
         };
@@ -1544,6 +1715,95 @@ try {
   assert.ok(verifierInputs.at(-1).source_material.includes("Fotosyntes sker i kloroplasterna"),
     "the independent reviewer receives the synthetic biology source material");
 
+  const respirationQuote = "Cellandningen gör energi i glukos tillgänglig i form av ATP.";
+  const relationshipMaterial = `${biologyMaterial} ${respirationQuote}`;
+  const reversedRelationship = {
+    ...biologyQuestions[2], id: "respiration-reversed",
+    question: "Vilket ämne används av celler för att lagra energi, genererat från cellandningen?",
+    options: ["Glukos", "Syre", "Koldioxid"], correct_index: 0,
+    model_answer: "Glukos används av celler för att lagra energi, genererat från cellandningen.",
+    concept_tag: "ATP", learning_objective: "Förklara cellandningens syfte",
+    source_references: [respirationQuote],
+  };
+  activeQuestions = [...biologyQuestions.slice(0, 2), reversedRelationship];
+  regenerationQuestions = [{ ...biologyQuestions[2], id: "relationship-repaired-output" }];
+  solverSourceCheckOverrides.set(reversedRelationship.id, {
+    premise_supported: true, independent_answer: "ATP", basis: "source_fact",
+    evidence_quotes: [respirationQuote], option_matches: [false, false, false],
+  });
+  calls.length = 0;
+  const relationRepaired = await invoke(generateExam, {
+    lang: "sv", level: "C", course: biologyCourse, pastedText: relationshipMaterial, qType: "mc", numQuestions: 3,
+  });
+  assert.equal(relationRepaired.status, 200, JSON.stringify(relationRepaired.body));
+  assert.equal(relationRepaired.body.exam.questions.length, 3);
+  assert.equal(relationRepaired.body.exam.questions.some((question) => question.id === reversedRelationship.id), false,
+    "an agreeing old option verdict and reviewer cannot issue a key contradicted by the independent answer audit");
+  assert.ok(relationRepaired.body.exam.questions.some((question) => question.id === "relationship-repaired-output"),
+    "the existing bounded repair replaces the rejected relationship question");
+  const relationRepairCall = calls.find((call) => call.body?.text?.format?.name === "mock_exam_schema"
+    && call.body.input.at(-1).content.includes("KVALITETSREPARATION"));
+  assert.match(relationRepairCall.body.input.at(-1).content, /solver_no_single_answer/,
+    "the same safe failure category reaches repair without a database contract change");
+  const relationSolverCall = calls.find((call) => call.body?.text?.format?.name === "exam_solver_schema");
+  const relationSolverItems = JSON.parse(relationSolverCall.body.input[1].content.split("Frågor:\n")[1]);
+  assert.ok(relationSolverItems.every((question) => !Object.hasOwn(question, "correct_index") && !Object.hasOwn(question, "model_answer")),
+    "the answer audit still receives no generator key or exemplar");
+  solverSourceCheckOverrides.clear();
+  regenerationQuestions = null;
+  activeQuestions = biologyQuestions;
+
+  const extractionMaterial = "Cellmembranet reglerar ämnestransport. Mitokondrierna gör energi användbar. Ribosomer bygger proteiner.";
+  const extractionQuestions = [
+    ["Vad reglerar cellmembranet?", "ämnestransport", "Vilken transport cellmembranet reglerar"],
+    ["Vad gör mitokondrierna med energin?", "gör energi användbar", "Mitokondriernas roll för energin"],
+    ["Vad bygger ribosomer?", "proteiner", "Vad ribosomer bygger"],
+  ].map(([question, answer, target], index) => ({
+    ...questions[index], id: `extract-valid-${index}`, type: "short", question,
+    options: [], correct_index: -1, model_answer: answer, points: 1,
+    concept_tag: ["Cellmembran", "Mitokondrier", "Ribosomer"][index],
+    learning_objective: target, rubric: `Ange ${answer}.`, accepted_answers: [],
+    scoring_rubric: { parts: [{ description: `Ange ${answer}.`, points: 1 }],
+      full_score_requirements: `Ange ${answer}.`, partial_credit_notes: "" },
+    source_references: [extractionMaterial],
+  }));
+  for (const invalidCount of [3, 1]) {
+    activeQuestions = extractionQuestions.map((question, index) => index < invalidCount
+      ? { ...question, id: `extract-invalid-${index}`, model_answer: "Omskrivet svar som saknas i materialet." }
+      : question);
+    regenerationQuestions = extractionQuestions;
+    calls.length = 0;
+    const reviewStart = verifierInputs.length;
+    const recovered = await invoke(generateExam, {
+      lang: "sv", level: "C", course: biologyCourse, pastedText: extractionMaterial, qType: "short", numQuestions: 3,
+    });
+    assert.equal(recovered.status, 200, JSON.stringify(recovered.body));
+    assert.equal(recovered.body.exam.questions.length, 3);
+    const repairCall = calls.find((call) => call.url === "https://api.openai.com/v1/responses"
+      && call.body.input?.at(-1)?.content?.includes("KVALITETSREPARATION"));
+    assert.ok(repairCall, `${invalidCount} structural failures trigger exactly one bounded repair`);
+    assert.match(repairCall.body.input.at(-1).content,
+      new RegExp(`"source_answer_not_extractable":${invalidCount}`));
+    const generationCalls = calls.filter((call) => call.url === "https://api.openai.com/v1/responses"
+      && call.body.text?.format?.name === "mock_exam_schema");
+    assert.ok(generationCalls.length >= 2);
+    assert.ok(generationCalls.every((call) => {
+      const item = call.body.text.format.schema.properties.questions.items;
+      return item.properties.type.enum.length === 1 && item.properties.type.enum[0] === "short"
+        && item.properties.scoring_rubric.properties.parts.minItems === 1;
+    }), "initial and repair calls both emit the selected type's nonempty-rubric contract");
+    assert.ok(repairCall.body.input[1].content.endsWith(extractionMaterial));
+    assert.ok(verifierInputs.slice(reviewStart).every((review) =>
+      review.questions.every((question) => !question.id.startsWith("extract-invalid-"))),
+    "non-extractive candidates stay rejected before the independent reviewer");
+    assert.ok(recovered.body.exam.questions.every((question) => !question.id.startsWith("extract-invalid-")),
+      "structural feedback never restores rejected candidates just to reach the requested count");
+    assert.equal(calls.filter((call) => call.url === "https://api.openai.com/v1/responses"
+      && call.body.input?.at(-1)?.content?.includes("KVALITETSREPARATION")).length, 1);
+  }
+  regenerationQuestions = null;
+  activeQuestions = biologyQuestions;
+
   activeQuestions = biologyQuestions.map((question) => question.id === "biology-2"
     ? { ...question, source_references: ["Parafras som inte finns ordagrant i materialet"] }
     : question);
@@ -1617,11 +1877,16 @@ try {
     question.id === "biology-repair-1" && question.options.includes("Kloroplasterna")),
   "a source-supported repair candidate can replace the deterministically dropped outlier");
   verifierRejectOptionId = null;
-  solverRejectNonsenseOption = true;
+  solverRejectNonsenseOption = false;
+  solverRejectOptionText = "en blå resväska";
   regenerationQuestions = null;
 
-  activeQuestions = malformedBiology;
+  const solverMalformedBiology = biologyQuestions.map((question) => question.id === "biology-1"
+    ? { ...question, options: ["I cellkärnan", "I kloroplasterna", "en blå resväska"], correct_index: 1, model_answer: "I kloroplasterna" }
+    : question);
+  activeQuestions = solverMalformedBiology;
   regenerationQuestions = repairedBiology;
+  const verifierInputCountBeforeSolverRejection = verifierInputs.length;
   const solverInputCountBeforeSolverRejection = solverInputs.length;
   calls.length = 0;
   const solverRejectedNonsenseExam = await invoke(generateExam, {
@@ -1629,13 +1894,24 @@ try {
   });
   assert.equal(solverRejectedNonsenseExam.status, 200, JSON.stringify(solverRejectedNonsenseExam.body));
   assert.equal(solverRejectedNonsenseExam.body.exam.questions.length, 3);
+  assert.ok(verifierInputs.slice(verifierInputCountBeforeSolverRejection)
+    .some((review) => review.questions.some((question) => question.id === "biology-1"
+      && question.options.includes("en blå resväska"))),
+  "the candidate reaches the reviewer before the solver-only rejection");
   assert.equal(solverInputs.slice(solverInputCountBeforeSolverRejection)
-    .some((batch) => batch.some((question) => question.id === "biology-1" && question.options.includes("Kesäkten"))), false,
-  "an unsupported outlier does not reach the blind solver in the subsequent request either");
-  assert.equal(solverRejectedNonsenseExam.body.exam.questions.some((question) => question.options.includes("Kesäkten")), false,
+    .some((batch) => batch.some((question) => question.id === "biology-1" && question.options.includes("en blå resväska"))), true,
+  "a reviewer-approved candidate reaches the blind solver and is rejected for its implausible option");
+  assert.equal(solverRejectedNonsenseExam.body.exam.questions.some((question) => question.options.includes("en blå resväska")), false,
     "the solver's option-plausibility rejection triggers bounded replacement when the verifier does not flag the item");
   assert.ok(solverRejectedNonsenseExam.body.exam.questions.some((question) => question.id === "biology-repair-1"),
     "the solver-rejected item is replaced by an independently checked candidate");
+  assert.ok(verifierInputs.slice(verifierInputCountBeforeSolverRejection)
+    .some((review) => review.questions.some((question) => question.id === "biology-repair-1")),
+  "the replacement candidate is independently reviewed");
+  assert.ok(solverInputs.slice(solverInputCountBeforeSolverRejection)
+    .some((batch) => batch.some((question) => question.id === "biology-repair-1")),
+  "the replacement candidate also reaches the independent solver");
+  solverRejectOptionText = null;
   regenerationQuestions = null;
 
   const allWordNonsenseBiology = biologyQuestions.map((question) => question.id === "biology-1"
