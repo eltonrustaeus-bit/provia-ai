@@ -2369,6 +2369,7 @@ module.exports = async function handler(req, res, internalContext = null) {
           requestId: pipelineJobId ? `exam-pipeline:${pipelineJobId}` : quotaRequestId,
           stage: "initial_solver",
           failure: s1.failureReason || "verification_failed",
+          ...(s1.contractFailure ? { contractFailure: s1.contractFailure } : {}),
           solverLatencyMs: s1.latencyMs,
           generationMs: gen.latencyMs,
           elapsedMs: budget.elapsed(),
@@ -2581,6 +2582,7 @@ module.exports = async function handler(req, res, internalContext = null) {
                       requestId: pipelineJobId ? `exam-pipeline:${pipelineJobId}` : quotaRequestId,
                       stage: "repair_solver",
                       failure: s2.failureReason || "verification_failed",
+                      ...(s2.contractFailure ? { contractFailure: s2.contractFailure } : {}),
                       solverLatencyMs: s2.latencyMs,
                       elapsedMs: budget.elapsed(),
                     }));

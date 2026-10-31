@@ -99,6 +99,61 @@ try {
     assert.equal(outcome.model, "measured-solver-model", name);
     assert.deepEqual(outcome.usage, { input_tokens: 44, output_tokens: 9 }, name);
   }
+  // Exercise the real provider parser; diagnostics must remain content-free
+  // and the entire batch stays withheld, even if another result was valid.
+  const source = "ATP driver aktiv transport. DNA finns i cellkärnan.";
+  const sourceCheck = {
+    premise_supported: true, independent_answer: "ATP", basis: "source_fact",
+    evidence_quotes: ["ATP driver aktiv transport."], option_matches: [false, true, false],
+  };
+  const diagnostics = [
+    ["result_count", [valid[0]]],
+    ["result_id", [valid[0], result("private-unknown-id")]],
+    ["duplicate_result_id", [valid[0], valid[0]]],
+    ["source_check_shape", [result("q1", {source_check: null}), valid[1]]],
+    ["option_matches_shape", [result("q1", {source_check: {...sourceCheck, option_matches: []}}), valid[1]]],
+    ["source_quotes_shape", [result("q1", {source_check: {...sourceCheck, evidence_quotes: [null]}}), valid[1]]],
+    ["source_quote_missing", [result("q1", {source_check: {...sourceCheck, evidence_quotes: []}}), valid[1]]],
+    ["source_quote_duplicate", [result("q1", {source_check: {...sourceCheck,
+      evidence_quotes: ["ATP driver aktiv transport.", "atp  driver aktiv transport."]}}), valid[1]]],
+    ["source_quote_not_in_material_or_boundary", [result("q1", {source_check: {...sourceCheck,
+      evidence_quotes: ["private invented quote"]}}), valid[1]]],
+    ["source_quote_not_in_material_or_boundary", [result("q1", {source_check: {...sourceCheck,
+      evidence_quotes: ["ransport"]}}), valid[1]]],
+    ["option_verdicts_shape", [result("q1", {option_verdicts: []}), valid[1]]],
+    ["option_plausibility_shape", [result("q1", {option_plausibility: []}), valid[1]]],
+    ["index_range", [result("q1", {index: 3}), valid[1]]],
+    ["confidence_range", [result("q1", {confidence: 2}), valid[1]]],
+    ["reason_shape", [result("q1", {reason: null}), valid[1]]],
+  ];
+  for (const [expectedIssue, results] of diagnostics) {
+    globalThis.fetch = async () => new Response(JSON.stringify({output_text: JSON.stringify({results})}));
+    const outcome = await solver.solveQuestions(questions, {
+      apiKey: "private-test-key", model: "test-model", lang: "sv", material: source,
+    });
+    assert.equal(outcome.callOk, false, expectedIssue);
+    assert.equal(outcome.failureReason, "invalid_contract", expectedIssue);
+    assert.equal(outcome.contractFailure, expectedIssue);
+    assert.equal(outcome.perQuestion.size, 0, "no partial verdict batch is accepted");
+    for (const secret of [source, "private-unknown-id", "private invented quote", "private-test-key"]) {
+      assert.equal(JSON.stringify(outcome).includes(secret), false, expectedIssue);
+    }
+  }
+  globalThis.fetch = async () => new Response(JSON.stringify({output_text: JSON.stringify({
+    results: [result("q1", {source_check: sourceCheck}), valid[1]],
+  })}));
+  const supported = await solver.solveQuestions(questions, {
+    apiKey: "test-only", model: "test-model", lang: "sv", material: source,
+  });
+  assert.equal(supported.callOk, true, "distinct literal evidence remains valid");
+  assert.equal(supported.perQuestion.size, 2);
+  const duplicateRequest = await solver.solveQuestions([questions[0], questions[0]], {
+    apiKey: "test-only", model: "test-model", lang: "sv", material: source,
+  });
+  assert.equal(duplicateRequest.callOk, false);
+  assert.equal(duplicateRequest.contractFailure, "request_id");
+  assert.equal(duplicateRequest.perQuestion.size, 0);
+
   const sensitiveMarker = "synthetic-question-or-secret-must-not-appear";
   for (const [name, respond, expectedReason] of [
     ["http failure", async () => new Response(sensitiveMarker, { status: 429 }), "http_error"],

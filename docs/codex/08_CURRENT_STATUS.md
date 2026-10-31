@@ -1,5 +1,49 @@
 # 08 Current Status
 
+## One authorized staging journey; solver contract follow-up — 2026-10-31
+
+- Reused the same authenticated stable Preview tab. “Återställ resultatet”
+  recovered the existing verified 16/18 result without changing spend or
+  reservations; “Nytt ämne” then released only its local recovery copy. No
+  account, extra tab or replacement exam was needed. Independent read-only
+  review confirmed completed replay returns before provider/quota work.
+- Applied the approved +0.50 USD only to the existing staging budget row and
+  branch-scoped `EXGEN_PILOT_BUDGET_CAP_USD`, both now **3.879071**. Redeployed
+  existing Preview `dpl_67pV38YWcXDjDGcmLkc7WmhA6wNW` at exact `6debf6b`;
+  READY, correct feature branch and staging URL verified, same alias/session.
+- Exactly one synthetic Biologi 1 C/mixed 12-question flow used
+  `tests/fixtures/numbered-biology-notes.txt`. Job
+  `9ff96bd1-ac52-424a-9552-a7d7748d11e3` stopped at **2/12** with
+  `STAGE_RETRY_LIMIT`. UI explicitly says no exam was delivered; hosted state
+  confirms zero active exams and scrubbed candidate/source payload. No P.E.R
+  or grading call followed, because no acceptable exam was issued.
+- Sanitized logs now distinguish the observed failure: initial/repair blind
+  solver responses repeatedly had **invalid_contract**, not an established
+  timeout. Other batches failed source support and distractor-quality checks;
+  five short-answer candidates also failed `source_answer_not_extractable`.
+  The exact invalid solver field was not captured, so its cause is still
+  unknown. Type alternation enabled two accepted short answers but did not
+  make this a usable exam.
+- Spend rose from 3.064882 to **3.114597 USD** (delta **0.049715**);
+  reservations stayed **0.263628**, available **0.500846 USD**. The one-test
+  authorization is consumed; do not start a replacement automatically.
+- Follow-up code makes exact IDs, unique whole-word literal quotes and one
+  ordered match per option explicit in both solver prompts. Fixed parser
+  categories identify the failing contract component without exposing source,
+  questions, IDs, responses or credentials. The parser still rejects the whole
+  batch on any invalid item; source provenance, independent solving and all
+  approval thresholds are unchanged. These changes do not establish that
+  model-generated content now passes.
+- Offline verification: `node tests/api/solver-contract.test.mjs` passed,
+  including 15 malformed-contract scenarios, zero partial acceptance and safe
+  diagnostic output. HTTP/PGlite pipeline and source-reference group **8/8**;
+  source-relationship/assessment group **6/6** (including the assessment
+  script). HTTP cases exercise initial and repair failures, exact log fields
+  and zero issuance. Syntax and whitespace checks passed. Independent final
+  review found no blockers; its diagnostic coverage note was also addressed.
+  Main/Production and PR #125 release remain held for actual
+  content acceptance; no new schema, model, secret, role or quota change.
+
 ## Local reliability fixes — awaiting Preview acceptance — 2026-10-31
 
 - Mixed 12-question jobs now alternate the requested question type on tied

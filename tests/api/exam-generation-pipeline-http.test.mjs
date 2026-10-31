@@ -1699,13 +1699,16 @@ test("separate authenticated advance requests persist full 3/6/12 runs, retry sa
 
     const diagnosticJobId = testUuid(9921);
     const diagnosticEvents = [];
+    let diagnosticContractFailure = false;
     const diagnosticFetch = globalThis.fetch;
     const diagnosticInfo = console.info;
     globalThis.fetch = async (input, init = {}) => {
       if (String(input).startsWith("https://api.openai.com/") &&
           JSON.parse(init.body || "{}").text?.format?.name === "exam_solver_schema") {
-        return new Response(JSON.stringify({ error: "synthetic private provider failure" }), {
-          status: 503, headers: { "Content-Type": "application/json" },
+        return new Response(JSON.stringify(diagnosticContractFailure
+          ? { output_text: "null" }
+          : { error: "synthetic private provider failure" }), {
+          status: diagnosticContractFailure ? 200 : 503, headers: { "Content-Type": "application/json" },
         });
       }
       return diagnosticFetch(input, init);
@@ -1717,31 +1720,37 @@ test("separate authenticated advance requests persist full 3/6/12 runs, retry sa
       } catch {}
     };
     try {
-      const unavailable = await originalGenerateBatch({
-        userId, pipelineJobId: diagnosticJobId, deadlineAt: Date.now() + 44_000,
-        payload: { lang: "sv", level: "C", course: "Aritmetik", qType: "mc", numQuestions: 3,
-          pastedText: source, idempotencyKey: testUuid(9922) },
-      });
-      assert.equal(unavailable.status, 503, JSON.stringify(unavailable.body));
-      assert.equal(unavailable.body.error, "independent_check_unavailable");
-      assert.deepEqual(diagnosticEvents.map(event => event.stage).sort(), ["initial_solver", "repair_solver"]);
-      for (const event of diagnosticEvents) {
-        assert.equal(event.requestId, `exam-pipeline:${diagnosticJobId}`,
-          "both unavailable checks correlate with the validated parent job, not the batch quota key");
-        assert.equal(event.failure, "http_error");
-        assert.ok(Number.isFinite(event.solverLatencyMs));
-        assert.deepEqual(Object.keys(event).sort(), [
-          "elapsedMs", "event", "failure", ...(event.stage === "initial_solver" ? ["generationMs"] : []),
-          "requestId", "solverLatencyMs", "stage",
-        ].sort());
+      for (const contractFailure of [false, true]) {
+        diagnosticContractFailure = contractFailure;
+        diagnosticEvents.length = 0;
+        const unavailable = await originalGenerateBatch({
+          userId, pipelineJobId: diagnosticJobId, deadlineAt: Date.now() + 44_000,
+          payload: { lang: "sv", level: "C", course: "Aritmetik", qType: "mc", numQuestions: 3,
+            pastedText: source, idempotencyKey: testUuid(9922) },
+        });
+        assert.equal(unavailable.status, 503, JSON.stringify(unavailable.body));
+        assert.equal(unavailable.body.error, "independent_check_unavailable");
+        assert.deepEqual(diagnosticEvents.map(event => event.stage).sort(), ["initial_solver", "repair_solver"]);
+        for (const event of diagnosticEvents) {
+          assert.equal(event.requestId, `exam-pipeline:${diagnosticJobId}`,
+            "both unavailable checks correlate with the validated parent job, not the batch quota key");
+          assert.equal(event.failure, contractFailure ? "invalid_contract" : "http_error");
+          if (contractFailure) assert.equal(event.contractFailure, "result_count");
+          assert.ok(Number.isFinite(event.solverLatencyMs));
+          assert.deepEqual(Object.keys(event).sort(), [
+            ...(contractFailure ? ["contractFailure"] : []),
+            "elapsedMs", "event", "failure", ...(event.stage === "initial_solver" ? ["generationMs"] : []),
+            "requestId", "solverLatencyMs", "stage",
+          ].sort());
+        }
+        const diagnostics = JSON.stringify(diagnosticEvents);
+        for (const privateValue of [source, "synthetic private provider failure", "synthetic-http-openai-key"]) {
+          assert.equal(diagnostics.includes(privateValue), false);
+        }
+        assert.equal((await db.query(
+          "select count(*)::int as n from public.exam_issuances where user_id=$1", [userId],
+        )).rows[0].n, widenedIssuanceBaseline + 1, "failed checks never issue a diagnostic test exam");
       }
-      const diagnostics = JSON.stringify(diagnosticEvents);
-      for (const privateValue of [source, "synthetic private provider failure", "synthetic-http-openai-key"]) {
-        assert.equal(diagnostics.includes(privateValue), false);
-      }
-      assert.equal((await db.query(
-        "select count(*)::int as n from public.exam_issuances where user_id=$1", [userId],
-      )).rows[0].n, widenedIssuanceBaseline + 1, "failed checks never issue a diagnostic test exam");
     } finally {
       globalThis.fetch = diagnosticFetch;
       console.info = diagnosticInfo;
