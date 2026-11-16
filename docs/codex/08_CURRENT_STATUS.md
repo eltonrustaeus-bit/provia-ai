@@ -1,5 +1,38 @@
 # 08 Current Status
 
+## A-nivåinstruktion och verifierardiagnostik — 2026-11-16
+
+- Senaste stagingförsöket med syntetiskt Biologi 1-material slutade säkert på
+  0/12. Granskarna avvisade kandidater på källstöd, nivå och poängsättning;
+  ett separat HTTP 200-svar saknade användbar granskningstext. Inget prov
+  utfärdades. Det exakta underlaget och kandidattexterna är inte bevarade, så
+  materialets faktiska kapacitet och en enskild rotorsak kan inte fastställas.
+- En oberoende källgranskning fann att A-nivågrinden kräver minst två skilda
+  källfakta och att matrisen belönar ett motiverat resonemang, medan den
+  generella generatorinstruktionen tidigare bara bad om analys/värdering med
+  materialstöd. Generatorns svenska och engelska A-instruktioner anger nu
+  samma förarbete, koppling mellan fakta och poängsättning som granskaren.
+  De säger uttryckligen att fakta inte får hittas på och att nivån inte får
+  sänkas för att fylla antalet. Inga godkännandetrösklar eller granskare har
+  ändrats.
+- Verifieraren loggar nu endast allowlistad Responses-status,
+  allowlistad ofullständighetsorsak och en vägransindikator när granskningstext
+  saknas. Timeout, nätverksfel och HTTP-felsvar får uppmätt latens. Råa
+  provider-/elevtexter sparas inte i de nya fälten. Alla sådana svar fortsätter
+  att misslyckas stängt utan godkända frågor.
+- Oberoende slutgranskning: inga blockerare, inga sänkta grindar och inget
+  textläckage i de nya diagnostikfälten. Granskarens lågriskförslag om mätning
+  av latens vid HTTP-fel och testning av A-kortsvar/engelska/okända metadata har
+  åtgärdats i samma diff.
+- Offlineverifiering: `tests/api/exam-pipeline-offline.test.mjs` passerade;
+  `tests/api/verifier-output-contract.test.mjs` passerade; tidigare i samma
+  arbetsomgång `tests/api/exam-generation-pipeline.test.mjs` passerade **34/34**.
+  Syntaxkontroll för båda API-filerna och båda ändrade testscripten samt
+  `git diff --check` passerade.
+- Ingen ny staging-AI-körning, databasändring, kvotändring, `main`- eller
+  Production-ändring har gjorts. Kodbeteendet efter promptändringen är ännu
+  inte liveverifierat; nästa tillåtna steg är en feature-Preview-checkpoint.
+
 ## OpenAI verifier request compatibility — 2026-11-16
 
 - A live synthetic 3-question Biologi 1 A-level request failed closed at 0/3.

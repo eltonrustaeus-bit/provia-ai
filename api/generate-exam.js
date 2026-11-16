@@ -38,12 +38,12 @@ function cognitiveLevelInstruction(level, lang) {
     ? {
         E: "E: pröva ett centralt begrepp eller en tydlig uppgift i taget; eleven ska främst identifiera, beskriva eller genomföra en enkel tillämpning.",
         C: "C: eleven ska förklara eller tillämpa centralt innehåll och göra ett tydligt resonemang, till exempel koppla ihop två relevanta led. Frågetexten ska faktiskt begära denna koppling och rubric ska ge poäng för den; en ren benämnings- eller funktionsfråga räcker inte. Håll uppgiften på gymnasienivå men undvik flera dolda delkrav, avancerad värdering eller syntes som hör hemma på A. Kräv bara sådant som frågan uttryckligen ber om och poängsättningen stödjer.",
-        A: "A: pröva självständig analys eller välgrundad värdering där eleven väger relevanta aspekter och motiverar slutsatsen med stöd i materialet; använd flerledat resonemang när underlaget räcker.",
+        A: "A: pröva självständig analys eller välgrundad värdering med en motiverad slutsats. Före varje fråga ska du identifiera minst två skilda fakta eller uppgifter som uttryckligen stöds av materialet och formulera den jämförelse, slutsats eller syntes eleven ska göra mellan dem. Frågan ska faktiskt kräva detta resonemang, och poängmatrisen ska ge poäng för både resonemanget och slutsatsen. En återgivning av en enda källa eller en A-etikett räcker inte. Om materialet inte stödjer två skilda fakta och ett relevant samband ska du inte hitta på ett andra faktum, sänka nivån eller klä en enkel fråga i A-språk; välj en annan tydligt stödd uppgift.",
       }
     : {
         E: "E: assess one central concept or clear task at a time; the student should mainly identify, describe, or complete a simple application.",
         C: "C: the student should explain or apply central content and make one clear line of reasoning, for example connect two relevant steps. The question must actually ask for that connection and the rubric must award it; naming a term or function alone is insufficient. Keep the task at upper-secondary level but avoid hidden sub-requirements, advanced evaluation, or synthesis associated with A. Require only what the question explicitly asks and the scoring supports.",
-        A: "A: assess independent analysis or well-grounded evaluation where the student weighs relevant aspects and justifies the conclusion using the supplied material; use multi-step reasoning only when the source supports it.",
+        A: "A: assess independent analysis or well-grounded evaluation with a justified conclusion. Before writing each item, identify at least two distinct facts or data points explicitly supported by the material and define the comparison, inference, or synthesis the student must make between them. The task must actually require that reasoning, and the rubric must award points for both the reasoning and conclusion. Repeating one source sentence or adding an A label is insufficient. If the material does not support two distinct facts and a relevant relationship, do not invent a second fact, lower the level, or dress up a simple recall item as A-level; choose another clearly supported task.",
       };
   const alignment = lang === "sv"
     ? "Sätt cognitive_level efter det tänkande som faktiskt krävs, inte efter enstaka verb."
@@ -2455,6 +2455,9 @@ module.exports = async function handler(req, res, internalContext = null) {
           stage: "initial_verifier",
           model: v1.model,
           failure: v1.failureReason || "verification_failed",
+          responseStatus: v1.responseStatus,
+          incompleteReason: v1.incompleteReason,
+          refusalPresent: v1.refusalPresent,
           generationMs: gen.latencyMs,
           verifierLatencyMs: v1.latencyMs,
           elapsedMs: budget.elapsed(),
@@ -2672,6 +2675,9 @@ module.exports = async function handler(req, res, internalContext = null) {
                       stage: "repair_verifier",
                       model: v2.model,
                       failure: v2.failureReason || "verification_failed",
+                      responseStatus: v2.responseStatus,
+                      incompleteReason: v2.incompleteReason,
+                      refusalPresent: v2.refusalPresent,
                       verifierLatencyMs: v2.latencyMs,
                       elapsedMs: budget.elapsed(),
                     }));

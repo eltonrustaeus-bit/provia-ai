@@ -457,22 +457,86 @@ try {
   });
   assert.equal(timedOutReview.callOk, false, "an actually expired retry reviewer signal fails closed");
   assert.equal(timedOutReview.failureReason, "timeout", "safe diagnostics classify timeout without provider error text");
+  assert.ok(timedOutReview.latencyMs >= 900, "timeout diagnostics retain elapsed request time");
   assert.equal(verifierTimeoutSignal.aborted, true, "the bounded verifier request is aborted at its timeout");
 } finally {
   clearTimeout(verifierTimeoutKeeper);
   globalThis.fetch = originalTimeoutFetch;
 }
 
+const originalMissingOutputFetch = globalThis.fetch;
+globalThis.fetch = async () => Response.json({
+  status: "incomplete",
+  incomplete_details: { reason: "max_output_tokens" },
+  output: [{ type: "reasoning", content: [] }],
+  usage: { input_tokens: 40, output_tokens: 12 },
+});
+try {
+  const missingOutput = await verifyQuestions([question("missing-output")], {
+    apiKey: "synthetic", model: "synthetic", timeoutMs: 1_000,
+  });
+  assert.equal(missingOutput.callOk, false, "a response without reviewer text remains fail-closed");
+  assert.equal(missingOutput.failureReason, "missing_output_text");
+  assert.equal(missingOutput.responseStatus, "incomplete");
+  assert.equal(missingOutput.incompleteReason, "max_output_tokens");
+  assert.equal(missingOutput.refusalPresent, false);
+  assert.equal(missingOutput.perQuestion.size, 0, "no question is approved without a parsed independent review");
+  assert.doesNotMatch(JSON.stringify(missingOutput), /source|question text|private/i,
+    "response diagnostics contain no submitted or provider text");
+} finally {
+  globalThis.fetch = originalMissingOutputFetch;
+}
+
+const originalUnknownMetadataFetch = globalThis.fetch;
+globalThis.fetch = async () => Response.json({
+  status: "private provider text that must not be logged",
+  incomplete_details: { reason: "private reason text" },
+  output: [{ type: "reasoning", content: [] }],
+});
+try {
+  const unknownMetadata = await verifyQuestions([question("unknown-metadata")], {
+    apiKey: "synthetic", model: "synthetic", timeoutMs: 1_000,
+  });
+  assert.equal(unknownMetadata.responseStatus, "unknown");
+  assert.equal(unknownMetadata.incompleteReason, "other");
+  assert.doesNotMatch(JSON.stringify(unknownMetadata), /private provider text|private reason text/,
+    "unrecognized provider metadata is reduced to fixed safe categories");
+} finally {
+  globalThis.fetch = originalUnknownMetadataFetch;
+}
+
+const originalRefusalFetch = globalThis.fetch;
+globalThis.fetch = async () => Response.json({
+  status: "completed",
+  output: [{ type: "message", content: [{ type: "refusal", refusal: "synthetic private refusal text" }] }],
+});
+try {
+  const refusal = await verifyQuestions([question("refusal")], {
+    apiKey: "synthetic", model: "synthetic", timeoutMs: 1_000,
+  });
+  assert.equal(refusal.callOk, false, "a refusal is not treated as a completed review");
+  assert.equal(refusal.responseStatus, "completed");
+  assert.equal(refusal.refusalPresent, true);
+  assert.doesNotMatch(JSON.stringify(refusal), /synthetic private refusal text/,
+    "refusal contents never enter diagnostic output");
+} finally {
+  globalThis.fetch = originalRefusalFetch;
+}
+
 const originalRejectedFetch = globalThis.fetch;
-globalThis.fetch = async () => Response.json({ error: {
-  code: "invalid_json_schema", message: "Invalid schema; echoed synthetic study excerpt: private-marker-7f6b", param: "text.format.schema",
-} }, { status: 400 });
+globalThis.fetch = async () => {
+  await new Promise((resolve) => setTimeout(resolve, 25));
+  return Response.json({ error: {
+    code: "invalid_json_schema", message: "Invalid schema; echoed synthetic study excerpt: private-marker-7f6b", param: "text.format.schema",
+  } }, { status: 400 });
+};
 try {
   const rejectedSchema = await verifyQuestions([question("schema-rejected")], {
     apiKey: "synthetic", model: "synthetic", timeoutMs: 1_000,
   });
   assert.equal(rejectedSchema.callOk, false, "provider schema rejection remains fail-closed");
   assert.equal(rejectedSchema.failureReason, "http_400_schema", "safe diagnostics identify the schema rejection category");
+  assert.ok(rejectedSchema.latencyMs >= 20, "HTTP provider failures retain elapsed response time");
   assert.doesNotMatch(JSON.stringify(rejectedSchema), /private-marker-7f6b|Invalid schema/,
     "provider message text is not retained in diagnostic results");
 } finally {

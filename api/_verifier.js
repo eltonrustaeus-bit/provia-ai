@@ -448,6 +448,20 @@ function extractOutputText(data) {
   return typeof out === "string" ? out : null;
 }
 
+function safeResponseDiagnostics(data) {
+  const allowedStatuses = new Set(["completed", "incomplete", "failed", "cancelled", "queued", "in_progress"]);
+  const allowedIncompleteReasons = new Set(["max_output_tokens", "content_filter"]);
+  const status = typeof data?.status === "string" && allowedStatuses.has(data.status)
+    ? data.status : "unknown";
+  const rawReason = data?.incomplete_details?.reason;
+  const incompleteReason = typeof rawReason === "string"
+    ? (allowedIncompleteReasons.has(rawReason) ? rawReason : "other")
+    : null;
+  const refusalPresent = Array.isArray(data?.output) && data.output.some((item) =>
+    Array.isArray(item?.content) && item.content.some((part) => part?.type === "refusal"));
+  return { responseStatus: status, incompleteReason, refusalPresent };
+}
+
 function reviewHintsFor(reviewHintsById, questionId) {
   const id = String(questionId ?? "");
   const hints = reviewHintsById instanceof Map
@@ -526,7 +540,8 @@ async function verifyQuestions(questions, opts) {
   const reviewPayload = JSON.stringify(reviewInput);
 
   const reviewModel = verifierModel(model);
-  const failed = { perQuestion: new Map(), callOk: false, model: reviewModel, usage: null, latencyMs: 0, failureReason: null };
+  const failed = { perQuestion: new Map(), callOk: false, model: reviewModel, usage: null, latencyMs: 0, failureReason: null,
+    responseStatus: null, incompleteReason: null, refusalPresent: false };
   const expectedIds = new Set(items.map((item) => item.id));
   if (items.length === 0 || items.some((item) => !item.id.trim()) || expectedIds.size !== items.length ||
       !reviewInputWithinLimits(reviewInput) || reviewPayload.length > REVIEW_PAYLOAD_CHAR_CAP) {
@@ -551,15 +566,18 @@ async function verifyQuestions(questions, opts) {
       signal: AbortSignal.timeout(requestTimeoutMs)
     }, { userId });
     if (!r.ok) {
-      failed.failureReason = classifyOpenAiHttpError(r.status, await r.text().catch(() => ""));
+      const errorBody = await r.text().catch(() => "");
+      failed.latencyMs = Date.now() - startedAt;
+      failed.failureReason = classifyOpenAiHttpError(r.status, errorBody);
       await settleRejectedAiSpend(r);
       return failed;
     }
     const raw = await r.text();
+    failed.latencyMs = Date.now() - startedAt;
     let data;
     try { data = JSON.parse(raw); } catch { failed.failureReason = "invalid_response_json"; return failed; }
     failed.usage = data?.usage || null;
-    failed.latencyMs = Date.now() - startedAt;
+    Object.assign(failed, safeResponseDiagnostics(data));
     if (failed.usage) await settleAiSpend(r.aiSpendReservation, failed.usage);
     const outputText = extractOutputText(data);
     if (!outputText) { failed.failureReason = "missing_output_text"; return failed; }
@@ -821,6 +839,7 @@ async function verifyQuestions(questions, opts) {
     }
     return { perQuestion, callOk: true, model: failed.model, usage: failed.usage, latencyMs: failed.latencyMs };
   } catch (error) {
+    failed.latencyMs = Date.now() - startedAt;
     failed.failureReason = error?.name === "TimeoutError" || error?.name === "AbortError" ? "timeout" : "request_error";
     return failed;
   }
@@ -830,6 +849,7 @@ module.exports = {
   buildVerifierSchema,
   decideApproval,
   buildVerifierPrompt,
+  safeResponseDiagnostics,
   verifierModel,
   verifyQuestions,
   SUBJECT_HINTS,

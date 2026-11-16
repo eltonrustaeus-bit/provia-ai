@@ -173,6 +173,10 @@ const biologyAPrompt = generateExam.buildExamPrompts({
 });
 assert.match(biologyAPrompt.systemPrompt, /kräva en verklig slutsats, jämförelse eller värdering.*minst två skilda fakta/u,
   "A-level MC prompts require genuine reasoning across distinct source facts");
+assert.match(biologyAPrompt.userPrompt, /Före varje fråga ska du identifiera minst två skilda fakta.*poängmatrisen ska ge poäng för både resonemanget och slutsatsen/u,
+  "A-level generation plans distinct source facts and aligns the rubric with the reasoning the verifier checks");
+assert.match(biologyAPrompt.userPrompt, /inte hitta på ett andra faktum, sänka nivån eller klä en enkel fråga i A-språk/u,
+  "A-level generation does not fill unsupported evidence gaps to reach the requested count");
 const biologyARepair = generateExam.buildRepairPayload({
   model: "synthetic-model",
   input: [{ role: "system", content: biologyAPrompt.systemPrompt }, { role: "user", content: biologyAPrompt.userPrompt }],
@@ -190,6 +194,8 @@ const biologyShortPrompt = generateExam.buildExamPrompts({
   pastedText: "Fotosyntesen sker i kloroplasterna. Växten använder ljus, vatten och koldioxid för att bilda glukos och syre. Cellandning frigör energi ur glukos.",
   isMath: false, requireExtractiveAnswers: true,
 });
+assert.match(biologyShortPrompt.userPrompt, /Före varje fråga ska du identifiera minst två skilda fakta.*poängmatrisen ska ge poäng för både resonemanget och slutsatsen/u,
+  "A-level short-answer prompts use the same two-source-fact and rubric contract as the verifier");
 assert.doesNotMatch(biologyShortPrompt.systemPrompt, /FLERVALS-SJÄLVKONTROLL/u,
   "short-answer prompts avoid irrelevant MC instructions and token overhead");
 const batchWithNoveltyContext = generateExam.buildExamPrompts({
@@ -269,6 +275,17 @@ assert.match(biologyShortPrompt.systemPrompt, /det kortaste sammanhängande, ord
   "the science-specific answer span retains every necessary qualifier");
 assert.match(biologyShortPrompt.systemPrompt, /source_references ska visa hela den relevanta källmeningen eller de källmeningar.*går före önskemålet om korta utdrag/i,
   "science source references retain full context despite the general short-reference preference");
+const biologyAShortRepair = generateExam.buildRepairPayload({
+  model: "synthetic-model",
+  input: [{ role: "system", content: biologyShortPrompt.systemPrompt }, { role: "user", content: biologyShortPrompt.userPrompt }],
+  text: { format: generateExam.buildMockExamSchema(3, "short") },
+}, { lang: "sv", level: "A", numQuestions: 3, candidateCount: 4, qType: "short",
+  questionCountOffset: biologyShortPrompt.questionCountOffset,
+  reviewFailureCodes: ["source_support", "difficulty_mismatch", "scoring_alignment"] });
+assert.match(biologyAShortRepair.input[1].content, /Före varje fråga ska du identifiera minst två skilda fakta.*poängmatrisen ska ge poäng för både resonemanget och slutsatsen/u,
+  "A-level short-answer repairs preserve the generator/reviewer evidence contract");
+assert.match(biologyAShortRepair.input.at(-1).content, /avvikelse mellan frågan och poängmatrisen.*bedöms endast det angivna slutsvaret/u,
+  "A-level short-answer repair receives the scoped scoring-alignment signal");
 const historyPrompt = generateExam.buildExamPrompts({
   lang: "sv", level: "C", course: "Historia 1b", qType: "short", numQuestions: 3,
   pastedText: "Industrialiseringen förändrade samhället.", isMath: false,
@@ -399,6 +416,14 @@ const englishPrompt = generateExam.buildExamPrompts({
   lang: "en", level: "C", course: "Mathematics 2b", qType: "short", numQuestions: 2,
   pastedText: "A fixed fee is 50 SEK and each hour costs 30 SEK.", isMath: true,
 });
+const englishALevelPrompt = generateExam.buildExamPrompts({
+  lang: "en", level: "A", course: "Biology 1", qType: "short", numQuestions: 3,
+  pastedText: "Photosynthesis stores carbon in glucose. Cellular respiration releases carbon dioxide.", isMath: false,
+});
+assert.match(englishALevelPrompt.userPrompt, /identify at least two distinct facts.*rubric must award points for both the reasoning and conclusion/i,
+  "English A-level prompts align evidence and scoring expectations with the reviewer");
+assert.match(englishALevelPrompt.userPrompt, /do not invent a second fact, lower the level, or dress up a simple recall item as A-level/i,
+  "English generation does not manufacture unsupported source coverage");
 assert.match(englishPrompt.systemPrompt, /one self-contained task with a clear answer target/i,
   "English short-answer generation follows the same bounded-task rule");
 assert.match(englishPrompt.systemPrompt, /Score only work explicitly requested by the question/i,
@@ -3238,12 +3263,16 @@ try {
   assert.equal(initialVerifierLog.event, "exam_quality_review_unavailable");
   assert.equal(initialVerifierLog.stage, "initial_verifier");
   assert.equal(initialVerifierLog.failure, "http_503");
+  assert.equal(initialVerifierLog.responseStatus, null);
+  assert.equal(initialVerifierLog.incompleteReason, null);
+  assert.equal(initialVerifierLog.refusalPresent, false);
   assert.equal(typeof initialVerifierLog.model, "string", "safe reviewer model identifier is logged for rejected requests");
   assert.ok(Number.isFinite(initialVerifierLog.generationMs));
   assert.ok(Number.isFinite(initialVerifierLog.verifierLatencyMs));
   assert.ok(Number.isFinite(initialVerifierLog.elapsedMs));
   assert.deepEqual(Object.keys(initialVerifierLog).sort(), [
-    "elapsedMs", "event", "failure", "generationMs", "model", "stage", "verifierLatencyMs",
+    "elapsedMs", "event", "failure", "generationMs", "incompleteReason", "model", "refusalPresent",
+    "responseStatus", "stage", "verifierLatencyMs",
   ]);
 
   activeQuestions = questions;
