@@ -56,6 +56,28 @@ check("science KEEPS prose options (not quantities, never coerced)", (() => {
   return kept(q, "natural_sciences");
 })());
 
+check("science blocks a live-style MC whose source names two separately offered products", (() => {
+  const q = mc({ question: "Vad omvandlas koldioxid och vatten till under fotosyntesen?",
+    options: ["Glukos", "Syre", "Stärkelse"], correct_index: 0 });
+  const result = gate(q, "natural_sciences", {
+    sourceMaterial: "Fotosyntesen använder koldioxid och vatten för att bilda glukos och syre.",
+  });
+  return result.questions.length === 0 && result.dropped[0]?.issues.includes("source_product_options_ambiguous");
+})());
+
+check("science keeps a complete paired product answer and unrelated source facts", (() => {
+  const sourceMaterial = "Vid fotosyntesen används koldioxid och vatten och det bildas glukos och syre.";
+  const paired = mc({ question: "Vad omvandlas koldioxid och vatten till under fotosyntesen?",
+    options: ["Glukos och syre", "Stärkelse", "Koldioxid"], correct_index: 0 });
+  const unrelated = mc({ question: "Vad omvandlas koldioxid och vatten till under cellandningen?",
+    options: ["Glukos", "Syre", "Stärkelse"], correct_index: 0 });
+  const single = mc({ question: "Vad omvandlas koldioxid och vatten till under fotosyntesen?",
+    options: ["Glukos", "Syre", "Stärkelse"], correct_index: 0 });
+  return gate(paired, "natural_sciences", { sourceMaterial }).questions.length === 1
+    && gate(unrelated, "natural_sciences", { sourceMaterial }).questions.length === 1
+    && gate(single, "natural_sciences", { sourceMaterial: "Vid fotosyntesen används koldioxid och vatten och det bildas glukos." }).questions.length === 1;
+})());
+
 check("all subjects block an objectively corrupted MC option", (() => {
   const damagedOptions = ["Cellkärna", "Kloroplast", "Fotosyntes�"];
   const result = gate(mc({ options: damagedOptions, correct_index: 1 }), "natural_sciences");

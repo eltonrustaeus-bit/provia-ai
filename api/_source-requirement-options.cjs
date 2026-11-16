@@ -53,4 +53,49 @@ function hasCoordinatedRequirementAmbiguity(question, material) {
   return false;
 }
 
-module.exports = { hasCoordinatedRequirementAmbiguity };
+// A single-answer item cannot split two explicitly co-produced outputs into
+// separate choices. Keep this veto narrow: the stem must name the same input
+// and process as one complete source sentence, and the source must give the
+// paired outputs for that relationship. Other scientific questions remain for
+// the independent verifier and solver.
+function hasCoordinatedProductAmbiguity(question, material) {
+  if (question?.type !== "mc" || typeof material !== "string" || Array.from(material).length > MAX_MATERIAL_CHARS) return false;
+  const stem = normalized(question.question).match(/^vad omvandlas ([\p{L} -]+) till under ([\p{L}-]+)$/u);
+  if (!stem || qualified.test(stem[1])) return false;
+  const choices = Array.isArray(question.options) ? question.options.map(normalized) : [];
+  const key = question.correct_index;
+  if (!Number.isInteger(key) || key < 0 || key >= choices.length) return false;
+  const segmenter = new Intl.Segmenter("sv", { granularity: "sentence" });
+  const blocks = material.split(/\n\s*\n|\n(?=\s*\d+[.)]\s)/u);
+  for (const block of blocks) {
+    const sentences = [...segmenter.segment(block.replace(/^\s*\d+[.)]\s*/u, ""))]
+      .filter(({ segment }) => /[.!]\s*$/u.test(segment))
+      .map(({ segment }) => normalized(segment));
+    for (let index = 0; index < sentences.length; index += 1) {
+      const sentence = sentences[index];
+      const next = sentences[index + 1] || "";
+      const clauses = sentence.split(/\b(?:medan|däremot|samtidigt)\b|\b(?:men|och)\s+(?!(?:då|sedan|även|också|därmed)\b)[\p{L}-]+(?:\s+[\p{L}-]+){0,4}\s+(?=(?:bildar|producerar|använder|omvandlar)\b)/u)
+        .map(normalized);
+      const products = /\b(?:bilda|bildar|bildas|producera|producerar|produceras|omvandlas till) ([\p{L}-]+) och ([\p{L}-]+)$/u;
+      for (const clause of clauses) {
+        if (!clause.includes(stem[1]) || !new RegExp(`\\b${stem[2]}\\b`, "u").test(clause)) continue;
+        const pair = clause.match(products) ||
+          (/^(?:den|det) (?:bildar|producerar)\b/u.test(next) ? next.match(products) : null);
+        if (!pair) continue;
+        const left = pair[1], right = pair[2];
+        if (left === right) continue;
+        const keyedCompletePair = choices[key] === `${left} och ${right}` || choices[key] === `${right} och ${left}`;
+        const splitPairOffered = choices.includes(left) && choices.includes(right);
+        if (keyedCompletePair) {
+          if (splitPairOffered) return true;
+          continue;
+        }
+        if ((choices[key] === left && choices.includes(right)) ||
+            (choices[key] === right && choices.includes(left))) return true;
+      }
+    }
+  }
+  return false;
+}
+
+module.exports = { hasCoordinatedRequirementAmbiguity, hasCoordinatedProductAmbiguity };

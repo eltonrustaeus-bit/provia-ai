@@ -425,6 +425,8 @@ test("terminal generation failure survives a lost advance response and does not 
   assert.equal(statusResponse.statusCode, 502);
   assert.equal(statusResponse.body.error, "incomplete_exam");
   assert.equal(statusResponse.body.received, 7);
+  assert.equal(statusResponse.body.failureKind, "GENERATION_TERMINAL_UNCLASSIFIED");
+  assert.doesNotMatch(statusResponse.body.message, /Kontrollera materialet/);
 });
 
 test("expired pipeline lease produces a clear incomplete-exam response", async () => {

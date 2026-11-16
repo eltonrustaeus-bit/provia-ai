@@ -316,7 +316,8 @@ async function status(req, res, user) {
       error: "incomplete_exam",
       requested: job.requested_count,
       received: job.progress_current,
-      message: "Provet kunde inte färdigställas med tillräckligt många granskade frågor. Inget prov lämnades ut. Kontrollera materialet eller försök igen senare.",
+      message: "Provet kunde inte färdigställas. Inget prov lämnades ut. Försök igen senare.",
+      failureKind: "GENERATION_TERMINAL_UNCLASSIFIED",
     });
   }
   if (job.state === "succeeded") {

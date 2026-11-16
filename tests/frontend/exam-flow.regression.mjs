@@ -81,7 +81,10 @@ async function mk(opts = {}, gradeOk = true, gradeResult = null, gradeDelayMs = 
     }],
     ["**/api/generate-exam*", r => {
       generationCallCount++;
-      try { lastGeneratePayload = JSON.parse(r.request().postData() || "{}"); } catch (_) {}
+      try {
+        const body = JSON.parse(r.request().postData() || "{}");
+        if (body && Object.hasOwn(body, "pastedText")) lastGeneratePayload = body;
+      } catch (_) {}
       return r.fulfill({ json: { ok: true, exam: JSON.parse(JSON.stringify(EXAM)), meta: { quota: { enforced: false } } } });
     }],
     ["**/api/grade", async r => {
@@ -449,7 +452,7 @@ async function toMaterial(page) {
   }
 }
 
-// Long source text must be preserved up to the shared 12,000-character cap;
+// Long source text must be preserved up to the shared 16,000-character cap;
 // the student must never proceed with a silently shortened source.
 {
   const { ctx, page, errs } = await mk();
@@ -459,16 +462,16 @@ async function toMaterial(page) {
     await page.setViewportSize({ width: 320, height: 740 });
     const area = page.locator("#xf .xf-screen[data-screen='material'] .xf-area");
     const next = page.locator("#xf .xf-screen[data-screen='material'] .xf-btn.primary");
-    await area.fill("x".repeat(12001));
+    await area.fill("x".repeat(16001));
     const overLimit = await page.locator("#xf .xf-screen[data-screen='material'] .xf-read[role='status']").textContent();
-    ok("aktivt materialflöde varnar och stoppar över 12 000 tecken",
-      /12.?000/.test(overLimit || "") && /korta ner/.test(overLimit || "") && await next.isDisabled(), overLimit || "");
+    ok("aktivt materialflöde varnar och stoppar över 16 000 tecken",
+      /16.?000/.test(overLimit || "") && /korta ner/.test(overLimit || "") && await next.isDisabled(), overLimit || "");
     ok("övergränsmaterialet bevaras redigerbart",
-      (await area.inputValue()).length === 12001);
-    await area.fill("x".repeat(12000));
+      (await area.inputValue()).length === 16001);
+    await area.fill("x".repeat(16000));
     const atLimit = await page.locator("#xf .xf-screen[data-screen='material'] .xf-read[role='status']").textContent();
-    ok("exakt 12 000 tecken tillåts och hela texten används",
-      /12.?000 \/ 12.?000/.test(atLimit || "") && /hela texten används/.test(atLimit || "") && await next.isEnabled(), atLimit || "");
+    ok("exakt 16 000 tecken tillåts och hela texten används",
+      /16.?000 \/ 16.?000/.test(atLimit || "") && /hela texten används/.test(atLimit || "") && await next.isEnabled(), atLimit || "");
     const mobileOverflow = await page.evaluate(() => ({
       documentWidth: document.documentElement.scrollWidth,
       status: document.querySelector("#xf .xf-screen[data-screen='material'] .xf-read[role='status']")?.getBoundingClientRect().toJSON(),
@@ -492,12 +495,12 @@ async function toMaterial(page) {
     await signIn(page, "long-training-material-user");
     await page.goto(`${srv.url}/app.html`, { waitUntil: "domcontentloaded" });
     await page.waitForFunction(() => typeof window.__xfPrefill === "function", null, { timeout: 8000 });
-    await page.evaluate(() => window.__xfPrefill("y".repeat(12001), "Biologi 1"));
+    await page.evaluate(() => window.__xfPrefill("y".repeat(16001), "Biologi 1"));
     const area = page.locator("#xf .xf-screen[data-screen='material'] .xf-area");
     const status = page.locator("#xf .xf-screen[data-screen='material'] .xf-read[role='status']");
     ok("felbanksträning visar hela överlånga källan och stoppar fortsättning",
-      (await area.inputValue()).length === 12001 && await page.locator("#xf .xf-screen[data-screen='material'] .xf-btn.primary").isDisabled()
-        && /12.?000/.test(await status.textContent() || "")
+      (await area.inputValue()).length === 16001 && await page.locator("#xf .xf-screen[data-screen='material'] .xf-btn.primary").isDisabled()
+        && /16.?000/.test(await status.textContent() || "")
         && /Träningsmaterialet är längre/.test(await page.locator("#xf .xf-screen[data-screen='material'] .xf-err").textContent() || ""));
   } catch (e) {
     ok("felbanksträning bevarar material över gränsen", false, e.message);
@@ -896,6 +899,85 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
   } finally {
     await ctx.close();
   }
+}
+
+// Budget failures must not be shown as a source-quality rejection or raw HTTP
+// error. These mocked responses exercise the real guided flow and engine.
+const budgetPassStart = pass.length;
+const budgetFailStart = fail.length;
+{
+  const { ctx, page, errs } = await mk();
+  try {
+    await signIn(page, "english-budget-guidance", "en");
+    await toMaterial(page);
+    await page.fill("#xf .xf-screen[data-screen='material'] .xf-area",
+      "Photosynthesis uses carbon dioxide and water and produces glucose and oxygen.");
+    await page.click("#xf .xf-screen[data-screen='material'] .xf-btn.primary");
+    await page.waitForSelector("#xf .xf-screen[data-screen='contract'].on", { timeout: 5000 });
+    const operationId = "12345678-1234-4234-8234-123456789abc";
+    await page.route("**/api/generate-exam*", route => {
+      const pipeline = new URL(route.request().url()).searchParams.get("pipeline");
+      if (pipeline === "start") return route.fulfill({ status: 202, json: {
+        ok: true, operationId, requested: 3, approved: 0, state: "queued",
+      } });
+      return route.fulfill({ status: 502, json: {
+        ok: false, error: "incomplete_exam", failureKind: "AI_BUDGET_EXHAUSTED",
+        message: "Stagingens AI-budget är slut.", received: 0, requested: 3,
+      } });
+    });
+    await page.click("#xf .xf-screen[data-screen='contract'] .xf-btn.primary");
+    await page.waitForFunction(() => document.querySelector("#xf .xf-screen[data-screen='contract'] .xf-err")
+      ?.textContent?.includes("The staging AI budget is exhausted"), null, { timeout: 5000 });
+    await page.waitForFunction(() => document.querySelector("#xf .xf-screen[data-screen='contract'] .xf-sub")
+      ?.textContent?.includes("Contact the pilot lead"), null, { timeout: 5000 });
+    const error = await page.locator("#xf .xf-screen[data-screen='contract'] .xf-err").textContent();
+    const hint = await page.locator("#xf .xf-screen[data-screen='contract'] .xf-sub").textContent();
+    ok("English budget stop remains localized and does not blame the source",
+      error.includes("The staging AI budget is exhausted") && !error.includes("Stagingens")
+        && !error.includes("relevant material") && hint.includes("Contact the pilot lead")
+        && !hint.includes("fewer questions") && errs.length === 0,
+      JSON.stringify({ error, hint, errs }));
+  } catch (e) {
+    ok("English budget stop remains localized and does not blame the source", false, e.message);
+  } finally {
+    await ctx.close();
+  }
+}
+
+{
+  const { ctx, page, errs } = await mk();
+  try {
+    await signIn(page, "graph-budget-guidance", "sv");
+    await page.goto(`${srv.url}/app.html`, { waitUntil: "domcontentloaded" });
+    await page.waitForFunction(() => window.ExGenEngine?.ready === true);
+    await page.route("**/api/generate-exam*", route => route.fulfill({ status: 502, json: {
+      ok: false, error: "ai_budget_unavailable", message: "Stagingens AI-budget kunde inte verifieras.",
+    } }));
+    const result = await page.evaluate(async () => {
+      window.ExGenEngine.setInputs({ course: "Matematik 1b", level: "E", qType: "graph", num: 1,
+        material: "I tabellen är x 1, 2, 3 och y 2, 4, 6. Rita en graf över sambandet." });
+      return window.ExGenEngine.generate();
+    });
+    const status = await page.locator("#status").textContent();
+    ok("graph budget stop returns its cause without raw HTTP diagnostics",
+      result.failureKind === "AI_BUDGET_UNAVAILABLE" && status.includes("AI-budget kunde inte verifieras")
+        && !status.includes("HTTP 502") && errs.length === 0,
+      JSON.stringify({ result, status, errs }));
+  } catch (e) {
+    ok("graph budget stop returns its cause without raw HTTP diagnostics", false, e.message);
+  } finally {
+    await ctx.close();
+  }
+}
+
+if (process.env.EXGEN_BUDGET_ERRORS_ONLY === "1") {
+  await browser.close();
+  await srv.close();
+  const budgetPass = pass.length - budgetPassStart;
+  const budgetFail = fail.slice(budgetFailStart);
+  console.log(`budget UI checkpoint: ${budgetPass} passed, ${budgetFail.length} failed`);
+  budgetFail.forEach(item => console.error(`FEL ${item}`));
+  process.exit(budgetFail.length ? 1 : 0);
 }
 
 // ── T1f: a fresh local save cannot revive an expired server issuance ──────

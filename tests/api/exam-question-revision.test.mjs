@@ -16,21 +16,37 @@ const originals = [
   { id: "q2", type: "mc", points: 2, question: "Vad är skärningen i y = 2x + 3?", options: ["2", "3", "5"], correct_index: 1, source_references: ["För y = 2x + 3 är lutningen 2 och skärningen 3."] },
 ];
 
-function issued() {
-  const context = gradeTasks.hashContext(material, course, userId);
-  const publicQuestions = originals.map(({ correct_index, ...question }, index) => ({
+function issued({ examCourse = course, examMaterial = material, questions = originals } = {}) {
+  const context = gradeTasks.hashContext(examMaterial, examCourse, userId);
+  const publicQuestions = questions.map(({ correct_index, ...question }, index) => ({
     ...question,
-    grade_task: gradeTasks.sealQuestion(originals[index], undefined, context),
+    grade_task: gradeTasks.sealQuestion(questions[index], undefined, context),
   }));
-  const submissionId = completion.submissionId(userId, course, publicQuestions);
+  const submissionId = completion.submissionId(userId, examCourse, publicQuestions);
   return {
     submissionId,
     exam: {
-      questions: completion.issueActiveQuestionProofs(userId, course, publicQuestions),
-      exam_manifest: completion.issueExamManifest(userId, course, material, publicQuestions),
+      questions: completion.issueActiveQuestionProofs(userId, examCourse, publicQuestions),
+      exam_manifest: completion.issueExamManifest(userId, examCourse, examMaterial, publicQuestions),
     },
   };
 }
+
+test("a verified replacement is still refused when the source makes two MC options correct", () => {
+  const examCourse = "Biologi 1";
+  const examMaterial = "Vid fotosyntesen används koldioxid och vatten och det bildas glukos och syre. Klorofyll fångar ljusenergi.";
+  const questions = [{ id: "biology-original", type: "mc", points: 2,
+    question: "Vilken uppgift har klorofyll?", options: ["Fånga ljusenergi", "Lagra stärkelse", "Bildar koldioxid"],
+    correct_index: 0, source_references: ["Klorofyll fångar ljusenergi."] }];
+  const old = issued({ examCourse, examMaterial, questions });
+  const ambiguous = { id: "biology-replacement", type: "mc", points: 2,
+    question: "Vad omvandlas koldioxid och vatten till under fotosyntesen?",
+    options: ["Glukos", "Syre", "Stärkelse"], correct_index: 0,
+    cognitive_level: "minnas", source_references: ["Vid fotosyntesen används koldioxid och vatten och det bildas glukos och syre."],
+    validation_status: "verified", confidence_score: 0.99 };
+  assert.equal(revision.reviseIssuedExam({ userId, course: examCourse, material: examMaterial,
+    ...old, questionId: "biology-original", candidate: ambiguous }), null);
+});
 
 const candidate = {
   id: "q3", type: "mc", points: 2,

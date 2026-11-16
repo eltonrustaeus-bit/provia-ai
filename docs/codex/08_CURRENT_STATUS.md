@@ -1,5 +1,34 @@
 # 08 Current Status
 
+## Source-product ambiguity and terminal guidance — 2026-11-16
+
+- On the staging Preview at feature commit `111977e`, one synthetic 3-question
+  Biologi 1 exam reached 3/3 only after several repair batches. Replacing its
+  second question succeeded without losing the earlier answer, but the new MC
+  asked what carbon dioxide and water become and offered **glucose** and
+  **oxygen** separately although the source supported both. This is a live
+  content-acceptance failure, despite the candidate having passed the model
+  gates. P.E.R gave a hint rather than the answer. The synthetic exam was
+  abandoned without grading; no 6/12-question live test followed.
+- A narrow blocking source-product check now rejects that form when the same
+  source sentence or an adjacent sentence in the same numbered section says
+  both products are formed. It also rejects a single keyed product when a
+  complete product pair appears elsewhere among the options. A keyed complete
+  pair and unrelated source relationships remain eligible for the independent
+  checks. Initial generation, final issuance and server-side replacement use
+  the shared gate. Repair feedback names only a fixed error category.
+- The frontend maps exact budget error codes to localized messages for both
+  resumable and graph exam paths. A terminal status with no persisted cause is
+  described neutrally, without blaming the student's material. Browser-mocked
+  budget checks passed 2/2; source/final-issuance and recovery tests passed
+  offline. These checks do **not** establish that the newly patched version
+  avoids all ambiguous questions in live model output, nor its 6/12 yield.
+- The full `tests/frontend/exam-flow.regression.mjs` suite now passes **248/248**.
+  The stale material-boundary cases now cover 16,000 characters, and its mock
+  captures the initial generation payload rather than replacing it with later
+  resume-operation bodies. The bounded English/graph budget checkpoint passed
+  **2/2**. These are mocked browser checks, not live model behavior.
+
 ## Question-revision foundation — 2026-11-16
 
 - Feature commit `a8883be` is on the existing feature branch and Vercel Preview

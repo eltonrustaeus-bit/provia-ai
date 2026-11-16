@@ -1116,6 +1116,7 @@ function buildExamPrompts({ lang, level, course, qType, numQuestions, examQuesti
     "(d) Villkorsfrågor där flera värden uppfyller villkoret — ange villkoret så att exakt ett alternativ passar. " +
     "(e) Alternativ som är logiska följder av varandra, t.ex. 'x > 10' och 'x != 10' när x är större än 10. " +
     "(f) Frågor om när eller var en process sker: pröva varje alternativ mot samma tids- eller platsvillkor. Om även en annan process uppfyller villkoret, avgränsa frågan tydligare eller välj kortsvar. " +
+    "(g) Om materialet säger att en process bildar två produkter, får de inte stå som separata svar på en bred fråga om vad processen bildar. Fråga efter en tydligt avgränsad produkt eller använd hela produktparet som ett svar. " +
     "Fråga hellre efter ett beräknat värde, ett exakt begrepp eller en konkret konsekvens än efter 'vilket av dessa stämmer'. " +
     "14) RÄKNA IGENOM varje beräkning innan du sätter correct_index, och kontrollera att slutsvaret i model_answer pekar på exakt det alternativet. " +
     "En korrekt förklaring med fel markerat alternativ är det allvarligaste felet ett prov kan innehålla. " +
@@ -1192,6 +1193,7 @@ function buildExamPrompts({ lang, level, course, qType, numQuestions, examQuesti
     "(d) Condition questions where several values satisfy the condition — state the condition so exactly one option fits. " +
     "(e) Options that logically follow from one another, e.g. 'x > 10' and 'x != 10' when x is greater than 10. " +
     "(f) Questions about when or where a process occurs: test every option against the same time or place condition. If another process also meets it, narrow the question or use short answer. " +
+    "(g) When the material says a process produces two products, do not offer them separately for a broad question about what the process produces. Ask for one clearly bounded product or use the complete pair as one answer. " +
     "Prefer asking for a computed value, an exact term or a concrete consequence over 'which of these is true'. " +
     "14) WORK THROUGH every calculation before setting correct_index, and verify that the final answer in model_answer points at exactly that option. " +
     "A correct explanation with the wrong option marked is the most serious error an exam can contain. " +
@@ -1456,7 +1458,8 @@ const SAFE_REPAIR_SOLVER_FAILURE_CODES = new Set([
 ]);
 const SAFE_REPAIR_STRUCTURAL_SOURCE_CODES = new Set([
   "source_answer_not_extractable", "source_reference_missing",
-  "source_requirement_options_incomplete", "source_quantity_subject_changed", "circular_location_task",
+  "source_requirement_options_incomplete", "source_product_options_ambiguous",
+  "source_quantity_subject_changed", "circular_location_task",
 ]);
 
 function structuralSourceFailureCounts(gate) {
@@ -1566,6 +1569,11 @@ function buildRepairPayload(payload, { lang, numQuestions, existingQuestions = [
     ? (lang === "en"
       ? "A broad requirement question split a source-supported combination across separate options. Replace it with a more precise task or a complete combination and plausible distractors; independently check uniqueness again. Do not merely change the answer key. "
       : "En bred fråga om förutsättningar delade upp en källstödd kombination i separata alternativ. Ersätt den med en mer precis fråga eller en fullständig kombination och rimliga distraktorer; kontrollera entydigheten på nytt. Byt inte bara facitnyckel. ")
+    : "";
+  const productOptionsGuidance = safeStructuralIssueCounts.source_product_options_ambiguous
+    ? (lang === "en"
+      ? "A broad product question split two source-supported outputs across separate options. Ask for one precisely qualified product or make the complete pair one answer; do not merely change the key. "
+      : "En bred produktfråga delade två källstödda produkter i separata alternativ. Fråga efter en tydligt avgränsad produkt eller låt hela paret vara ett svar; byt inte bara facitnyckel. ")
     : "";
   const quantitySubjectGuidance = safeStructuralIssueCounts.source_quantity_subject_changed
     ? (lang === "en"
@@ -1694,7 +1702,7 @@ function buildRepairPayload(payload, { lang, numQuestions, existingQuestions = [
     text: { ...payload.text, format: buildMockExamSchema(repairCount, qType) },
     input: [
       ...repairInput,
-      { role: "user", content: `${instruction}\n\n${structuralSourceGuidance}${requirementOptionsGuidance}${quantitySubjectGuidance}${circularTaskGuidance}${repairFactualAnswerInstruction} ${repairSourceReferenceInstruction}` },
+      { role: "user", content: `${instruction}\n\n${structuralSourceGuidance}${requirementOptionsGuidance}${productOptionsGuidance}${quantitySubjectGuidance}${circularTaskGuidance}${repairFactualAnswerInstruction} ${repairSourceReferenceInstruction}` },
     ],
   };
 }

@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 const require = createRequire(import.meta.url);
-const { hasCoordinatedRequirementAmbiguity: ambiguous } = require("../../api/_source-requirement-options.cjs");
+const { hasCoordinatedRequirementAmbiguity: ambiguous,
+  hasCoordinatedProductAmbiguity: ambiguousProduct } = require("../../api/_source-requirement-options.cjs");
 const { gateExam } = require("../../api/_assessment.js");
 const generation = require("../../api/generate-exam.js");
 
@@ -65,4 +67,52 @@ test("repair feedback keeps only the fixed ambiguity category and does not presc
   assert.match(prompt, /kontrollera entydigheten på nytt/);
   assert.match(prompt, /Byt inte bara facitnyckel/);
   assert.doesNotMatch(prompt, /PRIVATE_CANDIDATE_INSTRUCTION|Transportproteiner|Energi från ATP/);
+});
+
+test("co-produced outputs cannot be separately keyed in a broad transformation MC", async () => {
+  const source = "Fotosyntesen använder koldioxid och vatten för att bilda glukos och syre.";
+  const candidate = { id: "products", type: "mc", points: 1, cognitive_level: "minnas",
+    question: "Vad omvandlas koldioxid och vatten till under fotosyntesen?",
+    options: ["Glukos", "Syre", "Stärkelse"], correct_index: 0,
+    model_answer: "Glukos", validation_status: "verified", source_references: [source] };
+  assert.equal(ambiguousProduct(candidate, source), true);
+  assert.equal(ambiguousProduct({ ...candidate, options: ["Glukos", "Syre", "Glukos och syre"] }, source), true,
+    "a combined unkeyed option cannot excuse two separately defensible options");
+  assert.equal(ambiguousProduct({ ...candidate, options: ["Glukos och syre", "Stärkelse", "Koldioxid"] }, source), false,
+    "the complete pair as the keyed answer remains reviewable");
+  assert.equal(ambiguousProduct({ ...candidate, options: ["Glukos", "Syre", "Glukos och syre"], correct_index: 2 }, source), true,
+    "the keyed pair cannot hide its separate source-supported outputs");
+  assert.equal(ambiguousProduct(candidate,
+    "Fotosyntesen använder koldioxid och vatten samt ljusenergi. Den bildar glukos och syre."), true,
+  "adjacent sentences in the same source item retain their subject");
+  assert.equal(ambiguousProduct(candidate,
+    readFileSync(new URL("../fixtures/numbered-biology-notes.txt", import.meta.url), "utf8")), true,
+  "numbered biology material must not bypass the two-product veto");
+  assert.equal(ambiguousProduct(candidate,
+    "Fotosyntesen använder koldioxid och vatten.\n\nCellandningen bildar glukos och syre."), false,
+  "an unrelated paragraph must not be joined to the source relationship");
+  assert.equal(ambiguousProduct({ ...candidate, question: "Vad omvandlas stärkelse till under matsmältningen?",
+    options: ["Glukos", "Syre", "Koldioxid"] },
+  "Under matsmältningen omvandlas stärkelse till glukos, medan fotosyntesen bildar glukos och syre."), false,
+  "a product pair from a contrasting process must not be attributed to the asked process");
+  assert.equal(ambiguousProduct({ ...candidate, question: "Vad omvandlas stärkelse till under matsmältningen?",
+    options: ["Glukos", "Syre", "Koldioxid"] },
+  "Under matsmältningen omvandlas stärkelse till glukos och fotosyntesen bildar glukos och syre."), false,
+  "a coordinated clause naming another process must not inherit the first process");
+  assert.equal(ambiguousProduct({ ...candidate, question: "Vad omvandlas vattenånga till under kondensationen?",
+    options: ["Vatten", "Koldioxid", "Syre"] },
+  "Under kondensationen omvandlas vattenånga till vatten och förbränning av metan bildar vatten och koldioxid."), false,
+  "a newly named process is separated even when its name uses a different morphology");
+  assert.equal(ambiguousProduct(candidate,
+    "Fotosyntesen använder koldioxid och vatten, men bildar glukos och syre."), true,
+  "a following clause with an omitted subject remains linked to the named process");
+  const gated = gateExam({ questions: [candidate] }, { profile: "natural_sciences", sourceMaterial: source });
+  assert.equal(gated.questions.length, 0);
+  assert.ok(gated.dropped[0].issues.includes("source_product_options_ambiguous"));
+  await assert.rejects(generation.finalizeVerifiedExam({ userId: "11111111-1111-4111-8111-111111111111",
+    payload: { lang: "sv", level: "E", course: "Biologi 1", qType: "mc", numQuestions: 1, pastedText: source },
+    questions: [candidate] }), /Final structural validation/);
+  const feedback = generation.buildRepairPayload({ input: [] }, { lang: "sv", numQuestions: 1, qType: "mc",
+    structuralIssueCounts: { source_product_options_ambiguous: 1 } });
+  assert.match(JSON.stringify(feedback.input), /tydligt avgränsad produkt/);
 });

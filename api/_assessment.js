@@ -12,7 +12,7 @@
 
 const crypto = require("crypto");
 const graphAnswers = require("./_graph.js");
-const { hasCoordinatedRequirementAmbiguity } = require("./_source-requirement-options.cjs");
+const { hasCoordinatedRequirementAmbiguity, hasCoordinatedProductAmbiguity } = require("./_source-requirement-options.cjs");
 const { losesSourceQuantitySubject } = require("./_source-quantity-subject.cjs");
 const { repeatsEnergyInputTask } = require("./_energy-input-task.cjs");
 const { MAX_MATERIAL_CHARS } = require("./_material.cjs");
@@ -315,6 +315,9 @@ function generalQualityIssues(q, options) {
   }
   if (options?.profile === "natural_sciences" && hasCoordinatedRequirementAmbiguity(q, options?.sourceMaterial)) {
     issues.push("source_requirement_options_incomplete");
+  }
+  if (options?.profile === "natural_sciences" && hasCoordinatedProductAmbiguity(q, options?.sourceMaterial)) {
+    issues.push("source_product_options_ambiguous");
   }
   if (options?.profile === "natural_sciences" && losesSourceQuantitySubject(q, options?.sourceMaterial)) {
     issues.push("source_quantity_subject_changed");
@@ -636,6 +639,7 @@ const BLOCKING = new Set([
   "source_answer_not_extractable",
   "language_quality",
   "source_requirement_options_incomplete",
+  "source_product_options_ambiguous",
   "source_quantity_subject_changed",
   "circular_location_task",
   "open_question_ungradeable", "leaked_instructions", "corrupted_option_text", "math_options_numerically_equal", "math_option_type_mismatch",

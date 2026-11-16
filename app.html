@@ -2633,11 +2633,29 @@ try{
         setStatus(message,"bad");hideDebug();
         return {ok:false,error:message};
       }
-      if(["quality_review_unavailable","incomplete_exam","independent_check_unavailable"].includes(res.data?.error)){
+      if(res.data?.error==="ai_budget_exhausted"||res.data?.error==="ai_budget_unavailable"){
+        const exhausted=res.data.error==="ai_budget_exhausted";
         const message=LANG==="sv"
-          ? (res.data.message||"Kvalitetskontrollen kunde inte slutföras. Inget prov lämnades ut; försök igen.")
+          ?(exhausted?"Stagingens AI-budget är slut. Inget prov lämnades ut. Kontakta pilotansvarig.":"Stagingens AI-budget kunde inte verifieras. Inget prov lämnades ut. Kontakta pilotansvarig.")
+          :(exhausted?"The staging AI budget is exhausted. No exam was issued. Please contact the pilot lead.":"The staging AI budget could not be verified. No exam was issued. Please contact the pilot lead.");
+        setStatus(message,"bad");hideDebug();
+        return {ok:false,error:message,errorCode:res.data.error,
+          failureKind:exhausted?"AI_BUDGET_EXHAUSTED":"AI_BUDGET_UNAVAILABLE"};
+      }
+      if(["quality_review_unavailable","incomplete_exam","independent_check_unavailable"].includes(res.data?.error)){
+        const budgetKind=res.data?.failureKind==="AI_BUDGET_EXHAUSTED"||res.data?.failureKind==="AI_BUDGET_UNAVAILABLE"
+          ?res.data.failureKind:null;
+        const terminalUnknown=res.data?.failureKind==="GENERATION_TERMINAL_UNCLASSIFIED";
+        const message=LANG==="sv"
+          ? (budgetKind==="AI_BUDGET_EXHAUSTED"?"Stagingens AI-budget är slut. Inget prov lämnades ut. Kontakta pilotansvarig."
+            :budgetKind==="AI_BUDGET_UNAVAILABLE"?"Stagingens AI-budget kunde inte verifieras. Inget prov lämnades ut. Kontakta pilotansvarig."
+            :terminalUnknown?"Provet kunde inte färdigställas. Inget prov lämnades ut. Försök igen senare."
+            :res.data.message||"Kvalitetskontrollen kunde inte slutföras. Inget prov lämnades ut; försök igen.")
           : (res.data?.error==="incomplete_exam"
-            ? "ExGen could not create a complete exam that passed review. No exam was issued; try again with more relevant material or fewer questions."
+            ? (budgetKind==="AI_BUDGET_EXHAUSTED"?"The staging AI budget is exhausted. No exam was issued. Please contact the pilot lead."
+              :budgetKind==="AI_BUDGET_UNAVAILABLE"?"The staging AI budget could not be verified. No exam was issued. Please contact the pilot lead."
+              :terminalUnknown?"The exam could not be completed. No exam was issued. Please try again later."
+              :"ExGen could not create a complete exam that passed review. No exam was issued; try again with more relevant material or fewer questions.")
             : "ExGen could not complete the required quality checks. No exam was issued; please try again.");
         if(res.data.error==="incomplete_exam")try{window.ExGenGenerationRequest?.clearPendingGeneration?.(idempotencyKey);}catch{}
         const hasSafeCounts=res.data?.error==="incomplete_exam"
@@ -2649,7 +2667,8 @@ try{
         const fullMessage=message+countNote;
         setStatus(fullMessage,"bad");
         hideDebug();
-        return {ok:false,error:fullMessage,errorCode:res.data.error,failureKind:res.data.failureKind||null};
+        return {ok:false,error:fullMessage,errorCode:res.data.error,
+          failureKind:budgetKind||(terminalUnknown?"GENERATION_TERMINAL_UNCLASSIFIED":null)};
       }
       if(res.data?.error==="mock_quota_unavailable"||res.data?.error==="exam_generation_failed"){
         const message=res.data.error==="mock_quota_unavailable"
