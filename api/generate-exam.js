@@ -36,12 +36,12 @@ function cognitiveLevelInstruction(level, lang) {
   const descriptions = lang === "sv"
     ? {
         E: "E: pröva ett centralt begrepp eller en tydlig uppgift i taget; eleven ska främst identifiera, beskriva eller genomföra en enkel tillämpning.",
-        C: "C: eleven ska förklara eller tillämpa centralt innehåll och göra ett tydligt resonemang, till exempel koppla ihop två relevanta led. Håll uppgiften på gymnasienivå men undvik flera dolda delkrav, avancerad värdering eller syntes som hör hemma på A. Kräv bara sådant som frågan uttryckligen ber om och poängsättningen stödjer.",
+        C: "C: eleven ska förklara eller tillämpa centralt innehåll och göra ett tydligt resonemang, till exempel koppla ihop två relevanta led. Frågetexten ska faktiskt begära denna koppling och rubric ska ge poäng för den; en ren benämnings- eller funktionsfråga räcker inte. Håll uppgiften på gymnasienivå men undvik flera dolda delkrav, avancerad värdering eller syntes som hör hemma på A. Kräv bara sådant som frågan uttryckligen ber om och poängsättningen stödjer.",
         A: "A: pröva självständig analys eller välgrundad värdering där eleven väger relevanta aspekter och motiverar slutsatsen med stöd i materialet; använd flerledat resonemang när underlaget räcker.",
       }
     : {
         E: "E: assess one central concept or clear task at a time; the student should mainly identify, describe, or complete a simple application.",
-        C: "C: the student should explain or apply central content and make one clear line of reasoning, for example connect two relevant steps. Keep the task at upper-secondary level but avoid hidden sub-requirements, advanced evaluation, or synthesis associated with A. Require only what the question explicitly asks and the scoring supports.",
+        C: "C: the student should explain or apply central content and make one clear line of reasoning, for example connect two relevant steps. The question must actually ask for that connection and the rubric must award it; naming a term or function alone is insufficient. Keep the task at upper-secondary level but avoid hidden sub-requirements, advanced evaluation, or synthesis associated with A. Require only what the question explicitly asks and the scoring supports.",
         A: "A: assess independent analysis or well-grounded evaluation where the student weighs relevant aspects and justifies the conclusion using the supplied material; use multi-step reasoning only when the source supports it.",
       };
   const alignment = lang === "sv"
@@ -1115,6 +1115,7 @@ function buildExamPrompts({ lang, level, course, qType, numQuestions, examQuesti
     "(c) Ordningsfrågor som 'den första/andra faktorn' när ordningen inte är definierad. " +
     "(d) Villkorsfrågor där flera värden uppfyller villkoret — ange villkoret så att exakt ett alternativ passar. " +
     "(e) Alternativ som är logiska följder av varandra, t.ex. 'x > 10' och 'x != 10' när x är större än 10. " +
+    "(f) Frågor om när eller var en process sker: pröva varje alternativ mot samma tids- eller platsvillkor. Om även en annan process uppfyller villkoret, avgränsa frågan tydligare eller välj kortsvar. " +
     "Fråga hellre efter ett beräknat värde, ett exakt begrepp eller en konkret konsekvens än efter 'vilket av dessa stämmer'. " +
     "14) RÄKNA IGENOM varje beräkning innan du sätter correct_index, och kontrollera att slutsvaret i model_answer pekar på exakt det alternativet. " +
     "En korrekt förklaring med fel markerat alternativ är det allvarligaste felet ett prov kan innehålla. " +
@@ -1190,6 +1191,7 @@ function buildExamPrompts({ lang, level, course, qType, numQuestions, examQuesti
     "(c) Ordering questions such as 'the first/second factor' when no order is defined. " +
     "(d) Condition questions where several values satisfy the condition — state the condition so exactly one option fits. " +
     "(e) Options that logically follow from one another, e.g. 'x > 10' and 'x != 10' when x is greater than 10. " +
+    "(f) Questions about when or where a process occurs: test every option against the same time or place condition. If another process also meets it, narrow the question or use short answer. " +
     "Prefer asking for a computed value, an exact term or a concrete consequence over 'which of these is true'. " +
     "14) WORK THROUGH every calculation before setting correct_index, and verify that the final answer in model_answer points at exactly that option. " +
     "A correct explanation with the wrong option marked is the most serious error an exam can contain. " +
@@ -1801,12 +1803,28 @@ module.exports = async function handler(req, res, internalContext = null) {
     : [];
   const targetExcerpt = internalBatch ? safeString(parsed.sourceTarget?.excerpt, 400).trim() : "";
   const sourceTarget = targetExcerpt.length >= 60 && pastedText.replace(/\r\n?/g, "\n").includes(targetExcerpt)
-    ? { title: safeString(parsed.sourceTarget?.title, 70), excerpt: targetExcerpt } : null;
+    ? { index: Number.isInteger(parsed.sourceTarget?.index) ? parsed.sourceTarget.index : null,
+        title: safeString(parsed.sourceTarget?.title, 70), excerpt: targetExcerpt } : null;
+  const generationMaterial = trainingFocus.length || qType === "graph" ? pastedText : require("./_material-selection.cjs")
+    .selectGenerationMaterial(pastedText, sourceTarget, selectedFocusTerms,
+      internalBatch && Number.isInteger(parsed.sourceSelectionOffset) ? parsed.sourceSelectionOffset : 0);
+  // Independent review keeps the full source so facts outside the selected
+  // generation sections can still invalidate an ambiguous answer. Preview may
+  // compare a selected-source experiment without changing production behavior.
+  const reviewMaterial = process.env.VERCEL_ENV === "preview" &&
+    process.env.EXGEN_EXPERIMENTAL_REVIEW_SELECTION === "1" ? generationMaterial : pastedText;
   const idempotencyKey = typeof parsed.idempotencyKey === "string" ? parsed.idempotencyKey : "";
   if (!examGenerationOperations.UUID.test(idempotencyKey)) {
     return json(res, 400, { ok: false, error: "GENERATION_REQUEST_ID_REQUIRED" });
   }
   const quotaRequestId = generationRequestId(internalBatch, idempotencyKey);
+  if (Array.from(pastedText).length > 12000) console.info(JSON.stringify({
+    event: "exam_source_selection", requestId: quotaRequestId,
+    fullChars: Array.from(pastedText).length,
+    generationChars: Array.from(generationMaterial).length,
+    reviewChars: Array.from(reviewMaterial).length,
+    targetIndex: sourceTarget?.index ?? null,
+  }));
 
   const numQuestionsRaw = toInt(parsed.numQuestions, 3);
   const numQuestions = qType === "graph" ? 1 : Math.min(20, Math.max(2, numQuestionsRaw));
@@ -2002,7 +2020,7 @@ module.exports = async function handler(req, res, internalContext = null) {
       examQuestionCount: internalBatch
         ? Math.min(20, Math.max(numQuestions, toInt(parsed.examQuestionCount, numQuestions)))
         : numQuestions,
-      pastedText, isMath, requireExtractiveAnswers: subjectProfile === "natural_sciences", graphMode: graphMode || "line", focusInstruction, selectedFocusTerms, trainingFocus, trainingFocusRequiredIds, priorQuestions, comparisonQuestions, sourceTarget
+      pastedText: generationMaterial, isMath, requireExtractiveAnswers: subjectProfile === "natural_sciences", graphMode: graphMode || "line", focusInstruction, selectedFocusTerms, trainingFocus, trainingFocusRequiredIds, priorQuestions, comparisonQuestions, sourceTarget
     });
 
     let payload = {
@@ -2338,7 +2356,7 @@ module.exports = async function handler(req, res, internalContext = null) {
       const [v1, s1] = await Promise.all([
         verifier.verifyQuestions(exam.questions, {
           userId: user.id,
-          apiKey, model, subjectProfile, lang, material: pastedText, targetLevel: level,
+          apiKey, model, subjectProfile, lang, material: reviewMaterial, targetLevel: level,
           trainingFocus,
           comparisonQuestions: initialReviewComparisons,
           comparisonAnswerTargets: initialReviewAnswerTargets,
@@ -2353,8 +2371,8 @@ module.exports = async function handler(req, res, internalContext = null) {
         }),
         solver.solveQuestions(exam.questions, {
           userId: user.id,
-          apiKey, model, subjectProfile, lang, pastedText,
-          material: pastedText,
+          apiKey, model, subjectProfile, lang, pastedText: reviewMaterial,
+          material: reviewMaterial,
           timeoutMs: Math.max(1000, budget.remaining() - RESPONSE_RESERVE_MS),
         }),
       ]);
@@ -2555,7 +2573,7 @@ module.exports = async function handler(req, res, internalContext = null) {
                   const [v2, s2] = await Promise.all([
                     verifier.verifyQuestions(candidateQuestions, {
                       userId: user.id,
-                      apiKey, model, subjectProfile, lang, material: pastedText, targetLevel: level,
+                      apiKey, model, subjectProfile, lang, material: reviewMaterial, targetLevel: level,
                       trainingFocus,
                       reviewHintsById: candidateGate.flagged
                         .flatMap((item) => item.issues
@@ -2570,7 +2588,7 @@ module.exports = async function handler(req, res, internalContext = null) {
                     }),
                     solver.solveQuestions(candidateQuestions, {
                       userId: user.id,
-                      apiKey, model, subjectProfile, lang, material: pastedText,
+                      apiKey, model, subjectProfile, lang, material: reviewMaterial,
                       timeoutMs: Math.max(1000, Math.min(REGENERATION_REVIEW_TIMEOUT_MS, budget.remaining() - regenerationPostReviewReserveMs(internalBatch))),
                     }),
                   ]);

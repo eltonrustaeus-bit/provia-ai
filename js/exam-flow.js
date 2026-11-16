@@ -44,7 +44,7 @@
   /* Serverns tak på pastedText i api/generate-exam.js. Speglas här så att
      eleven ser gränsen medan hen klistrar in i stället för att upptäcka den
      genom att halva materialet tyst försvann. */
-  var MATERIAL_MAX = 12000;
+  var MATERIAL_MAX = 16000;
 
   // ── Små hjälpare ─────────────────────────────────────────────────────────
 

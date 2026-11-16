@@ -44,7 +44,7 @@ test("numbered factual paragraphs retain literal coverage without becoming exerc
     facts[0], facts.slice(0, 2).join("\n").replace("2.", "3."),
     facts.slice(0, 2).join("\n").replace("2.", "1."),
     facts.slice(0, 2).join("\n").replace("2.", "2)"),
-    [...facts, facts[0].replace("1.", "13.")].join("\n"),
+    [...facts, ...Array.from({ length: 13 }, (_, index) => facts[0].replace("1.", `${index + 13}.`))].join("\n"),
     "1. Kort etikett\n2. Nästa korta etikett",
     facts.slice(0, 2).join("\n").replace("1. Celler", "1. Beskriv hur celler"),
     facts.slice(0, 2).join("\n").replace("arbete.", "arbete?"),

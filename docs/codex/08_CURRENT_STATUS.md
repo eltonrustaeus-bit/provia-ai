@@ -1,5 +1,29 @@
 # 08 Current Status
 
+## Local 16k-material and source-selection checkpoint — 2026-11-16
+
+- Current feature work raises the material limit from 12,000 to 16,000 Unicode
+  characters across the browser, request recovery, server validation, source
+  checks, exam manifests, and grading. The original full material remains
+  bound to the issued exam and is retained for grading and P.E.R.
+- For material over 12,000 characters, generation can select complete source
+  sections. Indexed targets, learner focus, CRLF normalization, and rotation
+  toward uncovered unheaded paragraphs have focused offline coverage. The
+  independent verifier and solver still receive the full material by default
+  so they can detect contradictions outside the generation selection. A
+  selected-review experiment is gated to Preview explicitly; no live result
+  supports enabling it as the default.
+- Targeted generator guidance now requires an actual scored reasoning step at
+  C level and checks time/place MC alternatives against the same condition.
+  This is a prompt hypothesis, not evidence of improved model output.
+- A synthetic 15,048-character fixture sends 11,570 characters to the
+  generator (23% fewer source characters); this is an offline input-size
+  comparison, not measured token cost, latency, or semantic quality.
+- The requested in-exam "Fel fråga – generera ny" still needs an atomic
+  server-side issuance revision, replay, client draft migration, and hosted
+  verification. No replacement control is available to students yet. No
+  staging, main, Production, or database change is implied by this checkpoint.
+
 ## Twelve delivered; content acceptance still held — 2026-10-31
 
 - The newly authorized single synthetic Biologi 1 C/mixed journey ran on

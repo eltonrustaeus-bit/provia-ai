@@ -826,7 +826,7 @@ function escapeHtml(s){
 
 let LANG = localStorage.getItem("proviaai_lang") || "sv";
 let selectedExamFocusTerms = [];
-const MATERIAL_CHAR_LIMIT = 12000;
+const MATERIAL_CHAR_LIMIT = 16000;
 // Nuvarande roll — laddas från Supabase vid inloggning, cachas i localStorage
 let currentRole = localStorage.getItem(LS_ROLE) || "gratis";
 
@@ -844,7 +844,7 @@ sv:{
   mImprove:"Min utveckling",mLang:"English",mLogout:"Logga ut",
   step1:"Material",step1Sub:"Klistra in texten du pluggar på — rubriker, definitioner, formler, exempel",
   pasteLabel:"Studiematerial",pastePH:"Rubriker → punktlista → definitioner/formler → exempel",
-  materialTooLong:"Materialet är för långt. Korta ner det till högst 12 000 tecken innan du fortsätter.",
+  materialTooLong:"Materialet är för långt. Korta ner det till högst 16 000 tecken innan du fortsätter.",
   ocrTitle:"Bild → OCR (valfritt)",ocrBtn:"OCR till material",
   ocrHint:"Tips: tydlig bild rakt ovanifrån, bra ljus, hög kontrast.",
   tip:"Tips: rubriker + punktlistor ger mer exakta frågor och bättre rättning.",
@@ -1563,8 +1563,8 @@ function updateMaterialCounter(){
   const over=count>MATERIAL_CHAR_LIMIT;
   counter.className="stxt"+(over?" bad":"");
   counter.textContent=LANG==="sv"
-    ? `${count.toLocaleString("sv-SE")} / ${MATERIAL_CHAR_LIMIT.toLocaleString("sv-SE")} tecken · ${over?"Korta ner materialet innan du fortsätter.":"Hela texten används."}`
-    : `${count.toLocaleString("en-US")} / ${MATERIAL_CHAR_LIMIT.toLocaleString("en-US")} characters · ${over?"Shorten the material before continuing.":"All entered text is used."}`;
+    ? `${count.toLocaleString("sv-SE")} / ${MATERIAL_CHAR_LIMIT.toLocaleString("sv-SE")} tecken · ${over?"Korta ner materialet innan du fortsätter.":count>12000?"Hela texten sparas; relevanta avsnitt väljs vid generering.":"Hela texten används."}`
+    : `${count.toLocaleString("en-US")} / ${MATERIAL_CHAR_LIMIT.toLocaleString("en-US")} characters · ${over?"Shorten the material before continuing.":count>12000?"All text is saved; relevant sections are selected during generation.":"All entered text is used."}`;
 }
 
 function materialTooLongMessage(){return T[LANG].materialTooLong;}

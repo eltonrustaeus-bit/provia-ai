@@ -405,6 +405,7 @@ async function advance(job, { deadlineAt = null } = {}) {
   const comparisonQuestions = comparisonQuestionsFor(existing, job.requested_count);
   const comparisonAnswerTargets = comparisonAnswerTargetsFor(existing, job.requested_count);
   const coverage = require("./_source-coverage.cjs");
+  const materialSelection = require("./_material-selection.cjs");
   const hasRequiredTrainingFocus = Array.isArray(job.payload.trainingFocus) && job.payload.trainingFocus.length > 0;
   const sections = hasRequiredTrainingFocus ? [] : coverage.sourceSections(job.payload.pastedText);
   const sourceTarget = coverage.nextSourceSection(sections, existing, Number(job.stage_attempts) - 1);
@@ -415,7 +416,9 @@ async function advance(job, { deadlineAt = null } = {}) {
     examQuestionCount: job.requested_count,
     comparisonQuestions,
     comparisonAnswerTargets,
-    sourceTarget: sourceTarget ? { title: sourceTarget.title, excerpt: sourceTarget.excerpt } : null,
+    sourceTarget: sourceTarget ? { index: sourceTarget.index, title: sourceTarget.title, excerpt: sourceTarget.excerpt } : null,
+    sourceSelectionOffset: materialSelection.nextUnheadedParagraph(
+      job.payload.pastedText, existing, Math.max(0, Number(job.stage_attempts) - 1)),
     trainingFocusRequiredIds: uncoveredBefore,
     idempotencyKey: crypto.randomUUID(),
   };

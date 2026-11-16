@@ -12,7 +12,7 @@ function numberedProseSections(lines) {
     const match = line.match(/^\s*(\d+)([.)])\s+(\S.*)$/u);
     if (!match && /^\s*\d/u.test(line)) return [];
     if (match) {
-      if (Number(match[1]) !== sections.length + 1 || sections.length >= 12 ||
+      if (Number(match[1]) !== sections.length + 1 || sections.length >= 24 ||
           (marker && marker !== match[2])) return [];
       marker = match[2];
       sections.push({ title: `Avsnitt ${sections.length + 1}`, body: line });
@@ -69,7 +69,7 @@ function sourceSections(material) {
     }
   }
   if (current && current.body.trim().length >= 60) sections.push(current);
-  if (sections.length >= 2 && sections.length <= 12) return sections;
+  if (sections.length >= 2 && sections.length <= 24) return sections;
   return current ? [] : numberedProseSections(lines);
 }
 

@@ -15,6 +15,7 @@ const graphAnswers = require("./_graph.js");
 const { hasCoordinatedRequirementAmbiguity } = require("./_source-requirement-options.cjs");
 const { losesSourceQuantitySubject } = require("./_source-quantity-subject.cjs");
 const { repeatsEnergyInputTask } = require("./_energy-input-task.cjs");
+const { MAX_MATERIAL_CHARS } = require("./_material.cjs");
 const MAX_MC_OPTIONS = 5;
 
 // ── Answer-key signing (integrity, not confidentiality) ─────────────────────
@@ -1420,7 +1421,7 @@ function questionPairConflict(left, right, options = {}) {
   const signature = functionTaskSignature(left);
   if (!signature || signature !== functionTaskSignature(right)) return "";
   const material = normalizeSourceAnswer(options.sourceMaterial);
-  if (!material || material.length > 12000) return "";
+  if (!material || Array.from(material).length > MAX_MATERIAL_CHARS) return "";
   const normalizedAnswer = value => normalizeSourceAnswer(value).replace(/[.!?]+$/u, "").trim();
   const mcHasNoExtraChoiceDemand = (question, fact) => {
     if (question.type !== "mc") return true;

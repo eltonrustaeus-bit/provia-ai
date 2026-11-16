@@ -925,9 +925,9 @@ const absentOptionReview = await runWithResults([{
 }], [malformedOption]);
 assert.equal(decideApproval(absentOptionReview.outcome.perQuestion.get(malformedOption.id)), false,
   "a missing per-option judgment fails closed even if a mocked provider ignores the strict schema");
-const boundedMaterial = await runWithResults([needsRevision], [openQuestion], "m".repeat(12050));
+const boundedMaterial = await runWithResults([needsRevision], [openQuestion], "m".repeat(16050));
 const boundedInput = JSON.parse(boundedMaterial.requestBody.input.find((item) => item.role === "user").content);
-assert.equal(boundedInput.source_material.length, 12000, "source context is capped before the paid review request");
+assert.equal(boundedInput.source_material.length, 16000, "source context is capped before the paid review request");
 const oversizedAnswer = await runWithResults([result("open-1", true)], [{ ...openQuestion, model_answer: "x".repeat(6001) }]);
 assert.equal(oversizedAnswer.outcome.callOk, false, "oversized generated review fields fail closed");
 assert.equal(oversizedAnswer.fetchCalls, 0, "oversized review input is rejected before provider traffic");

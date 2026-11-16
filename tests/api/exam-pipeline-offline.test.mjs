@@ -146,6 +146,8 @@ const biologyPrompt = generateExam.buildExamPrompts({
   lang: "sv", level: "C", course: "Biologi 1", qType: "mc", numQuestions: 3,
   pastedText: "Fotosyntes sker i kloroplasterna. Växten använder koldioxid och vatten.", isMath: false,
 });
+assert.match(biologyPrompt.userPrompt, /Frågetexten ska faktiskt begära denna koppling/);
+assert.match(biologyPrompt.systemPrompt, /Frågor om när eller var en process sker/);
 const biologyShortPrompt = generateExam.buildExamPrompts({
   lang: "sv", level: "A", course: "Biologi 1", qType: "short", numQuestions: 3,
   pastedText: "Fotosyntesen sker i kloroplasterna. Växten använder ljus, vatten och koldioxid för att bilda glukos och syre. Cellandning frigör energi ur glukos.",

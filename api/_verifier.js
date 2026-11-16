@@ -207,7 +207,7 @@ function classifyReviewFindings(requiredChanges) {
 
 const materialInput = require("./_material.cjs");
 const { budgetedOpenAIFetch, settleAiSpend } = require("./_ai-usage.cjs");
-const SOURCE_MATERIAL_CHAR_CAP = 12000;
+const SOURCE_MATERIAL_CHAR_CAP = materialInput.MAX_MATERIAL_CHARS;
 const REVIEW_PAYLOAD_CHAR_CAP = 60000;
 
 function reviewInputWithinLimits(input) {

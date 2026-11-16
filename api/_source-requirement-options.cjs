@@ -1,5 +1,7 @@
 "use strict";
 
+const { MAX_MATERIAL_CHARS } = require("./_material.cjs");
+
 const normalized = value => String(value || "").normalize("NFKC").toLocaleLowerCase("sv-SE")
   .replace(/\s+/gu, " ").trim().replace(/[.!?]+$/u, "").trim();
 const qualified = /\b(?:inte|utan|endast|bara|eller|samt|frivillig\p{L}*|valfri\p{L}*|ibland|exempelvis|exempel|medan|om|när|vid|före|efter)\b/iu;
@@ -17,7 +19,7 @@ function processMatches(stemProcess, sourceProcess, material) {
 }
 
 function hasCoordinatedRequirementAmbiguity(question, material) {
-  if (question?.type !== "mc" || typeof material !== "string" || material.length > 12_000) return false;
+  if (question?.type !== "mc" || typeof material !== "string" || Array.from(material).length > MAX_MATERIAL_CHARS) return false;
   const text = normalized(question.question);
   const stem = text.match(/^vad (?:krävs|behövs) för ([\p{L} -]+)$/u);
   if (!stem || qualified.test(stem[1]) || /\b(?:och|jämför|motivera|förklara)\b/u.test(stem[1])) return false;

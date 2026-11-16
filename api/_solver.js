@@ -47,7 +47,7 @@ const materialInput = require("./_material.cjs");
 const { budgetedOpenAIFetch, settleAiSpend } = require("./_ai-usage.cjs");
 const { MAX_MC_OPTIONS } = require("./_assessment.js");
 const { filterSourceReferences } = require("./_source-references.cjs");
-const MATERIAL_CHAR_CAP = 12000;
+const MATERIAL_CHAR_CAP = materialInput.MAX_MATERIAL_CHARS;
 
 function solverModel(generatorModel) {
   return process.env.OPENAI_SOLVER_MODEL || generatorModel;

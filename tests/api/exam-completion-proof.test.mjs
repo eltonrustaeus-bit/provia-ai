@@ -111,7 +111,7 @@ test("a graded full set authorizes only its signed question for its owner", () =
 });
 
 test("completion proof accepts the full supported material limit", () => {
-  const longMaterial = "x".repeat(12000);
+  const longMaterial = "x".repeat(16000);
   const contextHash = gradeTasks.hashContext(longMaterial, course, userId);
   const question = {
     id: "long-source", type: "mc", points: 1,

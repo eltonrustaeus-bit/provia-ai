@@ -117,7 +117,7 @@
       priorQuestions: Array.isArray(payload.priorQuestions) ? payload.priorQuestions : [],
       sourceReferences: Array.isArray(payload.sourceReferences) ? payload.sourceReferences : [],
     };
-    if (!clean.course || !clean.pastedText || Array.from(clean.pastedText).length > 12000 ||
+    if (!clean.course || !clean.pastedText || Array.from(clean.pastedText).length > 16000 ||
         !["mix", "mc", "short", "graph"].includes(clean.qType) ||
         !Number.isInteger(clean.numQuestions) ||
         (clean.qType === "graph" ? clean.numQuestions !== 1 : clean.numQuestions < 2 || clean.numQuestions > 20) ||

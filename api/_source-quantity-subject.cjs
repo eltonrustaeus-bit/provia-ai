@@ -1,5 +1,7 @@
 "use strict";
 
+const { MAX_MATERIAL_CHARS } = require("./_material.cjs");
+
 const normalize = value => String(value || "").normalize("NFC").replace(/\s+/gu, " ").trim();
 const lower = value => normalize(value).toLocaleLowerCase("sv-SE").replace(/[.!?]+$/u, "").trim();
 const qualified = /\b(?:inte|aldrig|om|när|medan|ibland|kan|endast|bara|vid|utan)\b/u;
@@ -48,7 +50,7 @@ function taskSharesContext(question, block, bearer) {
 }
 
 function sourceQuantityRelations(material) {
-  if (typeof material !== "string" || material.length > 12000) return [];
+  if (typeof material !== "string" || Array.from(material).length > MAX_MATERIAL_CHARS) return [];
   return sourceSentences(material).map(({ sentence, block }) => ({ sentence: lower(sentence), block: lower(block) }))
     .filter(({ sentence, block }) => !qualified.test(sentence) && !/\b(?:om|när|medan|ibland)\b/u.test(block))
     .map(({ sentence, block }) => ({ match: sentence.match(propertyRelation), sentence, block }))
@@ -56,7 +58,7 @@ function sourceQuantityRelations(material) {
 }
 
 function losesSourceQuantitySubject(question, material) {
-  if (typeof material !== "string" || material.length > 12000) return false;
+  if (typeof material !== "string" || Array.from(material).length > MAX_MATERIAL_CHARS) return false;
   const task = lower(question?.question);
   if (qualified.test(task) || /\b(?:fel|felaktig\p{L}*|oriktig\p{L}*)\b/u.test(task)) return false;
   // A bearer-directed movement question can legitimately ask about its level,
