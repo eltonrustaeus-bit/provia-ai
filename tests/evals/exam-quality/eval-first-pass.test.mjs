@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
+const { buildExamPrompts } = require("../../../api/generate-exam.js");
 const { normalizeAndGateFirstPass } = require("./eval-first-pass.cjs");
 const material = "Fotosyntesen sker i kloroplasterna. Ljusenergi används för att bilda glukos och syre.";
 const options = {
@@ -14,6 +15,18 @@ const candidate = {
   correct_index: 0, model_answer: "I kloroplasterna.",
   source_references: ["Fotosyntesen sker i kloroplasterna."],
 };
+
+for (const [lang, example, sourceRule] of [
+  ["sv", "mitokondrier när materialet anger kloroplaster", "Rätt svar och sakpåståenden"],
+  ["en", "mitochondria when the material says chloroplasts", "The correct answer and factual claims"],
+]) {
+  const { systemPrompt } = buildExamPrompts({
+    lang, level: "E", course: "Biologi 1", qType: "mc", numQuestions: 1,
+    pastedText: material, isMath: false,
+  });
+  assert.ok(systemPrompt.includes(example), `${lang}: allow an established wrong distractor absent from the notes`);
+  assert.ok(systemPrompt.includes(sourceRule), `${lang}: keep the correct answer grounded in the notes`);
+}
 
 const shortOptions = normalizeAndGateFirstPass({ questions: [{ ...candidate, options: candidate.options.slice(0, 2) }] }, options);
 assert.equal(shortOptions.failure?.payload.error, "MC options invalid",

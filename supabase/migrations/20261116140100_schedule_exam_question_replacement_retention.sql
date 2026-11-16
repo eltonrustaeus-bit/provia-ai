@@ -1,6 +1,15 @@
 -- Scrub expired private replay payloads every 15 minutes. The main migration
 -- retains lineage rows so replacement limits cannot reset after cleanup.
-create extension if not exists pg_cron with schema pg_catalog;
+-- pg_cron is already required by the existing exam-pipeline retention job.
+-- Do not re-run CREATE EXTENSION here: hosted Supabase may reject the
+-- extension's privilege setup even when pg_cron is already installed.
+do $check_cron$
+begin
+  if not exists (select 1 from pg_extension where extname = 'pg_cron') then
+    raise exception 'pg_cron must be installed before scheduling exam question replacement retention';
+  end if;
+end;
+$check_cron$;
 
 do $schedule$
 declare

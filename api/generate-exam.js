@@ -1108,7 +1108,7 @@ function buildExamPrompts({ lang, level, course, qType, numQuestions, examQuesti
     "Varje övrigt alternativ MÅSTE vara definitivt FELAKTIGT — inte bara sämre, mindre lämpligt, ofullständigt eller mindre vanligt. " +
     "Innan du skriver klart en fråga: gå igenom vart och ett av de felaktiga alternativen och kontrollera att det finns ett konkret skäl att förkasta det. " +
     "Om du inte kan formulera det skälet är alternativet inte en distraktor utan ett andra rätt svar — gör om frågan. " +
-    "Varje distraktor måste vara ett begripligt och ämnesrelevant begrepp eller svar i samma kategori och ungefär samma form som facit, gärna grundat i en vanlig missuppfattning. Hitta inte på nonsensord, trasig svenska, orelaterade alternativ eller begrepp som saknar stöd i materialet. " +
+    "Varje distraktor måste vara ett begripligt och ämnesrelevant begrepp eller svar i samma kategori och ungefär samma form som facit, gärna grundat i en vanlig missuppfattning. Ett etablerat men tydligt felaktigt begrepp får användas som distraktor även om ordet inte står i materialet, till exempel mitokondrier när materialet anger kloroplaster. Rätt svar och sakpåståenden i fråga och förklaring måste fortfarande stödjas av materialet. Hitta inte på nonsensord, trasig svenska eller orelaterade alternativ. " +
     "13) Ställ ALDRIG en fråga där materialet stöder flera alternativ samtidigt. Vanliga fällor att undvika: " +
     "(a) 'Vilken metod kan användas för att...' när materialet beskriver flera fungerande metoder — fråga i stället efter resultatet, eller lås frågan till en specifik metod. " +
     "(b) 'Vilken faktor/vilket begrepp tillhör kategorin X?' när materialet räknar upp flera i samma kategori. " +
@@ -1184,7 +1184,7 @@ function buildExamPrompts({ lang, level, course, qType, numQuestions, examQuesti
     "Every other option MUST be definitively WRONG — not merely worse, less suitable, incomplete or less common. " +
     "Before finishing a question, go through each incorrect option and check that there is a concrete reason to reject it. " +
     "If you cannot state that reason, the option is not a distractor but a second correct answer — rewrite the question. " +
-    "Every distractor must be an understandable, subject-relevant concept or answer in the same category and roughly the same form as the key, preferably based on a common misconception. Never invent nonsense words, broken English, unrelated choices, or concepts unsupported by the material. " +
+    "Every distractor must be an understandable, subject-relevant concept or answer in the same category and roughly the same form as the key, preferably based on a common misconception. An established but clearly wrong concept may be a distractor even when its name is absent from the material, for example mitochondria when the material says chloroplasts. The correct answer and factual claims in the question and explanation must still be supported by the material. Never invent nonsense words, broken English or unrelated choices. " +
     "13) NEVER ask a question the material supports several answers to. Common traps to avoid: " +
     "(a) 'Which method can be used to...' when the material describes several working methods — ask for the result instead, or pin the question to one method. " +
     "(b) 'Which factor/concept belongs to category X?' when the material lists several in that category. " +
