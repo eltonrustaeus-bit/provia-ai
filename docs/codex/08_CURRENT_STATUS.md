@@ -6050,3 +6050,27 @@ enda 12-frågetest. Offline- och mocktester bevisar inte live-modellens
   befintliga feature-branchen; Vercel Preview `dpl_41TirqsEW47GQJ39fZh4st3uFqyS`
   blev READY och den befintliga Preview-aliasen pekar på den. Ingen `main`,
   Production eller databas ändrades.
+
+### Syntetiskt 12-frågeprov efter reparationsbudgetfix — 2026-11-16
+
+- [x] På READY Preview för kodcheckpoint `7f21f96` (samma branch och befintliga
+  alias) kördes ett enda Biologi 1 A/blandat prov med syntetiskt material.
+  Eleven begärde 12 frågor; UI avslutade säkert med **0/12** och lämnade inte ut
+  något prov.
+- [x] Sanerad telemetri visar 3 genereringsanrop (medel **12,8 s**, max **13,9 s**),
+  3 jämförande granskningsanrop (medel **12,5 s**, max **12,7 s**) och 2 blinda
+  lösaranrop (medel **5,6 s**). Den första granskningen rapporterade
+  `missing_output_text` efter 12,5 s, inte timeout. Två senare jämförelser
+  slutfördes men avvisade kandidater på källstöd, nivå och poängsättning;
+  ytterligare språk-/lärandemålsfynd förekom. Inga kandidater passerade.
+- [!] Den utökade 13-sekundersgranskningen gav utrymme för långsammare interna
+  jämförelser, men detta test visar **inte** att fler frågor godkänns eller att
+  provet blir snabbare. Huvudproblemet i denna körning var innehålls-/nivå-
+  anpassning plus ett `missing_output_text`-fel, inte en verifierad timeout.
+- [x] Efter testet: budgettak `$5.879071`, spenderat `$3.687971`, reserverat
+  `$0.282822`, kvar **$1.908278**. Inga budget-, kvot-, konto-, databas- eller
+  produktionsändringar gjordes. Inga fler liveprov kördes.
+- [!] Nästa förbättring bör prioritera att minska verifierbara avvikelser mellan
+  valt A-läge, exakt materialstöd, fråga och poängmatris, samt klassificera
+  `missing_output_text` tydligare. Ändra inte granskningsgrindarna utan ny
+  evidens och riktade regressionsprov.
