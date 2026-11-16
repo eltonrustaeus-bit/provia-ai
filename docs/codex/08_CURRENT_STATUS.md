@@ -23,23 +23,30 @@
 - Added focused terminal-ID tests: **22 assertions passed**, including both
   Web-Lock orderings, stale input/recovery copies, marker-storage failure and
   fail-closed capacity. The browser UI checkpoint passed **91/91**, and the
-  budget-error UI checkpoint passed **2/2**. Syntax checks and `git diff
-  --check` passed. A full browser-suite run was interrupted after roughly two
-  minutes while it was progressing through older scenarios; it is not counted
-  as a pass. The broad idempotency script reaches the already-known unrelated
-  failure `recovery rejects oversized or excessive nested material without
-  truncating it` at line 483; it is not counted as passing.
+  budget-error UI checkpoint passed **2/2**. Syntax checks and `git diff --check`
+  passed. A full browser-suite run was interrupted after roughly two minutes
+  while progressing through older scenarios; it is not counted as a pass. The
+  broad idempotency script reaches the already-known unrelated failure
+  `recovery rejects oversized or excessive nested material without truncating
+  it` at line 483; it is not counted as passing.
 - Independent reviewer found no remaining blocker after the final patch. The
   reviewer noted optional extra UI cases for 202/500 and malformed 502
   responses; the implemented cleanup gate rejects them by construction, but
   those exact response variants were not separately exercised in the browser.
-- This is local verification only. No additional staging AI request, account
-  or budget change, database write, `main`, or Production action was made.
-  Last available staging observation showed no active leases and numerous
-  retryable request rows; it is not a fresh read from this turn. Next: finish
-  the browser regression, run the independent final review, then checkpoint to
-  the existing feature Preview and verify that deployment before any bounded
-  staging journey.
+- Commit `dee8fb9` was pushed to the existing feature branch. Vercel Preview
+  `dpl_EjeaN7ArrUCFegZYE3ydTtzRQ3bJ` reached READY for that exact commit; its
+  stable feature alias is `provia-ai-git-codex-exgen-gener-b3c147-eltons-projects-4adfb1a3.vercel.app`.
+  No merge to `main`, Production, or database change occurred.
+- A fresh, read-only staging budget query still shows cap **$5.879071**, spent
+  **$3.687971**, reserved **$0.282822**, available **$1.908278**. No new model
+  call was made. Reloading the same Preview tab after deployment displayed the
+  pilot login gate, so hosted behavior beyond READY metadata and offline UI
+  tests is not verified; the user must sign in again before a live test.
+- Last available staging observation showed no active leases but numerous
+  retryable request rows. Next: after the user reauthenticates in the same
+  Preview, check the duplicate-recovery screen without starting a paid request;
+  run one bounded synthetic flow only if it can use one stable request and the
+  refreshed budget still allows it.
 
 ## Continued pipeline and replacement verification — 2026-11-16
 
