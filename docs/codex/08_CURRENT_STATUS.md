@@ -1,5 +1,22 @@
 # 08 Current Status
 
+## Continued pipeline and replacement verification — 2026-11-16
+
+- The replacement-question flow now derives its training focus from the signed
+  original question and carries that target through generation, independent
+  review, and quality repair. A browser-provided focus remains ignored. The
+  offline integration test confirms the repair request and reviewer receive
+  the same private target; no quality gate was weakened.
+- The broader offline generation/recovery/material suite passed **45/45**:
+  3/6/12 accumulation, retries, partial-delivery labeling, deadlines, replay,
+  recovery, and material limits. The HTTP diagnostics assertion was aligned
+  with the current fixed `http_503` category and configured solver-model field.
+  Syntax checks and `git diff --check` passed.
+- This is local/offline evidence only. No new live model call, staging data
+  mutation, `main`, Production, or production database action was performed.
+  The current Preview remains the feature deployment for `973e64b`; the
+  test-only follow-up still needs its own checkpoint before Preview includes it.
+
 ## A-nivåinstruktion och verifierardiagnostik — 2026-11-16
 
 - Senaste stagingförsöket med syntetiskt Biologi 1-material slutade säkert på

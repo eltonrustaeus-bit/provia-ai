@@ -1734,12 +1734,16 @@ test("separate authenticated advance requests persist full 3/6/12 runs, retry sa
         for (const event of diagnosticEvents) {
           assert.equal(event.requestId, `exam-pipeline:${diagnosticJobId}`,
             "both unavailable checks correlate with the validated parent job, not the batch quota key");
-          assert.equal(event.failure, contractFailure ? "invalid_contract" : "http_error");
+          assert.equal(event.failure, contractFailure ? "invalid_contract" : "http_503");
+          assert.equal(event.model,
+            process.env.OPENAI_SOLVER_MODEL || process.env.OPENAI_MATH_MODEL || process.env.OPENAI_MODEL_MATH
+              || process.env.OPENAI_MODEL_EXAM || process.env.OPENAI_MODEL || "gpt-4o-mini",
+            "failure telemetry records only the configured solver model name");
           if (contractFailure) assert.equal(event.contractFailure, "result_count");
           assert.ok(Number.isFinite(event.solverLatencyMs));
           assert.deepEqual(Object.keys(event).sort(), [
             ...(contractFailure ? ["contractFailure"] : []),
-            "elapsedMs", "event", "failure", ...(event.stage === "initial_solver" ? ["generationMs"] : []),
+            "elapsedMs", "event", "failure", ...(event.stage === "initial_solver" ? ["generationMs"] : []), "model",
             "requestId", "solverLatencyMs", "stage",
           ].sort());
         }
