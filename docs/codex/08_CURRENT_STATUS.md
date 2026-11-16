@@ -5955,8 +5955,33 @@ enda 12-frågetest. Offline- och mocktester bevisar inte live-modellens
 - [x] Offline: pipeline-scriptet passerade; verifierar-, budget-, solver-,
   revisions- och frågebytes-HTTP-tester passerade **22/22**. Syntaxkontroll
   och `git diff --check` passerade.
-- [!] Promptändringen är lokal och ännu inte Preview-verifierad. Stagingens
-  senast lästa cap är $5.879071, spenderat $3.432670, reserverat $0.282822,
-  tillgängligt $2.163579. Fortsätt på samma feature-branch och befintliga
-  Preview-session; `main`, Production, databas, hemligheter och kvoter är
-  orörda. Jämförelse med `gpt-6-luna` är ännu inte gjord.
+- [!] Vid skrivtillfället var promptändringen lokal. Den publicerades sedan i
+  commit `18f993d` och dess misslyckade 0/3-liveprov redovisas nedan.
+  Budgeten som lästes före testet var cap $5.879071, spenderat $3.432670,
+  reserverat $0.282822 och tillgängligt $2.163579. `main`, Production,
+  databas, hemligheter och kvoter har inte ändrats.
+
+### Liveprov efter promptjustering — 2026-11-16
+
+- [x] Checkpoint `18f993d` nådde READY på befintlig branch-alias och samma
+  stagingflik. Ett syntetiskt Biologi 1 A/MC-prov med 3 frågor och 1 310
+  tecken gav **0/3**; inget prov utfärdades. UI markerade tydligt att provet
+  inte kunde färdigställas.
+- [x] Två stegvisa genereringsbatcher slutfördes på cirka **37,2 s** och
+  **38,9 s**. Första batchen stannade på verifierartimeout och noll godkända.
+  Reparationen gav fyra kandidater men inga godkända; diagnostiken visar
+  bland annat nivåträffar, svagt källstöd, alternativskvalitet och ett
+  `option_matches_shape`-fel i den blinda lösarens reparationssvar.
+- [x] Aggregerad AI-telemetri för jobbet: 3 generatoranrop, medel **15,3 s**;
+  4 verifieraranrop, medel **7,5 s**; 5 blinda lösaranrop, medel **5,3 s**.
+  Detta är mätvärden för modellen, inte en lyckad användarupplevelse.
+- [x] Kostnaden ökade **$0.081975**. Cap är fortfarande $5.879071; spenderat
+  $3.514645, reserverat $0.282822, tillgängligt $2.081604.
+- [x] Oberoende slutgranskning bekräftade att kortsvarsreparation i blandprov
+  inte längre får flervalsinriktad återkoppling, även vid MC-relaterade
+  granskningsfel. Detta kantfall har offline-test men kunde inte prövas av
+  just MC-liveprovet.
+- [x] För den redan godkända modelljämförelsen har `OPENAI_MODEL_EXAM` satts
+  till `gpt-6-luna` endast för Preview-branchen. Det är en icke-hemlig
+  modellinställning; Production påverkas inte. En ny deployment och ett enda
+  jämförande syntetiskt 3-frågetest återstår.
