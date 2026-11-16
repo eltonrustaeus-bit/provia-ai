@@ -52,7 +52,7 @@ const valid = await runWithResults([result("q1", true), result("q2", false)]);
 assert.equal(valid.outcome.callOk, true, "an exact one-to-one result set is accepted");
 assert.equal(valid.outcome.perQuestion.size, 2);
 assert.equal(valid.outcome.perQuestion.get("q1").approved, true);
-assert.equal(valid.outcome.model, "measured-review-model");
+assert.equal(valid.outcome.model, "synthetic", "diagnostics use the configured model, never provider-controlled response metadata");
 assert.deepEqual(valid.outcome.usage, { input_tokens: 31, output_tokens: 7 });
 assert.equal(valid.requestTimeoutMs, 30_000, "the reviewer keeps its default upper timeout");
 assert.deepEqual(classifyReviewFindings(["Poängmatrisen ger metodpoäng som frågan inte efterfrågar."]), ["scoring_alignment"],
@@ -158,6 +158,8 @@ assert.equal(decideApproval(supportedALevel.outcome.perQuestion.get("a-compare")
   "an A-level comparison with literal task/rubric evidence meets the added contract");
 assert.equal(supportedALevel.outcome.perQuestion.get("a-compare").difficulty_evidence_contract_ok, true);
 assert.ok(supportedALevel.requestBody.text.format.schema.properties.results.items.required.includes("difficulty_evidence"));
+assert.equal(supportedALevel.requestBody.text.format.schema.properties.results.items.properties.difficulty_evidence.properties.source_fact_evidence.uniqueItems,
+  undefined, "provider schema omits unsupported uniqueItems while server validates distinct evidence");
 
 const weakALevel = await runWithResults(
   [aLevelReviewResult({
@@ -300,6 +302,11 @@ const sameFactQuotes = await runWithResults(
   undefined, "A", undefined, "sv");
 assert.equal(decideApproval(sameFactQuotes.outcome.perQuestion.get("a-compare")), false,
   "two indexes to the same quoted source fact do not satisfy the A-level evidence contract");
+const duplicateFactIndices = await runWithResults(
+  [aLevelReviewResult({ ...validALevelEvidence, source_fact_evidence: [0, 0] })],
+  [aLevelQuestion], aLevelMaterial, undefined, "A", undefined, "sv");
+assert.equal(decideApproval(duplicateFactIndices.outcome.perQuestion.get("a-compare")), false,
+  "removing provider-side uniqueItems does not weaken server-side A-level evidence validation");
 
 const unsupportedALevel = await runWithResults(
   [aLevelReviewResult({ ...validALevelEvidence, task_evidence: "analyze the whole ecosystem" })],
@@ -450,6 +457,22 @@ try {
 } finally {
   clearTimeout(verifierTimeoutKeeper);
   globalThis.fetch = originalTimeoutFetch;
+}
+
+const originalRejectedFetch = globalThis.fetch;
+globalThis.fetch = async () => Response.json({ error: {
+  code: "invalid_json_schema", message: "Invalid schema; echoed synthetic study excerpt: private-marker-7f6b", param: "text.format.schema",
+} }, { status: 400 });
+try {
+  const rejectedSchema = await verifyQuestions([question("schema-rejected")], {
+    apiKey: "synthetic", model: "synthetic", timeoutMs: 1_000,
+  });
+  assert.equal(rejectedSchema.callOk, false, "provider schema rejection remains fail-closed");
+  assert.equal(rejectedSchema.failureReason, "http_400_schema", "safe diagnostics identify the schema rejection category");
+  assert.doesNotMatch(JSON.stringify(rejectedSchema), /private-marker-7f6b|Invalid schema/,
+    "provider message text is not retained in diagnostic results");
+} finally {
+  globalThis.fetch = originalRejectedFetch;
 }
 
 for (const results of [
@@ -777,6 +800,8 @@ assert.ok(focusSchema.required.includes("training_focus_skill_matches"), "mistak
 assert.ok(focusSchema.required.includes("training_focus_error_matches"), "mistake-training requires a separate verdict for the specific error evidence");
 assert.equal(focusSchema.properties.training_focus_matches.minItems, 0,
   "an explicit no-match review is representable so the server can reject only that candidate");
+assert.equal(focusSchema.properties.training_focus_matches.uniqueItems, undefined,
+  "provider schema omits unsupported uniqueItems while server checks duplicate focus IDs");
 assert.deepEqual(focusPayload.training_focus, [{ id: "focus-1", concept: "Linjär funktion", skill: "Tolka lutning", error_tags: ["calculation_error"],
   source_question: "Vad beskriver k?", student_answer: "Skärningen med y-axeln",
   grading_feedback: "k anger lutningen, inte skärningen.", expected_answer: "Lutningen",
@@ -869,6 +894,17 @@ const inventedFocusReview = await runWithResults([{
 }], [question("q-focus")], focusMaterial, undefined, undefined, undefined, "sv", undefined, focus);
 assert.equal(inventedFocusReview.outcome.callOk, false, "an invented focus ID invalidates the independent review response");
 assert.equal(inventedFocusReview.outcome.failureReason, "invalid_training_focus_matches");
+for (const [field, value, expectedReason] of [
+  ["training_focus_matches", ["focus-1", "focus-1"], "invalid_training_focus_matches"],
+  ["training_focus_skill_matches", ["focus-1", "focus-1"], "invalid_training_focus_skill_matches"],
+  ["training_focus_error_matches", ["focus-1", "focus-1"], "invalid_training_focus_error_matches"],
+]) {
+  const duplicateFocusReview = await runWithResults([{
+    ...focusedResult, [field]: value,
+  }], [question("q-focus")], focusMaterial, undefined, undefined, undefined, "sv", undefined, focus);
+  assert.equal(duplicateFocusReview.outcome.callOk, false, `duplicate ${field} is rejected server-side`);
+  assert.equal(duplicateFocusReview.outcome.failureReason, expectedReason);
+}
 const missingFocusVerdict = await runWithResults([(({ training_focus_alignment: _omitted, ...rest }) => rest)(focusedResult)], [question("q-focus")], focusMaterial, undefined, undefined, undefined, "sv", undefined, focus);
 assert.equal(missingFocusVerdict.outcome.callOk, false, "missing focus verdict fails the complete review closed");
 assert.equal(missingFocusVerdict.outcome.failureReason, "missing_training_focus_alignment");

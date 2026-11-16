@@ -7,6 +7,8 @@
 
 const { MAX_MC_OPTIONS } = require("./_assessment.js");
 const { filterSourceReferences } = require("./_source-references.cjs");
+const { classifyOpenAiHttpError } = require("./_openai-http-error.cjs");
+const { settleRejectedAiSpend } = require("./_ai-usage.cjs");
 
 function buildVerifierSchema(questionCount, requireTrainingFocus = false, requireMistakeEvidence = false, targetLevel = null, questions = null) {
   const required = [
@@ -60,7 +62,7 @@ function buildVerifierSchema(questionCount, requireTrainingFocus = false, requir
       properties: {
         task_evidence: { type: "string", minLength: 8, maxLength: 300 },
         scoring_evidence: { type: "string", minLength: 8, maxLength: 300 },
-        source_fact_evidence: { type: "array", minItems: 2, maxItems: 5, uniqueItems: true, items: { type: "integer", minimum: 0, maximum: 4 } },
+        source_fact_evidence: { type: "array", minItems: 2, maxItems: 5, items: { type: "integer", minimum: 0, maximum: 4 } },
         reasoning_operation: { type: "string", enum: ["recall", "explain", "apply", "analyze", "compare", "infer", "evaluate", "synthesize"] },
         distinct_source_facts: { type: "integer", minimum: 0, maximum: 20 },
         rubric_rewards_reasoning: { type: "boolean" },
@@ -75,18 +77,18 @@ function buildVerifierSchema(questionCount, requireTrainingFocus = false, requir
     properties.training_focus_matches = {
       // Empty is a valid review outcome when a candidate does not practice a
       // documented skill. The deterministic approval gate rejects that item.
-      type: "array", minItems: 0, maxItems: 20, uniqueItems: true,
+      type: "array", minItems: 0, maxItems: 20,
       items: { type: "string", minLength: 1, maxLength: 20 },
     };
     required.push("training_focus_skill_matches");
     properties.training_focus_skill_matches = {
-      type: "array", minItems: 0, maxItems: 20, uniqueItems: true,
+      type: "array", minItems: 0, maxItems: 20,
       items: { type: "string", minLength: 1, maxLength: 20 },
     };
     if (requireMistakeEvidence) {
       required.push("training_focus_error_matches");
       properties.training_focus_error_matches = {
-        type: "array", minItems: 0, maxItems: 20, uniqueItems: true,
+        type: "array", minItems: 0, maxItems: 20,
         items: { type: "string", minLength: 1, maxLength: 20 },
       };
     }
@@ -547,14 +549,14 @@ async function verifyQuestions(questions, opts) {
       signal: AbortSignal.timeout(requestTimeoutMs)
     }, { userId });
     if (!r.ok) {
-      failed.failureReason = `http_${r.status}`;
+      failed.failureReason = classifyOpenAiHttpError(r.status, await r.text().catch(() => ""));
+      await settleRejectedAiSpend(r);
       return failed;
     }
     const raw = await r.text();
     let data;
     try { data = JSON.parse(raw); } catch { failed.failureReason = "invalid_response_json"; return failed; }
     failed.usage = data?.usage || null;
-    failed.model = data?.model || reviewModel;
     failed.latencyMs = Date.now() - startedAt;
     if (failed.usage) await settleAiSpend(r.aiSpendReservation, failed.usage);
     const outputText = extractOutputText(data);

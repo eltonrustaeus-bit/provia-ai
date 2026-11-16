@@ -105,7 +105,7 @@ try {
       assert.equal(outcome.failureReason, "invalid_contract", name);
       assert.equal(outcome.perQuestion.size, 0, name);
     }
-    assert.equal(outcome.model, "measured-solver-model", name);
+    assert.equal(outcome.model, "test-model", "diagnostics use the configured model, never provider-controlled response metadata");
     assert.deepEqual(outcome.usage, { input_tokens: 44, output_tokens: 9 }, name);
   }
   // Exercise the real provider parser; diagnostics must remain content-free
@@ -168,7 +168,7 @@ try {
 
   const sensitiveMarker = "synthetic-question-or-secret-must-not-appear";
   for (const [name, respond, expectedReason] of [
-    ["http failure", async () => new Response(sensitiveMarker, { status: 429 }), "http_error"],
+    ["http failure", async () => new Response(sensitiveMarker, { status: 429 }), "http_429_request_rejected"],
     ["bad outer JSON", async () => new Response(sensitiveMarker), "invalid_response_json"],
     ["no output", async () => new Response(JSON.stringify({ output: [] })), "missing_output"],
     ["bad output JSON", async () => new Response(JSON.stringify({ output_text: sensitiveMarker })), "invalid_output_json"],

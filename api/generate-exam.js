@@ -2407,6 +2407,7 @@ module.exports = async function handler(req, res, internalContext = null) {
           event: "exam_independent_check_unavailable",
           requestId: pipelineJobId ? `exam-pipeline:${pipelineJobId}` : quotaRequestId,
           stage: "initial_solver",
+          model: s1.model,
           failure: s1.failureReason || "verification_failed",
           ...(s1.contractFailure ? { contractFailure: s1.contractFailure } : {}),
           solverLatencyMs: s1.latencyMs,
@@ -2418,6 +2419,7 @@ module.exports = async function handler(req, res, internalContext = null) {
         console.log(JSON.stringify({
           event: "exam_quality_review_unavailable",
           stage: "initial_verifier",
+          model: v1.model,
           failure: v1.failureReason || "verification_failed",
           generationMs: gen.latencyMs,
           verifierLatencyMs: v1.latencyMs,
@@ -2620,6 +2622,7 @@ module.exports = async function handler(req, res, internalContext = null) {
                       event: "exam_independent_check_unavailable",
                       requestId: pipelineJobId ? `exam-pipeline:${pipelineJobId}` : quotaRequestId,
                       stage: "repair_solver",
+                      model: s2.model,
                       failure: s2.failureReason || "verification_failed",
                       ...(s2.contractFailure ? { contractFailure: s2.contractFailure } : {}),
                       solverLatencyMs: s2.latencyMs,
@@ -2629,6 +2632,16 @@ module.exports = async function handler(req, res, internalContext = null) {
                   repairVerifierCallOk = v2.callOk;
                   repairVerifierChecked = v2.callOk ? candidateQuestions.length : 0;
                   repairVerifierFailure = v2.failureReason || null;
+                  if (!v2.callOk) {
+                    console.warn(JSON.stringify({
+                      event: "exam_quality_review_unavailable",
+                      stage: "repair_verifier",
+                      model: v2.model,
+                      failure: v2.failureReason || "verification_failed",
+                      verifierLatencyMs: v2.latencyMs,
+                      elapsedMs: budget.elapsed(),
+                    }));
+                  }
                   const kept = [];
                   const outcome2 = { checked: 0, approved: 0, rejected: 0, callOk: v2.callOk };
                   const solverOutcome2 = { checked: 0, rejected: 0, callOk: s2.callOk, model: s2.model, reasons: {} };

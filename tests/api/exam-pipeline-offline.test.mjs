@@ -3164,11 +3164,12 @@ try {
   assert.equal(initialVerifierLog.event, "exam_quality_review_unavailable");
   assert.equal(initialVerifierLog.stage, "initial_verifier");
   assert.equal(initialVerifierLog.failure, "http_503");
+  assert.equal(typeof initialVerifierLog.model, "string", "safe reviewer model identifier is logged for rejected requests");
   assert.ok(Number.isFinite(initialVerifierLog.generationMs));
   assert.ok(Number.isFinite(initialVerifierLog.verifierLatencyMs));
   assert.ok(Number.isFinite(initialVerifierLog.elapsedMs));
   assert.deepEqual(Object.keys(initialVerifierLog).sort(), [
-    "elapsedMs", "event", "failure", "generationMs", "stage", "verifierLatencyMs",
+    "elapsedMs", "event", "failure", "generationMs", "model", "stage", "verifierLatencyMs",
   ]);
 
   activeQuestions = questions;

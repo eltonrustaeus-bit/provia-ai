@@ -44,7 +44,8 @@ const MIN_APPROVAL_CONFIDENCE = 0.7;
 // is generous; anything beyond it is handled by the CANNOT_JUDGE escape rather
 // than by guessing.
 const materialInput = require("./_material.cjs");
-const { budgetedOpenAIFetch, settleAiSpend } = require("./_ai-usage.cjs");
+const { budgetedOpenAIFetch, settleAiSpend, settleRejectedAiSpend } = require("./_ai-usage.cjs");
+const { classifyOpenAiHttpError } = require("./_openai-http-error.cjs");
 const { MAX_MC_OPTIONS } = require("./_assessment.js");
 const { filterSourceReferences } = require("./_source-references.cjs");
 const MATERIAL_CHAR_CAP = materialInput.MAX_MATERIAL_CHARS;
@@ -385,12 +386,15 @@ async function solveQuestions(questions, opts) {
       }),
       signal,
     }, { userId });
-    if (!r.ok) return failed("http_error");
+    if (!r.ok) {
+      const failure = classifyOpenAiHttpError(r.status, await r.text().catch(() => ""));
+      await settleRejectedAiSpend(r);
+      return failed(failure);
+    }
     const raw = await r.text();
     let data;
     try { data = JSON.parse(raw); } catch { return failed("invalid_response_json"); }
     empty.usage = data?.usage || null;
-    empty.model = data?.model || empty.model;
     empty.latencyMs = Date.now() - startedAt;
     if (empty.usage) await settleAiSpend(r.aiSpendReservation, empty.usage);
     const outputText = extractOutputText(data);

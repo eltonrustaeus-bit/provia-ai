@@ -1,5 +1,36 @@
 # 08 Current Status
 
+## OpenAI verifier request compatibility — 2026-11-16
+
+- A live synthetic 3-question Biologi 1 A-level request failed closed at 0/3.
+  Sanitized Vercel diagnostics show the independent verifier returned HTTP 400
+  after generating two candidates; the repair verifier also returned HTTP 400.
+  Generation separately dropped both candidates because the answer could not
+  be extracted from the source. The exact provider rejection was not retained.
+- The verifier's strict output schema used `uniqueItems`, which is not a
+  supported Structured Outputs constraint. This is the leading explanation
+  for the HTTP 400, not yet live-confirmed. Removed that provider-side keyword
+  from the A-level source-index and all three training-focus arrays. Server
+  validation still rejects duplicate indexes/focus IDs; regression tests cover
+  every list, so the quality gates remain in force.
+- Provider HTTP errors are now reduced to fixed, content-free diagnostic
+  categories. Only a malformed-request HTTP 400 settles a staging reservation
+  at zero; other errors, including 429 and 5xx, retain conservative reserved
+  cost. Failure telemetry uses the configured model name, never
+  provider-controlled response metadata.
+- Offline verification after the changes: verifier/budget/solver group
+  **14/14**; `tests/api/exam-pipeline-offline.test.mjs` passed; changed API
+  files passed `node --check`, and `git diff --check` passed. Two independent
+  read-only reviews found no blockers. This does not prove that the live A-level
+  verifier now accepts the request.
+- Fresh staging budget read: cap **$5.879071**, spent **$3.372390**, reserved
+  **$0.282822**, available **$2.223859**. The already approved extra staging
+  headroom is at most $2; no budget or role was changed. Next: publish a
+  feature-only Preview checkpoint, verify the exact deployment and staging
+  connection, then run one 3-question A-level synthetic test. Continue with
+  larger sizes only if that succeeds and budget remains. No `main`, Production,
+  production database, or user data was changed.
+
 ## Source-product ambiguity and terminal guidance — 2026-11-16
 
 - On the staging Preview at feature commit `111977e`, one synthetic 3-question

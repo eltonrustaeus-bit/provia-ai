@@ -7,6 +7,7 @@ const { streamGeneration } = require("../../api/generate-exam.js");
 const {
   PILOT_USER_ID, PILOT_BUDGET_USD, isBudgetedPilot, pilotBudgetCapUsd, normalizeBudgetBody,
   estimateWorstCaseUsd, actualCostUsd, reserveAiSpend, settleAiSpend, budgetedOpenAIFetch,
+  settleRejectedAiSpend,
 } = require("../../api/_ai-usage.cjs");
 
 const stagingEnv = {
@@ -41,6 +42,21 @@ test("actual cost uses usage and the safety multiplier, rejects incomplete usage
   assert.equal(actualCostUsd({ input_tokens: 1_000_000, output_tokens: 1_000_000 }, "gpt-6-luna"), 1.2);
   assert.equal(actualCostUsd({ input_tokens: 10 }, "gpt-6-luna"), null);
   assert.equal(actualCostUsd({ input_tokens: 1, output_tokens: 1 }, "unknown-model"), null);
+});
+
+test("rejected provider requests settle safely without leaking budget reservations", async () => {
+  for (const [status, expected] of [[400, 0], [429, 0.000001], [500, 0.000001]]) {
+    const calls = [];
+    const fetchImpl = async (_url, init) => {
+      calls.push(JSON.parse(init.body));
+      return Response.json({ ok: true });
+    };
+    const reservation = { enforced: true, userId: "user", reservationId: "reservation", model: "gpt-6-luna", reserveUsd: 0.000001 };
+    assert.equal(await settleRejectedAiSpend({ status, aiSpendReservation: reservation }, { env: stagingEnv, fetchImpl }), true);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].p_actual_usd, expected,
+      status === 400 ? "a definitive malformed request settles at zero" : "uncertain provider outcomes retain the conservative reservation");
+  }
 });
 
 test("staging budget reservation fails closed and settlement uses the same server RPC", async () => {

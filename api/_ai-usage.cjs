@@ -138,6 +138,19 @@ async function settleAiSpend(reservation, usage, options = {}) {
   return result.ok === true;
 }
 
+async function settleRejectedAiSpend(response, options = {}) {
+  const reservation = response?.aiSpendReservation;
+  if (!reservation?.enforced) return true;
+  const status = Number(response.status);
+  // Only a definitive malformed-request response is settled at zero. For
+  // every other status (including 401/429), keep the conservative reservation
+  // because this wrapper cannot prove whether provider-side work was billed.
+  if (status === 400) {
+    return settleAiSpend(reservation, { input_tokens: 0, output_tokens: 0 }, options);
+  }
+  return settleAiSpend(reservation, null, { ...options, conservativeFallback: true });
+}
+
 function budgetFailureStatus(reason) { return reason === "budget_exhausted" ? 429 : 503; }
 
 async function budgetedOpenAIFetch(url, init, { userId, fetchImpl = globalThis.fetch, env = process.env } = {}) {
@@ -267,5 +280,5 @@ module.exports = {
   measuredTokens, measuredEmbeddingTokens, qualityGatePassed, usageEvent, logAiUsage, logMockExamUsage, safeFailureDetails,
   PILOT_STAGING_REF, PILOT_USER_ID, PILOT_BUDGET_USD, RATES_PER_MILLION,
   isBudgetedPilot, pilotBudgetCapUsd, normalizeBudgetBody, estimateWorstCaseUsd, actualCostUsd,
-  reserveAiSpend, settleAiSpend, budgetedOpenAIFetch, budgetFailureStatus,
+  reserveAiSpend, settleAiSpend, settleRejectedAiSpend, budgetedOpenAIFetch, budgetFailureStatus,
 };
