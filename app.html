@@ -2657,14 +2657,31 @@ try{
               :terminalUnknown?"The exam could not be completed. No exam was issued. Please try again later."
               :"ExGen could not create a complete exam that passed review. No exam was issued; try again with more relevant material or fewer questions.")
             : "ExGen could not complete the required quality checks. No exam was issued; please try again.");
-        if(res.data.error==="incomplete_exam")try{window.ExGenGenerationRequest?.clearPendingGeneration?.(idempotencyKey);}catch{}
+        let terminalCleanupFailed=false;
+        const definitiveTerminalFailure=res.status===502&&res.ok===false&&res.data?.ok===false
+          &&res.data?.error==="incomplete_exam"&&!res.data?.failureKind
+          &&!res.data?.exam&&!res.data?.exam_manifest&&!res.data?.questions;
+        if(definitiveTerminalFailure){
+          try{
+            const terminalResult=await window.ExGenGenerationRequest?.clearTerminalGeneration?.(idempotencyKey);
+            if(terminalResult?.terminalMarked!==true)terminalCleanupFailed=true;
+            else{
+              if(terminalResult.durableCleared!==true)terminalCleanupFailed=true;
+              try{window.ExGenGenerationRequest?.clearPendingGeneration?.(idempotencyKey);}catch{terminalCleanupFailed=true;}
+              try{window.ExGenGenerationRequest?.clearPendingInput?.(idempotencyKey);}catch{terminalCleanupFailed=true;}
+            }
+          }catch{terminalCleanupFailed=true;}
+        }
         const hasSafeCounts=res.data?.error==="incomplete_exam"
           && Number.isInteger(res.data.received)&&Number.isInteger(res.data.requested)
           && res.data.received>=0&&res.data.requested>0&&res.data.received<res.data.requested;
         const countNote=hasSafeCounts
           ? (LANG==="sv"?` ${res.data.received} av ${res.data.requested} frågor klarade kontrollen.`:` ${res.data.received} of ${res.data.requested} questions passed review.`)
           : "";
-        const fullMessage=message+countNote;
+        const cleanupNote=terminalCleanupFailed
+          ?(LANG==="sv"?" Den avslutade begäran kunde inte rensas säkert. Starta inte ett nytt prov i en annan flik; kontakta pilotansvarig.":" The completed request could not be cleared safely. Do not start another exam in a different tab; contact the pilot lead.")
+          :"";
+        const fullMessage=message+countNote+cleanupNote;
         setStatus(fullMessage,"bad");
         hideDebug();
         return {ok:false,error:fullMessage,errorCode:res.data.error,

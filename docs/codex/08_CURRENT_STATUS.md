@@ -1,5 +1,46 @@
 # 08 Current Status
 
+## Definitive terminal-request cleanup — 2026-11-17
+
+- The authenticated Preview previously blocked a new start because failed
+  generation requests were still offered for recovery. The client terminal
+  handler cleared only its tab recovery copy; durable same-payload request IDs
+  live in shared browser storage. The latest observed synthetic 12-question
+  pipeline job had failed at 0 accepted questions after three attempts. The
+  exact provider-stage cause is unavailable because retained Vercel runtime
+  logs did not cover that time window.
+- Terminal cleanup now requires the explicit final contract: HTTP 502,
+  `ok:false`, `error:incomplete_exam`, no issued exam fields, and no budget or
+  other failure classification. Budget exhaustion/unavailability, unknown
+  terminal results, timeouts, network/auth errors and nonterminal progress
+  preserve the retry data.
+- The browser stores a shared, 7-day terminal-ID marker under the existing
+  cross-tab Web Lock before removing that durable ID. Other tabs reject the ID
+  during ordinary lookup/retry/restore, and stale session recovery is filtered
+  before it is offered. The marker store has a 256-entry cap; it fails closed
+  rather than evicting unexpired markers. Marker-write failure leaves the
+  durable request intact. No quality gates or quota behavior changed.
+- Added focused terminal-ID tests: **22 assertions passed**, including both
+  Web-Lock orderings, stale input/recovery copies, marker-storage failure and
+  fail-closed capacity. The browser UI checkpoint passed **91/91**, and the
+  budget-error UI checkpoint passed **2/2**. Syntax checks and `git diff
+  --check` passed. A full browser-suite run was interrupted after roughly two
+  minutes while it was progressing through older scenarios; it is not counted
+  as a pass. The broad idempotency script reaches the already-known unrelated
+  failure `recovery rejects oversized or excessive nested material without
+  truncating it` at line 483; it is not counted as passing.
+- Independent reviewer found no remaining blocker after the final patch. The
+  reviewer noted optional extra UI cases for 202/500 and malformed 502
+  responses; the implemented cleanup gate rejects them by construction, but
+  those exact response variants were not separately exercised in the browser.
+- This is local verification only. No additional staging AI request, account
+  or budget change, database write, `main`, or Production action was made.
+  Last available staging observation showed no active leases and numerous
+  retryable request rows; it is not a fresh read from this turn. Next: finish
+  the browser regression, run the independent final review, then checkpoint to
+  the existing feature Preview and verify that deployment before any bounded
+  staging journey.
+
 ## Continued pipeline and replacement verification — 2026-11-16
 
 - The replacement-question flow now derives its training focus from the signed

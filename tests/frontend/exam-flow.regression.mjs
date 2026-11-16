@@ -869,12 +869,16 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
     await page.waitForSelector("#xf .xf-screen[data-screen='contract'].on", { timeout: 5000 });
     const qualityMessage = "För få frågor klarade kvalitetskontrollen för att bilda ett användbart prov. Inget prov lämnades ut. Lägg till mer relevant material eller avgränsa området och försök igen.";
     const operationId = "12345678-1234-4234-8234-123456789abc";
+    let terminalIdempotencyKey = null;
     await page.route("**/api/generate-exam*", route => {
       const url = new URL(route.request().url());
       const pipeline = url.searchParams.get("pipeline");
-      if (pipeline === "start") return route.fulfill({ status: 202, json: {
-        ok: true, operationId, requested: 3, approved: 0, state: "queued",
-      } });
+      if (pipeline === "start") {
+        try { terminalIdempotencyKey = route.request().postDataJSON()?.idempotencyKey || null; } catch {}
+        return route.fulfill({ status: 202, json: {
+          ok: true, operationId, requested: 3, approved: 0, state: "queued",
+        } });
+      }
       if (pipeline === "advance") return route.fulfill({ status: 502, json: {
         ok: false, error: "incomplete_exam", message: qualityMessage, received: 0, requested: 3,
       } });
@@ -899,6 +903,18 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
     ok("noll-frågefallet visar ett begripligt kvalitetsfel och inte en HTTP-kod",
       await page.locator("#xf .xf-screen[data-screen='contract'] .xf-err").textContent().then(text =>
         text.includes(qualityMessage) && text.includes("0 av 3 frågor klarade kontrollen") && !text.includes("Error (HTTP 502)")));
+    const failedRequestCleanup = await page.evaluate(key => {
+      const durable = JSON.parse(localStorage.getItem("exgen_generation_request_v1") || '{"requests":[]}');
+      const terminal = JSON.parse(localStorage.getItem("exgen_generation_terminal_v1") || '{"requests":[]}');
+      const recovery = JSON.parse(sessionStorage.getItem("exgen_generation_recovery_v1") || '{"requests":[]}');
+      const inputs = JSON.parse(sessionStorage.getItem("exgen_pending_generation_input_v1") || '{"requests":[]}');
+      const contains = value => JSON.stringify(value).includes(key);
+      return { durable: contains(durable), terminal: contains(terminal), recovery: contains(recovery), inputs: contains(inputs) };
+    }, terminalIdempotencyKey);
+    ok("definitivt misslyckad provbegäran rensas ur idempotens- och återupptagningslagret",
+      Boolean(terminalIdempotencyKey) && !failedRequestCleanup.durable && failedRequestCleanup.terminal
+        && !failedRequestCleanup.recovery && !failedRequestCleanup.inputs,
+      JSON.stringify(failedRequestCleanup));
     await page.route("**/api/generate-exam*", route => route.fulfill({
       status: 429, json: { ok: false, error: "Quota exceeded", count: 3, limit: 3, period: "2026-W43", periodUnit: "week" },
     }));
@@ -933,6 +949,14 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
   }
 }
 
+if (process.env.EXGEN_TERMINAL_CLEANUP_ONLY === "1") {
+  await browser.close();
+  await srv.close();
+  fail.forEach(item => console.error(`FEL ${item}`));
+  console.log(`terminal cleanup UI checkpoint: ${pass.length} passed, ${fail.length} failed`);
+  process.exit(fail.length ? 1 : 0);
+}
+
 // Budget failures must not be shown as a source-quality rejection or raw HTTP
 // error. These mocked responses exercise the real guided flow and engine.
 const budgetPassStart = pass.length;
@@ -947,11 +971,15 @@ const budgetFailStart = fail.length;
     await page.click("#xf .xf-screen[data-screen='material'] .xf-btn.primary");
     await page.waitForSelector("#xf .xf-screen[data-screen='contract'].on", { timeout: 5000 });
     const operationId = "12345678-1234-4234-8234-123456789abc";
+    let budgetIdempotencyKey = null;
     await page.route("**/api/generate-exam*", route => {
       const pipeline = new URL(route.request().url()).searchParams.get("pipeline");
-      if (pipeline === "start") return route.fulfill({ status: 202, json: {
-        ok: true, operationId, requested: 3, approved: 0, state: "queued",
-      } });
+      if (pipeline === "start") {
+        try { budgetIdempotencyKey = route.request().postDataJSON()?.idempotencyKey || null; } catch {}
+        return route.fulfill({ status: 202, json: {
+          ok: true, operationId, requested: 3, approved: 0, state: "queued",
+        } });
+      }
       return route.fulfill({ status: 502, json: {
         ok: false, error: "incomplete_exam", failureKind: "AI_BUDGET_EXHAUSTED",
         message: "Stagingens AI-budget är slut.", received: 0, requested: 3,
@@ -964,11 +992,20 @@ const budgetFailStart = fail.length;
       ?.textContent?.includes("Contact the pilot lead"), null, { timeout: 5000 });
     const error = await page.locator("#xf .xf-screen[data-screen='contract'] .xf-err").textContent();
     const hint = await page.locator("#xf .xf-screen[data-screen='contract'] .xf-sub").textContent();
+    const budgetRecoveryPreserved = await page.evaluate(key => {
+      const inStore = (storeKey, storage) => JSON.stringify(JSON.parse(storage.getItem(storeKey) || '{"requests":[]}')).includes(key);
+      return {
+        durable: inStore("exgen_generation_request_v1", localStorage),
+        recovery: inStore("exgen_generation_recovery_v1", sessionStorage),
+        terminal: inStore("exgen_generation_terminal_v1", localStorage),
+      };
+    }, budgetIdempotencyKey);
     ok("English budget stop remains localized and does not blame the source",
       error.includes("The staging AI budget is exhausted") && !error.includes("Stagingens")
         && !error.includes("relevant material") && hint.includes("Contact the pilot lead")
-        && !hint.includes("fewer questions") && errs.length === 0,
-      JSON.stringify({ error, hint, errs }));
+        && !hint.includes("fewer questions") && errs.length === 0
+        && budgetRecoveryPreserved.durable && budgetRecoveryPreserved.recovery && !budgetRecoveryPreserved.terminal,
+      JSON.stringify({ error, hint, errs, budgetRecoveryPreserved }));
   } catch (e) {
     ok("English budget stop remains localized and does not blame the source", false, e.message);
   } finally {
