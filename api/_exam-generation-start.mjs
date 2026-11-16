@@ -316,7 +316,7 @@ async function status(req, res, user) {
       error: "incomplete_exam",
       requested: job.requested_count,
       received: job.progress_current,
-      message: "För få frågor klarade kvalitetskontrollen för att skapa ett säkert prov. Inget prov lämnades ut.",
+      message: "Provet kunde inte färdigställas med tillräckligt många granskade frågor. Inget prov lämnades ut. Kontrollera materialet eller försök igen senare.",
     });
   }
   if (job.state === "succeeded") {

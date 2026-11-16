@@ -10,6 +10,7 @@ const ERROR_CLASSES = new Set(["AbortError", "Error", "TimeoutError", "TypeError
 const PILOT_STAGING_REF = "yhcinqejsocpmmetazpz";
 const PILOT_USER_ID = "c54b2a2a-c11a-4f55-aadd-f5935e7995e7";
 const PILOT_BUDGET_USD = 5;
+const MAX_APPROVED_PILOT_BUDGET_USD = 7; // default 5 USD plus at most 2 USD of explicitly approved staging headroom
 const SAFETY_FACTOR = 2;
 const DEFAULT_MAX_OUTPUT_TOKENS = 12000;
 const RATES_PER_MILLION = Object.freeze({
@@ -28,7 +29,7 @@ function isBudgetedPilot(userId, env = process.env) {
 function pilotBudgetCapUsd(env = process.env) {
   if (!Object.hasOwn(env, "EXGEN_PILOT_BUDGET_CAP_USD")) return PILOT_BUDGET_USD;
   const capUsd = Number(env.EXGEN_PILOT_BUDGET_CAP_USD);
-  return Number.isFinite(capUsd) && capUsd > 0 && capUsd <= PILOT_BUDGET_USD
+  return Number.isFinite(capUsd) && capUsd > 0 && capUsd <= MAX_APPROVED_PILOT_BUDGET_USD
     ? Math.round(capUsd * 1_000_000) / 1_000_000
     : null;
 }

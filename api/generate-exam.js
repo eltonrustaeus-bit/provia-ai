@@ -1011,7 +1011,7 @@ async function streamGeneration({ apiKey, payload, budgetMs, userId }) {
     reservation = r.aiSpendReservation || null;
     if (!r.ok) {
       await r.text().catch(() => "");
-      return { ok: false, status: r.status, latencyMs: Date.now() - t0 };
+      return { ok: false, status: r.status, budgetBlocked: r.aiBudgetBlocked === true, latencyMs: Date.now() - t0 };
     }
 
     const decoder = new TextDecoder();
@@ -2079,17 +2079,25 @@ module.exports = async function handler(req, res, internalContext = null) {
         event: "exam_generation_provider_failure",
         requestId: quotaRequestId,
         stage: failureStage,
-        category: gen.status ? "upstream_http_error" : (gen.failureKind || "transport_error"),
-        ...(Number.isInteger(gen.status) && gen.status > 0 ? { upstreamStatus: gen.status } : {}),
+        category: gen.budgetBlocked ? "local_budget_guard" : gen.status ? "upstream_http_error" : (gen.failureKind || "transport_error"),
+        ...(!gen.budgetBlocked && Number.isInteger(gen.status) && gen.status > 0 ? { upstreamStatus: gen.status } : {}),
       }));
       return fail(502, {
         ok: false,
-        error: "exam_generation_failed",
+        error: gen.budgetBlocked
+          ? (gen.status === 429 ? "ai_budget_exhausted" : "ai_budget_unavailable")
+          : "exam_generation_failed",
         requestId: quotaRequestId,
         stage: failureStage,
-        message: lang === "en"
-          ? "A technical issue stopped exam generation. No exam was issued. Please try again shortly."
-          : "Ett tekniskt fel stoppade provskapandet. Inget prov lämnades ut. Försök igen om en stund.",
+        message: gen.budgetBlocked
+          ? (gen.status === 429
+            ? (lang === "en" ? "The staging AI budget is exhausted. No exam was issued. Please contact the pilot lead."
+              : "Stagingens AI-budget är slut. Inget prov lämnades ut. Kontakta pilotansvarig.")
+            : (lang === "en" ? "The staging AI budget could not be verified. No exam was issued. Please contact the pilot lead."
+              : "Stagingens AI-budget kunde inte verifieras. Inget prov lämnades ut. Kontakta pilotansvarig."))
+          : lang === "en"
+            ? "A technical issue stopped exam generation. No exam was issued. Please try again shortly."
+            : "Ett tekniskt fel stoppade provskapandet. Inget prov lämnades ut. Försök igen om en stund.",
       });
     }
 

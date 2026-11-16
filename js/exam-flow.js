@@ -2079,8 +2079,10 @@
       if (!r || !r.ok || !r.exam || !Array.isArray(r.exam.questions) || !r.exam.questions.length) {
         if (r?.errorCode === "generation_request_expired") S.resumeRequest = null;
         err.textContent = (r && r.error) || tx("Provet kunde inte byggas. Försök igen.", "The exam could not be created. Please try again.");
-        var retryHint = r && r.errorCode === "incomplete_exam"
-          ? tx("Lägg till mer relevant material eller avgränsa området tydligare.", "Add more relevant study material or narrow the topic.")
+        var retryHint = r && r.failureKind && r.failureKind.indexOf("AI_BUDGET_") === 0
+          ? tx("Kontakta pilotansvarig om felet fortsätter.", "Contact the pilot lead if this continues.")
+          : r && r.errorCode === "incomplete_exam"
+          ? tx("Kontrollera materialet eller försök igen senare.", "Check the study material or try again later.")
           : tx("Försök igen, gärna med färre frågor.", "Try again, perhaps with fewer questions.");
         say(tx("Det gick inte den här gången.", "That did not work this time."), retryHint);
         return;

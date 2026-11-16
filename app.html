@@ -2399,6 +2399,7 @@ try{
         continue;
       }
       if(step.status===0||step.status>=500||step.timedOut||step.networkError){
+        if(step.data?.error==="incomplete_exam"&&step.data?.failureKind)return step;
         consecutiveNetworkFailures++;
         consecutiveWorkingPolls=0;
         const current=await getWithSessionRecovery(`/api/generate-exam?pipeline=status&operationId=${encodeURIComponent(operationId)}`,{timeoutMs:10000});
@@ -2648,7 +2649,7 @@ try{
         const fullMessage=message+countNote;
         setStatus(fullMessage,"bad");
         hideDebug();
-        return {ok:false,error:fullMessage,errorCode:res.data.error};
+        return {ok:false,error:fullMessage,errorCode:res.data.error,failureKind:res.data.failureKind||null};
       }
       if(res.data?.error==="mock_quota_unavailable"||res.data?.error==="exam_generation_failed"){
         const message=res.data.error==="mock_quota_unavailable"

@@ -16,8 +16,10 @@ assert.match(app, /Math\.max\(2, Number\(num\) \|\| 3\)/,
   "restoring an exam does not silently raise two questions to three");
 assert.match(app, /errorCode:res\.data\.error/,
   "the engine preserves the server error code separately from the localized message");
-assert.match(flow, /r\.errorCode === "incomplete_exam"[\s\S]*?Lägg till mer relevant material eller avgränsa området tydligare\.[\s\S]*?: tx\("Försök igen, gärna med färre frågor\./,
-  "quality rejections ask for better source material, while other failures may still suggest fewer questions");
+assert.match(flow, /r\.failureKind[\s\S]*?AI_BUDGET_[\s\S]*?Kontakta pilotansvarig om felet fortsätter\.[\s\S]*?r\.errorCode === "incomplete_exam"[\s\S]*?Kontrollera materialet eller försök igen senare\./,
+  "a local budget failure is not mislabeled as a question-quality rejection");
+assert.match(app, /failureKind:res\.data\.failureKind\|\|null/,
+  "the engine passes the sanitized terminal cause to the guided flow");
 assert.match(app, /Number\.isInteger\(res\.data\.received\)[\s\S]*?res\.data\.received\} av \$\{res\.data\.requested\} frågor klarade kontrollen/,
   "when no safe partial exam can be delivered, the student sees how many questions passed review");
 assert.match(flow, /function questionCountNote\(got, requested\)/,

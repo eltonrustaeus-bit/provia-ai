@@ -446,6 +446,8 @@ async function advance(job, { deadlineAt = null } = {}) {
   catch { generated = null; }
   if (!generated || generated.status !== 200 || generated.body?.ok !== true || !Array.isArray(generated.body.questions)) {
     const preflightBudgetInsufficient = generated?.body?.error === "generation_budget_insufficient";
+    const budgetFailure = generated?.body?.error === "ai_budget_exhausted" ? "AI_BUDGET_EXHAUSTED"
+      : generated?.body?.error === "ai_budget_unavailable" ? "AI_BUDGET_UNAVAILABLE" : null;
     console.info(JSON.stringify({
       event: "exam_generation_pipeline_batch",
       requestId: pipelineRequestId(job, generated?.body?.qualityDiagnostics?.requestId || generated?.body?.requestId),
@@ -455,7 +457,7 @@ async function advance(job, { deadlineAt = null } = {}) {
       acceptedAfter: existing.length,
       setupMs,
       remainingAtBatchStartMs,
-      failure: preflightBudgetInsufficient
+      failure: budgetFailure ? budgetFailure.toLowerCase() : preflightBudgetInsufficient
         ? "generation_budget_insufficient"
         : generated?.body?.error === "quality_review_unavailable"
         ? "quality_review_unavailable"
@@ -471,10 +473,10 @@ async function advance(job, { deadlineAt = null } = {}) {
       : await operations.retryPipelineStep({
           jobId: job.id,
           leaseToken: job.lease_token,
-          errorCode: generated?.body?.error === "quality_review_unavailable" ? "REVIEW_UNAVAILABLE" : "BATCH_FAILED",
+          errorCode: budgetFailure || (generated?.body?.error === "quality_review_unavailable" ? "REVIEW_UNAVAILABLE" : "BATCH_FAILED"),
         });
     return retryOutcome(retry, job,
-      preflightBudgetInsufficient ? "GENERATION_BUDGET_INSUFFICIENT" : "BATCH_FAILED");
+      preflightBudgetInsufficient ? "GENERATION_BUDGET_INSUFFICIENT" : budgetFailure || "BATCH_FAILED");
   }
 
   const accepted = [...existing];
