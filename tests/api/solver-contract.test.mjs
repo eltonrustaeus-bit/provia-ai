@@ -79,6 +79,7 @@ for (const [name, verdict] of [
 }
 
 const originalFetch = globalThis.fetch;
+let capturedRequestBody = null;
 try {
   for (const [name, results] of [
     ["complete response", valid],
@@ -108,6 +109,17 @@ try {
     assert.equal(outcome.model, "test-model", "diagnostics use the configured model, never provider-controlled response metadata");
     assert.deepEqual(outcome.usage, { input_tokens: 44, output_tokens: 9 }, name);
   }
+  globalThis.fetch = async (_input, init = {}) => {
+    capturedRequestBody = JSON.parse(init.body || "{}");
+    return new Response(JSON.stringify({
+      usage: { input_tokens: 44, output_tokens: 9 },
+      output_text: JSON.stringify({ results: valid.map(wire) }),
+    }), { status: 200, headers: { "content-type": "application/json" } });
+  };
+  await solver.solveQuestions(questions, { apiKey: "test-only", model: "gpt-6-luna", lang: "en", material: "test" });
+  assert.deepEqual(capturedRequestBody.reasoning, { effort: "none" },
+    "GPT-6 Luna blind solver uses low-latency reasoning");
+  assert.equal(capturedRequestBody.text.format.strict, true, "the Luna solver keeps strict structured output");
   // Exercise the real provider parser; diagnostics must remain content-free
   // and the entire batch stays withheld, even if another result was valid.
   const source = "ATP driver aktiv transport. DNA finns i cellkärnan.";

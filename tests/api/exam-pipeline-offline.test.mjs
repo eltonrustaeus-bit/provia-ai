@@ -23,20 +23,27 @@ assert.equal(generateExam.addRepairCandidateCount(
 
 const originalStreamFetch = globalThis.fetch;
 const streamedPartialQuestion = '{"title":"Syntetiskt","level":"C","questions":[{"id":"partial-1","question":"2 + 2?"},';
-globalThis.fetch = async (_url, { signal }) => new Response(new ReadableStream({
+let streamRequestBody;
+globalThis.fetch = async (_url, { signal, body }) => {
+  streamRequestBody = JSON.parse(body);
+  return new Response(new ReadableStream({
   start(controller) {
     const event = { type: "response.output_text.delta", delta: streamedPartialQuestion };
     controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(event)}\n\n`));
     signal.addEventListener("abort", () => controller.error(new DOMException("Aborted", "AbortError")), { once: true });
   },
-}));
+  }));
+};
 let interruptedRepairStream;
 try {
-  interruptedRepairStream = await generateExam.streamGeneration({ apiKey: "synthetic", payload: {}, budgetMs: 25 });
+  interruptedRepairStream = await generateExam.streamGeneration({ apiKey: "synthetic", payload: { model: "gpt-6-luna", text: { format: { strict: true } } }, budgetMs: 25 });
 } finally {
   globalThis.fetch = originalStreamFetch;
 }
 assert.equal(interruptedRepairStream.ok, true);
+assert.deepEqual(streamRequestBody.reasoning, { effort: "none" },
+  "GPT-6 Luna generation uses the documented low-latency reasoning mode");
+assert.equal(streamRequestBody.text.format.strict, true, "the Luna generator keeps strict structured output");
 assert.equal(interruptedRepairStream.cutShort, true,
   "a provider stream timeout is recognized as an expected bounded interruption");
 assert.match(interruptedRepairStream.text, /partial-1/,
@@ -47,6 +54,12 @@ const parsedInterruptedRepair = generateExam.parseExamResponse({
 assert.equal(parsedInterruptedRepair.parseStatus, "salvaged_json");
 assert.equal(parsedInterruptedRepair.exam.questions.length, 1,
   "the parser can recover a complete question before the interrupted JSON tail");
+
+const { modelReasoningOptions } = require("../../api/_model-reasoning.cjs");
+assert.deepEqual(modelReasoningOptions("gpt-6-luna"), { reasoning: { effort: "none" } });
+assert.deepEqual(modelReasoningOptions("gpt-6-luna-2026-10-01"), {}, "model snapshots must be explicitly evaluated before tuning");
+assert.deepEqual(modelReasoningOptions("gpt-4o-mini"), {}, "non-Luna model request settings remain unchanged");
+assert.deepEqual(modelReasoningOptions(""), {}, "missing model request settings remain unchanged");
 
 assert.equal(assessment.MAX_MC_OPTIONS, 5);
 assert.equal(generateExam.pickModel({ isMath: false, env: {} }), "gpt-4o-mini",

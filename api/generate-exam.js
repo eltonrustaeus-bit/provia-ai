@@ -18,6 +18,7 @@ const { logMockExamUsage, qualityGatePassed } = require("./_ai-usage.cjs");
 const { budgetedOpenAIFetch, settleAiSpend } = require("./_ai-usage.cjs");
 const materialInput = require("./_material.cjs");
 const mistakeTraining = require("./_mistake-training.cjs");
+const { modelReasoningOptions } = require("./_model-reasoning.cjs");
 
 function cognitiveVerbHint(lang) {
   const v = assessment.COGNITIVE_VERBS;
@@ -1016,7 +1017,7 @@ async function streamGeneration({ apiKey, payload, budgetMs, userId }) {
     const r = await budgetedOpenAIFetch("https://api.openai.com/v1/responses", {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ ...payload, stream: true }),
+      body: JSON.stringify({ ...payload, ...modelReasoningOptions(payload?.model), stream: true }),
       signal: controller.signal,
     }, { userId });
     reservation = r.aiSpendReservation || null;
@@ -2270,7 +2271,7 @@ module.exports = async function handler(req, res, internalContext = null) {
         const response = await budgetedOpenAIFetch("https://api.openai.com/v1/responses", {
           method: "POST",
           headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-          body: JSON.stringify(repairPayload),
+          body: JSON.stringify({ ...repairPayload, ...modelReasoningOptions(repairPayload?.model) }),
           signal: AbortSignal.timeout(structuralRepairTimeout),
         }, { userId: user.id });
         repairHttpStatus = response.status;

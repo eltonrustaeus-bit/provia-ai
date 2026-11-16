@@ -9,6 +9,7 @@ const { MAX_MC_OPTIONS } = require("./_assessment.js");
 const { filterSourceReferences } = require("./_source-references.cjs");
 const { classifyOpenAiHttpError } = require("./_openai-http-error.cjs");
 const { settleRejectedAiSpend } = require("./_ai-usage.cjs");
+const { modelReasoningOptions } = require("./_model-reasoning.cjs");
 
 function buildVerifierSchema(questionCount, requireTrainingFocus = false, requireMistakeEvidence = false, targetLevel = null, questions = null) {
   const required = [
@@ -540,6 +541,7 @@ async function verifyQuestions(questions, opts) {
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         model: reviewModel,
+        ...modelReasoningOptions(reviewModel),
         input: [
           { role: "system", content: buildVerifierPrompt(lang, subjectProfile, items.length, targetLevel, requiresTrainingFocus) },
           { role: "user", content: reviewPayload }

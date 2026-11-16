@@ -15,7 +15,7 @@ const sourceSupport = (quote, parts = 0, answers = 0) => ({
   accepted_answer_evidence: Array.from({ length: answers }, () => [0]),
 });
 
-async function runWithResults(results, questions = [question("q1"), question("q2")], material = "", timeoutMs, targetLevel, comparisonQuestions, lang = "en", reviewHintsById, trainingFocus, comparisonAnswerTargets) {
+async function runWithResults(results, questions = [question("q1"), question("q2")], material = "", timeoutMs, targetLevel, comparisonQuestions, lang = "en", reviewHintsById, trainingFocus, comparisonAnswerTargets, model = "synthetic") {
   const originalFetch = globalThis.fetch;
   const originalConsoleInfo = console.info;
   const sourceContractEvents = [];
@@ -40,7 +40,7 @@ async function runWithResults(results, questions = [question("q1"), question("q2
     });
   };
   try {
-    return { outcome: await verifyQuestions(questions, { apiKey: "synthetic", model: "synthetic", lang, material, timeoutMs, targetLevel, comparisonQuestions, comparisonAnswerTargets, reviewHintsById, trainingFocus }), fetchCalls, requestBody, requestTimeoutMs, sourceContractEvents };
+    return { outcome: await verifyQuestions(questions, { apiKey: "synthetic", model, lang, material, timeoutMs, targetLevel, comparisonQuestions, comparisonAnswerTargets, reviewHintsById, trainingFocus }), fetchCalls, requestBody, requestTimeoutMs, sourceContractEvents };
   } finally {
     globalThis.fetch = originalFetch;
     console.info = originalConsoleInfo;
@@ -54,6 +54,10 @@ assert.equal(valid.outcome.perQuestion.size, 2);
 assert.equal(valid.outcome.perQuestion.get("q1").approved, true);
 assert.equal(valid.outcome.model, "synthetic", "diagnostics use the configured model, never provider-controlled response metadata");
 assert.deepEqual(valid.outcome.usage, { input_tokens: 31, output_tokens: 7 });
+const lunaReview = await runWithResults([result("q1", true)], [question("q1")], "", undefined, undefined, undefined, "en", undefined, undefined, undefined, "gpt-6-luna");
+assert.deepEqual(lunaReview.requestBody.reasoning, { effort: "none" },
+  "GPT-6 Luna verifier uses low-latency reasoning without changing its review schema");
+assert.equal(lunaReview.requestBody.text.format.strict, true, "the Luna verifier keeps strict structured output");
 assert.equal(valid.requestTimeoutMs, 30_000, "the reviewer keeps its default upper timeout");
 assert.deepEqual(classifyReviewFindings(["Poängmatrisen ger metodpoäng som frågan inte efterfrågar."]), ["scoring_alignment"],
   "reviewer notes are reduced to a fixed scoring category without retaining their wording");

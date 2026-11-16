@@ -48,6 +48,7 @@ const { budgetedOpenAIFetch, settleAiSpend, settleRejectedAiSpend } = require(".
 const { classifyOpenAiHttpError } = require("./_openai-http-error.cjs");
 const { MAX_MC_OPTIONS } = require("./_assessment.js");
 const { filterSourceReferences } = require("./_source-references.cjs");
+const { modelReasoningOptions } = require("./_model-reasoning.cjs");
 const MATERIAL_CHAR_CAP = materialInput.MAX_MATERIAL_CHARS;
 
 function solverModel(generatorModel) {
@@ -378,6 +379,7 @@ async function solveQuestions(questions, opts) {
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         model: solverModel(model),
+        ...modelReasoningOptions(solverModel(model)),
         input: [
           { role: "system", content: buildSolverPrompt(lang, subjectProfile) },
           { role: "user", content: `Material:\n${trimmedMaterial}\n\nKällutdrag:\n${JSON.stringify(sourceUnits)}\n\nFrågor:\n${JSON.stringify(items)}` },

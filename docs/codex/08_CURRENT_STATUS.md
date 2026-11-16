@@ -5985,3 +5985,23 @@ enda 12-frågetest. Offline- och mocktester bevisar inte live-modellens
   till `gpt-6-luna` endast för Preview-branchen. Det är en icke-hemlig
   modellinställning; Production påverkas inte. En ny deployment och ett enda
   jämförande syntetiskt 3-frågetest återstår.
+
+### GPT-6 Luna: resonemangsläge — 2026-11-16
+
+- [x] Den första Luna-jämförelsen kördes med modellens standardläge `medium`.
+  Staging avslutade säkert med **0/3**, utan att utfärda prov. Den sanerade
+  körningsloggen visar verifierartimeout; ingen kvalitetsgrind passerades.
+- [x] Lokal ändring skickar nu `reasoning.effort: "none"` endast när det
+  konfigurerade modellnamnet exakt är `gpt-6-luna`, för generering,
+  strukturell reparation, oberoende granskning och blind lösning. Övriga
+  modellnamn behåller befintliga request body-inställningar.
+- [x] Strikta Structured Outputs-scheman och befintliga gransknings- och
+  lösargrindar är oförändrade. Riktade mocktester bekräftar request-parametern
+  för alla tre rollerna och strikt schema för generator, granskare och lösare.
+- [x] Officiell modellguide rekommenderar `none` som startläge vid GPT-4.x-
+  migrering och modellreferensen listar stödet för GPT-6 Luna. Detta är en
+  testkonfiguration, inte belägg för högre fråga- eller provkvalitet.
+- [!] Kodändringen är ännu lokal. Staging måste verifieras på exakt ny
+  Preview-commit med ett syntetiskt test innan någon slutsats om hastighet,
+  kvalitet eller användarresultat dras. Senast kända tillgängliga stagingbudget
+  före detta försök var $2.003781; kontrollera den färskt innan liveanrop.
