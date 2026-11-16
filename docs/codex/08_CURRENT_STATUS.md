@@ -6123,3 +6123,15 @@ enda 12-frågetest. Offline- och mocktester bevisar inte live-modellens
   passerade **10/10**. Syntaxkontroller och `git diff --check` passerade.
 - [!] Detta verifierar kodvägen offline, inte semantisk kvalitet med live-modell.
   Ingen betald modellkörning, migration, Preview eller produktionsändring gjordes.
+
+### Ersättningsfokus i den faktiska reparationsprompten — 2026-11-16
+
+- [x] Den nya interna integrationstesten hittade att `buildRepairPayload` byter
+  ut den ursprungliga användarprompten. Därför nådde ersättningsmålet inte själva
+  kvalitetsreparationsanropet trots att det fanns i den vanliga promptbyggaren.
+- [x] Reparationsprompten tar nu med samma avgränsade och serverhärledda fokus.
+  Testet kontrollerar också att målet når oberoende verifiering och återkommer
+  som verifierad match, medan ett manipulerat klientfält inte påverkar flödet.
+  Samtliga befintliga granskningsgrindar är kvar.
+- [!] Detta är lokal offline-evidens. Livekvalitet, kostnad och svarstid för en
+  verklig ersättningsfråga är fortfarande inte uppmätta.

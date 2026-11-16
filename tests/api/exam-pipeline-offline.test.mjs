@@ -1476,6 +1476,12 @@ globalThis.fetch = async (input, init = {}) => {
           : [],
         issues: rejected ? ["Exempelsvaret motsäger frågan."] : [],
         required_changes: rejected ? ["Rätta exempelsvaret."] : [],
+        ...(reviewInput.training_focus?.length ? {
+          training_focus_alignment: true,
+          training_focus_matches: reviewInput.training_focus.map((focus) => focus.id),
+          training_focus_skill_matches: reviewInput.training_focus.filter((focus) => focus.skill).map((focus) => focus.id),
+          training_focus_error_matches: [],
+        } : {}),
       }; }) });
     }
     if (schemaName === "exam_solver_schema") {
@@ -2654,6 +2660,53 @@ try {
   assert.ok(solverInputs.slice(solverCallsBeforeBoundaryRepair).some((batch) =>
     batch.some((question) => question.id.startsWith("retry-"))),
   "the replacement candidates reach the independent blind solver");
+
+  const focusReviewState = {
+    activeQuestions, regenerationQuestions, verifierRejectQuestionId,
+  };
+  const replacementVerifierStart = verifierInputs.length;
+  const replacementProviderStart = calls.length;
+  let verifiedReplacementBatch;
+  activeQuestions = questions;
+  regenerationQuestions = questions;
+  verifierRejectQuestionId = null;
+  try {
+    verifiedReplacementBatch = await generateExam.generateVerifiedBatch({
+      userId,
+      pipelineStage: "repair",
+      replacementFocus: {
+        concept: "Aritmetik", learningObjective: "Beräkna enkel addition.",
+        topic: "Räknesätt", subtopic: "Addition",
+      },
+      payload: {
+        lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 2,
+        idempotencyKey: "00000000-0000-4000-8000-000000000572",
+        replacementFocus: { learningObjective: "CLIENT SPOOF MUST NOT REACH REVIEW" },
+      },
+    });
+  } finally {
+    activeQuestions = focusReviewState.activeQuestions;
+    regenerationQuestions = focusReviewState.regenerationQuestions;
+    verifierRejectQuestionId = focusReviewState.verifierRejectQuestionId;
+  }
+  assert.equal(verifiedReplacementBatch.status, 200, JSON.stringify(verifiedReplacementBatch.body));
+  assert.equal(verifiedReplacementBatch.body.questions.length, 2);
+  assert.equal(verifiedReplacementBatch.body.quality.verifierApproved, 2);
+  assert.equal(verifiedReplacementBatch.body.quality.solverApprovedMc, 2);
+  assert.ok(verifiedReplacementBatch.body.questions.every((question) =>
+    question.training_focus_matches?.includes("focus-1")),
+  "internal replacement candidates retain the verifier's required original-target match");
+  const replacementReview = verifierInputs.slice(replacementVerifierStart)
+    .find((review) => review.training_focus?.some((focus) => focus.id === "focus-1"));
+  assert.deepEqual(replacementReview?.training_focus, [{
+    id: "focus-1", concept: "Aritmetik", skill: "Beräkna enkel addition.",
+  }], "the independent verifier receives a server-derived target, not the client-supplied spoof");
+  const replacementGeneration = calls.slice(replacementProviderStart).find((call) =>
+    call.url === "https://api.openai.com/v1/responses" && call.body?.text?.format?.name === "mock_exam_schema");
+  assert.match(replacementGeneration.body.input.at(-1).content, /ersättningsfråga för en signerad (?:prov|original)fråga/i,
+    "the actual internal repair prompt identifies the replacement context");
+  assert.doesNotMatch(replacementGeneration.body.input.at(-1).content, /CLIENT SPOOF MUST NOT REACH REVIEW/,
+    "untrusted client replacement focus never reaches the generation prompt");
 
   const sixQuestionSet = twelveQuestionSet.slice(0, 6).map((question, index) => ({
     ...question, id: `six-${index + 1}`,
