@@ -3089,6 +3089,47 @@ try{
       return record;
     },
     grade(answers) { return runGrade(answers); },
+    async canReplaceQuestion() {
+      const submissionId = submissionIdFromProof(currentExam?.exam_manifest);
+      if (!submissionId) return false;
+      const result = await getJson(`/api/replace-exam-question?submissionId=${encodeURIComponent(submissionId)}`, { timeoutMs: 8000 });
+      return result.ok && result.data?.enabled === true;
+    },
+    async replaceQuestion(input) {
+      const auth = await getGenerationAuthSnapshot();
+      if (!auth?.token || !auth.userId ||
+          !currentExam?.exam_manifest ||
+          submissionIdFromProof(currentExam.exam_manifest) !== input?.submissionId) {
+        return { ok: false, error: LANG === "sv" ? "Provet kunde inte verifieras. Ladda om sidan." : "The exam could not be verified. Reload the page." };
+      }
+      const result = await postJson("/api/replace-exam-question", {
+        requestId: input.requestId,
+        submissionId: input.submissionId,
+        questionId: input.questionId,
+        course: (courseEl()?.value || "").trim(),
+        pastedText: (pastedTextEl()?.value || "").trim(),
+        lang: input.lang || LANG,
+        level: input.level || levelEl()?.value || "C",
+      }, { token: auth.token, timeoutMs: 65000 });
+      if (!await isGenerationOwnerCurrent(auth.userId)) {
+        return { ok: false, error: LANG === "sv" ? "Kontot ändrades. Logga in igen." : "The account changed. Sign in again." };
+      }
+      if (result.status === 200 && result.data?.ok && result.data?.exam?.exam_manifest) {
+        return { ok: true, exam: result.data.exam, replacement: result.data.replacement };
+      }
+      if (result.status === 202) return { ok: false, pending: true };
+      return {
+        ok: false,
+        status: result.status,
+        errorCode: result.data?.error || "",
+        uncertain: result.status === 0 || result.status >= 500,
+        error: result.status === 429
+          ? (LANG === "sv" ? "Gränsen för frågebyten är nådd." : "The question replacement limit has been reached.")
+          : result.status === 409
+            ? (LANG === "sv" ? "Provet har ändrats eller är inte längre aktivt. Ladda om sidan." : "The exam changed or is no longer active. Reload the page.")
+            : (LANG === "sv" ? "Frågan kunde inte bytas just nu." : "The question could not be replaced right now."),
+      };
+    },
     async abandonExam() {
       if (!currentExam?.exam_manifest || !Array.isArray(currentExam.questions)) {
         return { ok: false, error: "Provet kan inte verifieras. Ladda om sidan och försök igen." };

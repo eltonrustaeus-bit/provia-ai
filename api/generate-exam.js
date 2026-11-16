@@ -3060,6 +3060,8 @@ module.exports = async function handler(req, res, internalContext = null) {
       ok: true,
       exam: clientExam,
       meta: {
+        lang,
+        level,
         isMath,
         subjectProfile,
         partial: partialExam,
@@ -3223,6 +3225,8 @@ module.exports.finalizeVerifiedExam = async function finalizeVerifiedExam({ user
     ok: true,
     exam,
     meta: {
+      lang,
+      level,
       isMath: looksLikeMath(course, pastedText),
       subjectProfile,
       partial: clientQuestions.length < numQuestions,

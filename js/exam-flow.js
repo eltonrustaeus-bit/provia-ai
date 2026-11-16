@@ -489,6 +489,19 @@
     try { return { draft: localStorage.getItem(draftKey(userId)), progress: localStorage.getItem(progressKey(userId)) }; }
     catch (_) { return null; }
   }
+  function persistRecoveredDraft(draft, expectedSnapshot) {
+    var ownerId = String(draft.uid || "");
+    var before = draftSnapshot(ownerId);
+    if (!ownerId || ownerId !== uid() || !before || !expectedSnapshot ||
+        before.draft !== expectedSnapshot.draft || before.progress !== expectedSnapshot.progress) return false;
+    draft.ts = Date.now();
+    draft.revision = draftRevision();
+    if (!lsSet(draftKey(ownerId), draft)) return false;
+    lsDel(progressKey(ownerId));
+    var savedSnapshot = draftSnapshot(ownerId);
+    S.draftSnapshot = savedSnapshot;
+    return savedSnapshot && savedSnapshot.draft ? savedSnapshot : null;
+  }
   function clearDraft(userId, expectedManifest, expectedSnapshot) {
     var ownerId = String(userId || S.draftOwnerId || uid());
     if (ownerId !== uid()) return false;
@@ -525,6 +538,7 @@
   var S = {
     course: "",
     level: "C",
+    examLang: "sv",
     qType: "mix",
     num: 12,
     nonGraphNum: 12,
@@ -545,6 +559,9 @@
     lastNudge: 0,
     generating: false,  // spärr mot dubbel generering (kostar kvot)
     submitting: false,   // spärr mot dubbel inlämning
+    replacing: false,
+    replacementAvailable: null,
+    replacementPending: null,
     gradingError: ""
   };
 
@@ -967,6 +984,90 @@
           if (discardRecovery) discardRecovery.disabled = true;
           resumeStatus.hidden = false;
           resumeStatus.textContent = tx("Kontrollerar att provet fortfarande är aktivt…", "Checking that the exam is still active…");
+          var pendingReplacement = draft.replacementPending;
+          if (pendingReplacement) {
+            var parentId = String(draft.exam.exam_manifest || "").split(".")[1];
+            if (!/^[0-9a-f-]{36}$/i.test(pendingReplacement.requestId || "") ||
+                !/^[a-f0-9]{32}$/.test(pendingReplacement.submissionId || "") ||
+                typeof pendingReplacement.questionId !== "string") {
+              releaseRecovery();
+              resumeStatus.textContent = tx("Det sparade frågebytet kunde inte verifieras. Ditt prov finns kvar.",
+                "The saved question replacement could not be verified. Your exam is still saved.");
+              back.disabled = false;
+              if (discardRecovery) discardRecovery.disabled = false;
+              return;
+            }
+            if (parentId === pendingReplacement.submissionId) {
+              var oldIndex = draft.exam.questions.findIndex(function (q, n) {
+                return qid(q, n) === pendingReplacement.questionId;
+              });
+              if (oldIndex < 0 || !window.ExGenEngine?.replaceQuestion) {
+                releaseRecovery();
+                resumeStatus.textContent = tx("Frågebytet kunde inte återställas. Ditt prov finns kvar.",
+                  "The replacement could not be restored. Your exam is still saved.");
+                back.disabled = false;
+                if (discardRecovery) discardRecovery.disabled = false;
+                return;
+              }
+              window.ExGenEngine.setInputs({ course: draft.course || "", level: draft.level || "C",
+                qType: draft.qType || "mix", num: draft.num || 12, material: draft.material || "" });
+              window.ExGenEngine.adoptExam(draft.exam);
+              resumeStatus.textContent = tx("Kontrollerar samma frågebyte…", "Checking the same question replacement…");
+              var replacementResult = null;
+              try { replacementResult = await window.ExGenEngine.replaceQuestion(pendingReplacement); }
+              catch (_) {}
+              if (!recoveryCurrent()) { releaseRecovery(); return; }
+              if (validReplacementResult(replacementResult, draft.exam, oldIndex, pendingReplacement.questionId)) {
+                draft.exam = replacementResult.exam;
+                delete draft.answers[pendingReplacement.questionId];
+                delete draft.helped[pendingReplacement.questionId];
+                draft.replacementPending = null;
+                displayedDraftSnapshot = persistRecoveredDraft(draft, displayedDraftSnapshot);
+                if (!displayedDraftSnapshot) {
+                  releaseRecovery();
+                  resumeStatus.textContent = tx("Den nya frågan kunde inte sparas på enheten. Lämna fliken öppen och försök igen.",
+                    "The new question could not be saved on this device. Keep the tab open and try again.");
+                  back.disabled = false;
+                  if (discardRecovery) discardRecovery.disabled = false;
+                  return;
+                }
+                window.ExGenEngine.adoptExam(draft.exam);
+              } else if (replacementResult?.pending || replacementResult?.uncertain || !replacementResult) {
+                releaseRecovery();
+                resumeStatus.textContent = tx("Frågebytet är ännu inte klart. Försök fortsätta igen om en stund.",
+                  "The replacement is not finished yet. Try continuing again shortly.");
+                back.disabled = false;
+                if (discardRecovery) discardRecovery.disabled = false;
+                return;
+              } else {
+                // A definitive rejection may leave the old issuance active.
+                // Verify that before releasing the local pending guard.
+                var previousState = null;
+                try { previousState = await window.ExGenEngine.examState(draft.exam.exam_manifest, {
+                  course: draft.course || "", pastedText: draft.material || "", questions: draft.exam.questions,
+                }); } catch (_) {}
+                if (!recoveryCurrent()) { releaseRecovery(); return; }
+                if (previousState?.state !== "active") {
+                  releaseRecovery();
+                  resumeStatus.textContent = tx("Provet kunde inte verifieras efter frågebytet. Dina svar är sparade.",
+                    "The exam could not be verified after replacement. Your answers are saved.");
+                  back.disabled = false;
+                  if (discardRecovery) discardRecovery.disabled = false;
+                  return;
+                }
+                draft.replacementPending = null;
+                displayedDraftSnapshot = persistRecoveredDraft(draft, displayedDraftSnapshot);
+                if (!displayedDraftSnapshot) {
+                  releaseRecovery();
+                  resumeStatus.textContent = tx("Provet kunde inte sparas på enheten. Försök igen.",
+                    "The exam could not be saved on this device. Try again.");
+                  back.disabled = false;
+                  if (discardRecovery) discardRecovery.disabled = false;
+                  return;
+                }
+              }
+            }
+          }
           var issuance = null;
           try {
             issuance = await window.ExGenEngine.examState(draft.exam.exam_manifest, {
@@ -1051,17 +1152,31 @@
             back.dataset.expired = "true";
             return;
           }
+          if (draft.replacementPending) {
+            draft.replacementPending = null;
+            displayedDraftSnapshot = persistRecoveredDraft(draft, displayedDraftSnapshot);
+            if (!displayedDraftSnapshot) {
+              releaseRecovery();
+              resumeStatus.textContent = tx("Det återställda provet kunde inte sparas på enheten. Försök igen.",
+                "The restored exam could not be saved on this device. Try again.");
+              back.disabled = false;
+              if (discardRecovery) discardRecovery.disabled = false;
+              return;
+            }
+          }
         }
         releaseRecovery();
         S.draftOwnerId = String(draft.uid || uid());
         S.course = draft.course || "";
         S.level = draft.level || "C";
+        S.examLang = draft.examLang || (window.ExGenEngine.language?.() === "en" ? "en" : "sv");
         S.qType = draft.qType || "mix";
         S.num = draft.num || 12;
         S.nonGraphNum = clamp(Number(draft.nonGraphNum) || (S.qType === "graph" ? 12 : S.num), 2, 20);
         S.material = draft.material || "";
         if (legacyDraft || back.dataset.expired === "true") { stepMaterial(); return; }
         S.exam = draft.exam;
+        S.replacementPending = null;
         S.questionCountNote = draft.questionCountNote
           ? questionCountNote(draft.exam.questions.length, S.num) : "";
         S.draftPhase = draft.phase === "result-recovery" ? "result-recovery" : "active";
@@ -1975,6 +2090,7 @@
       S.draftSnapshot = requestDraftSnapshot;
       S.draftStorageConflict = false;
       S.exam = normalizeIds(r.exam);
+      S.examLang = r.meta?.lang || (window.ExGenEngine.language?.() === "en" ? "en" : "sv");
       S.gradingError = "";
       S.draftPhase = "active";
       var got = S.exam.questions.length;
@@ -2080,6 +2196,8 @@
   }
 
   function openExam(resumedAt) {
+    // Eligibility belongs to the signed issuance, not the page session.
+    S.replacementAvailable = null;
     if (window.PER && window.PER.setExamHistoryMasked) window.PER.setExamHistoryMasked(true);
     UI.languageRerender = function () { renderQuestion(false, true); };
     if (window.dismissWelcome) window.dismissWelcome();
@@ -2101,6 +2219,26 @@
     lockScroll(true);
     tick();
     renderQuestion(true);
+    if (S.replacementAvailable === null && window.ExGenEngine?.canReplaceQuestion) {
+      var visibleExam = S.exam;
+      window.ExGenEngine.canReplaceQuestion().then(function (enabled) {
+        if (S.exam !== visibleExam || !UI.exam.classList.contains("on")) return;
+        S.replacementAvailable = enabled === true;
+        if (S.replacementAvailable) {
+          var active = document.activeElement;
+          var editing = active && UI.exam.contains(active) && active.matches("textarea.xf-answer");
+          var cursor = editing ? active.selectionStart : null;
+          renderQuestion(false, true);
+          if (editing) {
+            var nextAnswer = UI.exam.querySelector("textarea.xf-answer");
+            if (nextAnswer) {
+              nextAnswer.focus({ preventScroll: true });
+              if (Number.isInteger(cursor)) nextAnswer.setSelectionRange(cursor, cursor);
+            }
+          }
+        }
+      }).catch(function () { S.replacementAvailable = false; });
+    }
     watchKeyboard(true);
   }
 
@@ -2440,7 +2578,11 @@
       var did = qid(qq, n);
       if (n === i) d.classList.add("here");
       else if (isAnswerComplete(qq, S.answers[did])) d.classList.add("done");
-      d.addEventListener("click", function () { S.idx = n; renderQuestion(); });
+      d.disabled = S.replacing || Boolean(S.replacementPending);
+      d.addEventListener("click", function () {
+        if (S.replacing || S.replacementPending) return;
+        S.idx = n; renderQuestion();
+      });
       UI.dots.appendChild(d);
     });
     updateQuestionDotLabels();
@@ -2581,6 +2723,25 @@
       saveDraft();
     });
     sheet.appendChild(ask);
+    if (S.replacementAvailable && q.type !== "graph") {
+      var replace = el("button", "xf-replace", S.replacementPending
+        ? tx("Kontrollera frågebytet", "Check question replacement")
+        : tx("Fel fråga? Generera ny", "Bad question? Generate a new one"));
+      replace.type = "button";
+      replace.disabled = S.replacing || S.submitting ||
+        Boolean(S.replacementPending && (S.replacementPending.submissionId !==
+          String(S.exam.exam_manifest || "").split(".")[1] || S.replacementPending.questionId !== id));
+      replace.addEventListener("click", function () { replaceCurrentQuestion(); });
+      sheet.appendChild(replace);
+      if (S.replacementPending) {
+        var replaceStatus = el("p", "xf-replace-status", S.replacing
+          ? tx("Skapar och granskar en ny fråga…", "Creating and reviewing a new question…")
+          : tx("Bytet behöver kontrolleras innan provet kan lämnas in. Använd samma knapp igen.",
+            "The replacement must be checked before you submit. Use the same button again."));
+        replaceStatus.setAttribute("role", "status");
+        sheet.appendChild(replaceStatus);
+      }
+    }
     sheet.appendChild(el("div", "xf-per-dock"));
 
     UI.sheetWrap.innerHTML = "";
@@ -2590,12 +2751,130 @@
     UI.sheetWrap.scrollTop = 0;
     if (focusQuestion) qText.focus({ preventScroll: true });
 
-    UI.prev.disabled = i === 0;
+    UI.prev.disabled = i === 0 || S.replacing || Boolean(S.replacementPending);
     UI.next.textContent = i === S.exam.questions.length - 1 ? tx("Lämna in", "Submit") : tx("Nästa", "Next");
+    UI.next.disabled = S.replacing || Boolean(S.replacementPending);
+    UI.exit.disabled = S.replacing || Boolean(S.replacementPending);
 
     armStuck();
     pace();
     publish();
+  }
+
+  function replaceCurrentQuestion() {
+    if (!S.exam || !S.replacementAvailable || S.replacing || S.submitting) return;
+    var current = S.exam.questions[S.idx];
+    if (!current || current.type === "graph" || !window.ExGenEngine?.replaceQuestion) return;
+    var oldId = qid(current, S.idx);
+    var submissionId = String(S.exam.exam_manifest || "").split(".")[1];
+    if (!/^[a-f0-9]{32}$/.test(submissionId || "")) return;
+    if (S.replacementPending && (S.replacementPending.submissionId !== submissionId ||
+        S.replacementPending.questionId !== oldId)) return;
+    if (!S.replacementPending) {
+      if (String(S.answers[oldId] || "").trim() && !window.confirm(tx(
+        "Ditt svar på den här frågan tas bort om den byts. Övriga svar sparas. Fortsätta?",
+        "Your answer to this question will be removed if it is replaced. Other answers stay. Continue?"
+      ))) return;
+      if (!window.crypto?.randomUUID) {
+        nudge(tx("Frågebyte kräver en säker webbläsare. Ladda om sidan och försök igen.",
+          "Question replacement requires a secure browser. Reload and try again."), true);
+        return;
+      }
+      S.replacementPending = {
+        requestId: window.crypto.randomUUID(), submissionId: submissionId, questionId: oldId,
+        lang: S.examLang, level: S.level,
+      };
+      saveDraft();
+      var savedRequest = lsGet(draftKey(S.draftOwnerId), null);
+      if (S.draftStorageConflict ||
+          savedRequest?.replacementPending?.requestId !== S.replacementPending.requestId ||
+          savedRequest?.exam?.exam_manifest !== S.exam.exam_manifest) {
+        S.replacementPending = null;
+        nudge(tx("Provet kunde inte sparas. Frågan byttes inte.", "The exam could not be saved. The question was not replaced."), true);
+        return;
+      }
+    }
+    S.replacing = true;
+    closePerPanel();
+    renderQuestion(false, true);
+    var pending = S.replacementPending;
+    var originalExam = S.exam;
+    var targetIndex = S.idx;
+    window.ExGenEngine.replaceQuestion(pending).then(async function (result) {
+      if (S.exam !== originalExam || !S.replacementPending ||
+          S.replacementPending.requestId !== pending.requestId) return;
+      if (validReplacementResult(result, originalExam, targetIndex, oldId)) {
+        var previousAnswer = S.answers[oldId];
+        var previousHelp = S.helped[oldId];
+        S.exam = result.exam;
+        delete S.answers[oldId];
+        delete S.helped[oldId];
+        // Keep the pending request in the first new draft. A lost second write
+        // can still recover this exact server revision after a reload.
+        saveDraft();
+        var savedChild = lsGet(draftKey(S.draftOwnerId), null);
+        if (S.draftStorageConflict || savedChild?.exam?.exam_manifest !== S.exam.exam_manifest ||
+            savedChild?.replacementPending?.requestId !== pending.requestId) {
+          S.exam = originalExam;
+          if (previousAnswer !== undefined) S.answers[oldId] = previousAnswer;
+          if (previousHelp !== undefined) S.helped[oldId] = previousHelp;
+          S.replacing = false;
+          renderQuestion(false, true);
+          nudge(tx("Frågan byttes på servern men kunde inte sparas här. Ladda om sidan och kontrollera samma byte innan du fortsätter.",
+            "The server replaced the question, but this device could not save it. Reload and recover the same replacement before continuing."), true);
+          return;
+        }
+        S.replacementPending = null;
+        saveDraft();
+        window.ExGenEngine.adoptExam(S.exam);
+        S.replacing = false;
+        renderQuestion(true);
+        if (S.draftStorageConflict) nudge(tx(
+          "Den nya frågan visas, men provet kunde inte sparas lokalt. Håll fliken öppen och kontrollera frågebytet igen.",
+          "The new question is shown, but the exam could not be saved locally. Keep this tab open and check the replacement again."
+        ), true);
+        return;
+      }
+      if (result && !result.pending && !result.uncertain) {
+        var state = null;
+        try { state = await window.ExGenEngine.examState(originalExam.exam_manifest, {
+          course: S.course, pastedText: S.material, questions: originalExam.questions,
+        }); } catch (_) {}
+        if (S.exam !== originalExam || S.replacementPending?.requestId !== pending.requestId) return;
+        if (state?.state === "active") {
+          S.replacementPending = null;
+          saveDraft();
+          var cleared = lsGet(draftKey(S.draftOwnerId), null);
+          if (cleared?.replacementPending?.requestId === pending.requestId || S.draftStorageConflict) {
+            S.replacementPending = pending;
+          }
+        }
+      }
+      S.replacing = false;
+      renderQuestion(false, true);
+      nudge(result?.pending || result?.uncertain
+        ? tx("Bytet pågår eller behöver återhämtas. Tryck Kontrollera frågebytet igen; ett nytt AI-anrop startas inte medan samma begäran pågår.",
+          "The replacement is running or needs recovery. Check it again; the same pending request will not start another AI call.")
+        : (result?.error || tx("Frågan kunde inte bytas. Kontrollera bytet innan du lämnar in.",
+          "The question could not be replaced. Check it before submitting.")), true);
+    }).catch(function () {
+      S.replacing = false;
+      renderQuestion(false, true);
+      nudge(tx("Anslutningen bröts. Kontrollera samma frågebyte igen.",
+        "The connection was interrupted. Check the same question replacement again."), true);
+    });
+  }
+
+  function validReplacementResult(result, originalExam, index, oldId) {
+    return Boolean(result?.ok && Array.isArray(result.exam?.questions) &&
+      result.exam.questions.length === originalExam.questions.length &&
+      result.exam.exam_manifest !== originalExam.exam_manifest &&
+      result.replacement?.oldQuestionId === oldId &&
+      result.replacement?.newQuestionId === result.exam.questions[index]?.id &&
+      result.exam.questions.every(function (q, n) {
+        return n === index || (q.id === originalExam.questions[n].id &&
+          q.grade_task === originalExam.questions[n].grade_task);
+      }));
   }
 
   /* Öppnar P.E.R-panelen åt eleven. Frågekontexten sätts INTE här — publish()
@@ -2782,7 +3061,7 @@
   // ── Inlämning ────────────────────────────────────────────────────────────
 
   function abandon() {
-    if (S.submitting || UI.exit.disabled) return;
+    if (S.submitting || S.replacing || S.replacementPending || UI.exit.disabled) return;
     if (!window.confirm(tx(
       "Avsluta provet utan rättning? Dina svar tas bort och provet kan inte lämnas in senare.",
       "End the exam without grading? Your answers will be deleted, and you will not be able to submit it later."
@@ -2813,7 +3092,7 @@
        submit() två gånger: den andra fick tillbaka "Rättning pågår redan." från
        motorn, tolkade det som ett rättningsfel och öppnade provet igen — mitt
        under den första rättningen, som sedan landade bakom provöverlägget. */
-    if (S.submitting) return;
+    if (S.submitting || S.replacing || S.replacementPending) return;
     S.submitting = true;
 
     var qs = S.exam.questions;
@@ -3323,9 +3602,10 @@
       uid: ownerId,
       phase: S.draftPhase === "result-recovery" ? "result-recovery" : "active",
       startedAt: S.startedAt,
-      course: S.course, level: S.level, qType: S.qType, num: S.num, nonGraphNum: S.nonGraphNum,
+      course: S.course, level: S.level, examLang: S.examLang, qType: S.qType, num: S.num, nonGraphNum: S.nonGraphNum,
       material: S.material, exam: S.exam, questionCountNote: S.questionCountNote,
-      answers: S.answers, helped: S.helped, idx: S.idx
+      answers: S.answers, helped: S.helped, idx: S.idx,
+      replacementPending: S.replacementPending
     };
 
     var currentSnapshot = draftSnapshot(ownerId);

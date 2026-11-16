@@ -46,6 +46,8 @@ function reviseIssuedExam({ userId, course, material, exam, submissionId, questi
       originals.some((question) => question.id === candidate.id) ||
       candidate.type !== originals[index].type ||
       Number(candidate.points) !== Number(originals[index].points)) return null;
+  if (String(candidate.question).normalize("NFKC").trim().toLocaleLowerCase("sv-SE") ===
+      String(originals[index].question).normalize("NFKC").trim().toLocaleLowerCase("sv-SE")) return null;
   const profile = assessment.detectSubjectProfile(course, material);
   const gate = assessment.gateExam({ questions: [candidate] }, {
     profile,
