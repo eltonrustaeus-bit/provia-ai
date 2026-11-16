@@ -6001,7 +6001,25 @@ enda 12-frågetest. Offline- och mocktester bevisar inte live-modellens
 - [x] Officiell modellguide rekommenderar `none` som startläge vid GPT-4.x-
   migrering och modellreferensen listar stödet för GPT-6 Luna. Detta är en
   testkonfiguration, inte belägg för högre fråga- eller provkvalitet.
-- [!] Kodändringen är ännu lokal. Staging måste verifieras på exakt ny
-  Preview-commit med ett syntetiskt test innan någon slutsats om hastighet,
-  kvalitet eller användarresultat dras. Senast kända tillgängliga stagingbudget
-  före detta försök var $2.003781; kontrollera den färskt innan liveanrop.
+- [x] Ändringen pushades till feature-branchen i commit `ed4ffa2`; Vercel
+  Preview `dpl_28nc7FdQjY6nTTzoASMbJ1p6eZiy` blev READY och den stabila
+  Preview-aliasen pekade på exakt den deploymenten. Ingen Production- eller
+  `main`-ändring gjordes.
+- [x] Ett enda syntetiskt 3-frågeprov kördes på den nya Previewn. UI och
+  pipeline slutförde säkert med **0/3**, provet utfärdades inte. Jobbet nådde
+  `STAGE_RETRY_LIMIT`; första reparationsgranskningen nådde timeout. En senare
+  granskning fungerade men avvisade samtliga tre kandidater med bland annat
+  nivå-, källstöds- och poängsättningsproblem. Den blinda lösaren avvisade en
+  fråga som inte gick att avgöra.
+- [x] Sanerad stagingtelemetri för detta jobb: 3 generatoranrop, medel **11,2 s**
+  (max 11,7 s); 5 verifieraranrop, medel **9,3 s** (max 11,4 s); 8 blinda
+  lösaranrop, medel **5,3 s** (max 9,7 s). Batcharna tog cirka **39,7–41,2 s**;
+  lägre generatorlatens gav alltså inte snabbare komplett prov eller godkända frågor.
+- [x] Stagingkostnaden ökade **$0.082805**. Cap `$5.879071`, spenderat
+  `$3.675273`, reserverat `$0.282822`, tillgängligt `$1.920976`. Budget och
+  kvotinställningar ändrades inte.
+- [!] Slutsats: reasoning `none` verkar minska enskild genereringstid men löser
+  inte provets kvalitets- eller timeoutproblem. Ingen grund finns att byta
+  modell som lösning ännu. Nästa steg är att analysera varför de A-nivåfrågorna
+  faller på nivå/källstöd/poängsättning och varför reparationsgranskningen
+  timeoutar, med lokala/offline förbättringar före ytterligare betalda test.
