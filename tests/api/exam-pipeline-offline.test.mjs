@@ -112,6 +112,8 @@ for (const lang of ["sv", "en"]) {
     ? /Matematik får ha en korrekt härledd lösning/
     : /Mathematics may use a correctly derived solution/,
   `${lang} repair preserves the mathematical derivation exception`);
+  assert.doesNotMatch(repairInstruction, /MULTIPLE-CHOICE SELF-CHECK|FLERVALS-SJÄLVKONTROLL/u,
+    `${lang} short-answer repair avoids irrelevant MC guidance and token overhead`);
   assert.match(repairedUserPrompt, new RegExp(`^${label}: 4\\.$`, "m"),
     `${lang} repair prompt count agrees with the four-question output schema`);
   assert.match(repairedUserPrompt, new RegExp(`^${courseLabel}: .*\\n${label}: 3\\.$`, "m"),
@@ -148,11 +150,35 @@ const biologyPrompt = generateExam.buildExamPrompts({
 });
 assert.match(biologyPrompt.userPrompt, /Frågetexten ska faktiskt begära denna koppling/);
 assert.match(biologyPrompt.systemPrompt, /Frågor om när eller var en process sker/);
+assert.match(biologyPrompt.systemPrompt, /samma semantiska kategori.*parallell grammatik/u,
+  "MC prompts require parallel options that answer the same question");
+assert.match(biologyPrompt.systemPrompt, /konkret skäl från materialet.*rimlig sammanblandning/u,
+  "MC prompts require an explicit, source-grounded reason for each distractor");
+const biologyAPrompt = generateExam.buildExamPrompts({
+  lang: "sv", level: "A", course: "Biologi 1", qType: "mc", numQuestions: 3,
+  pastedText: "Fotosyntesen binder kol. Cellandning frigör koldioxid.", isMath: false,
+});
+assert.match(biologyAPrompt.systemPrompt, /kräva en verklig slutsats, jämförelse eller värdering.*minst två skilda fakta/u,
+  "A-level MC prompts require genuine reasoning across distinct source facts");
+const biologyARepair = generateExam.buildRepairPayload({
+  model: "synthetic-model",
+  input: [{ role: "system", content: biologyAPrompt.systemPrompt }, { role: "user", content: biologyAPrompt.userPrompt }],
+  text: { format: generateExam.buildMockExamSchema(3, "mc") },
+}, { lang: "sv", level: "A", numQuestions: 3, candidateCount: 4, qType: "mc",
+  questionCountOffset: biologyAPrompt.questionCountOffset, reviewFailureCodes: ["option_quality_failed"],
+  solverFailureCounts: { solver_implausible_option: 1 } });
+const biologyARepairPrompt = biologyARepair.input.at(-1).content;
+assert.match(biologyARepairPrompt, /FLERVALS-SJÄLVKONTROLL.*minst två skilda fakta/u,
+  "A-level MC repairs retain the stronger reasoning and distractor guidance");
+assert.match(biologyARepairPrompt, /blinda lösaren hittade ett orimligt alternativ/u,
+  "repair feedback uses the live safe failure category to direct option repairs");
 const biologyShortPrompt = generateExam.buildExamPrompts({
   lang: "sv", level: "A", course: "Biologi 1", qType: "short", numQuestions: 3,
   pastedText: "Fotosyntesen sker i kloroplasterna. Växten använder ljus, vatten och koldioxid för att bilda glukos och syre. Cellandning frigör energi ur glukos.",
   isMath: false, requireExtractiveAnswers: true,
 });
+assert.doesNotMatch(biologyShortPrompt.systemPrompt, /FLERVALS-SJÄLVKONTROLL/u,
+  "short-answer prompts avoid irrelevant MC instructions and token overhead");
 const batchWithNoveltyContext = generateExam.buildExamPrompts({
   lang: "sv", level: "C", course: "Biologi 1", qType: "short", numQuestions: 2,
   pastedText: "Fotosyntes sker i kloroplasterna.", isMath: false,
@@ -529,6 +555,41 @@ assert.deepEqual(generateExam.mixedTypeTargets(3), { mc: 1, short: 2 },
   "odd mixed exams give the extra slot to a gradable short-answer question");
 assert.deepEqual(generateExam.mixedRepairCandidateTypes(4, { mc: 0, short: 1 }), { mc: 0, short: 4 },
   "repair oversamples the missing type instead of wasting candidates on the already-full type");
+const mixedShortOnlyBase = generateExam.buildExamPrompts({
+  lang: "sv", level: "A", course: "Biologi 1", qType: "mix", numQuestions: 3,
+  pastedText: "Fotosyntesen binder kol. Cellandning frigör koldioxid.", isMath: false,
+});
+const mixedShortOnlyRepair = generateExam.buildRepairPayload({
+  model: "synthetic-model",
+  input: [
+    { role: "system", content: mixedShortOnlyBase.systemPrompt },
+    { role: "user", content: mixedShortOnlyBase.userPrompt },
+  ],
+  text: { format: generateExam.buildMockExamSchema(3, "mix") },
+}, {
+  lang: "sv", level: "A", numQuestions: 3, candidateCount: 4, qType: "mix",
+  missingTypes: { mc: 0, short: 1 }, questionCountOffset: mixedShortOnlyBase.questionCountOffset,
+  reviewFailureCodes: ["option_quality_failed"],
+  solverFailureCounts: { solver_implausible_option: 1, solver_multiple_correct_options: 1 },
+  structuralIssueCounts: {
+    source_requirement_options_incomplete: 1,
+    source_product_options_ambiguous: 1,
+    source_quantity_subject_changed: 1,
+  },
+});
+assert.match(mixedShortOnlyRepair.input.at(-1).content, /exakt 0 flervalskandidat\(er\) och 4 kortsvarskandidat\(er\)/u,
+  "mixed short-only repairs explicitly preserve the missing type allocation");
+assert.doesNotMatch(mixedShortOnlyRepair.input.at(-1).content, /FLERVALS-SJÄLVKONTROLL|För flervalsfrågor/u,
+  "mixed short-only repair instruction avoids irrelevant multiple-choice guidance");
+assert.doesNotMatch(mixedShortOnlyRepair.input.find((item) => item.role === "system").content,
+  /FLERVALS-SJÄLVKONTROLL/u,
+  "mixed short-only repair removes inherited MC guidance from the system prompt too");
+assert.doesNotMatch(mixedShortOnlyRepair.input.at(-1).content,
+  /distraktorer|svarsalternativ|alternativ är korrekt|kombination.*alternativ/u,
+  "MC-specific reviewer, solver, and structural feedback is omitted from short-only repairs");
+assert.doesNotMatch(mixedShortOnlyRepair.input.at(-1).content,
+  /keyed option|rätt alternativ|facitindex/u,
+  "short-only source-relation feedback stays answer-format neutral");
 assert.deepEqual(generateExam.selectMixedQuestions([
   { id: "mc-1", type: "mc" }, { id: "mc-2", type: "mc" },
   { id: "short-1", type: "short" }, { id: "short-2", type: "short" },

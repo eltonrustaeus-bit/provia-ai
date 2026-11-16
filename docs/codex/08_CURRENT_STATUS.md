@@ -5928,3 +5928,35 @@ enda 12-frågetest. Offline- och mocktester bevisar inte live-modellens
   avslutar säkert utan att utfärda en felaktig fråga men återställer inte jobbet.
   Ingen staging-/live-AI-verifiering gjordes. `main`, Production, Supabase,
   hemligheter, konton och kvoter förblir orörda.
+
+### Reviewer-prompt och blandreparationskant — 2026-11-16
+
+- [x] På Preview-commit `0633424` har verifierarens Structured Outputs-anrop
+  nu lyckats. Ett nytt syntetiskt Biologi 1 A/MC-prov gav **0/3** efter
+  att generator och reparation producerade kandidater som avvisades av
+  befintliga distraktor-, källstöds-, tydlighets- och nivågrindar. Inget prov
+  utfärdades. Detta bekräftar schemafixen, inte godkänd innehållskvalitet.
+- [x] Stagingens aggregerade `ai_usage_events` för försöket visar 3
+  genereringsanrop (medel 14,0 s, max 15,1 s), 4 verifieraranrop (medel
+  9,7 s, max 12,3 s), 4 blinda lösaranrop (medel 5,8 s, max 8,6 s) och ett
+  reparationsanrop (13,5 s). Detta är observerade modellsteg, inte en
+  jämförande modellbenchmark eller total tid för användaren.
+- [x] Prompten har fått tydligare instruktioner för relevanta, parallella
+  flervalsalternativ och en faktisk A-nivåslutsats från minst två källfakta.
+  Reparationsprompten skickar den skärpta vägledningen bara när den ska skapa
+  flervalsfrågor.
+- [x] Oberoende granskning fann att kortsvarsreparation i ett blandprov ändå
+  ärvde flervalsinstruktioner. Korrigeringen tar nu bort dem från både
+  system- och användarprompt när alla saknade platser är kortsvar. MC-repair
+  behåller kraven; inga kvalitetsgrindar eller kvoter ändras.
+- [x] Frågebytesgranskning fann inga blockerare. Läsverifiering av staging
+  bekräftade migrationsinnehåll via hash, RLS/service-only-behörigheter och
+  aktiv retention; den verifierade inte ett livefrågebyte.
+- [x] Offline: pipeline-scriptet passerade; verifierar-, budget-, solver-,
+  revisions- och frågebytes-HTTP-tester passerade **22/22**. Syntaxkontroll
+  och `git diff --check` passerade.
+- [!] Promptändringen är lokal och ännu inte Preview-verifierad. Stagingens
+  senast lästa cap är $5.879071, spenderat $3.432670, reserverat $0.282822,
+  tillgängligt $2.163579. Fortsätt på samma feature-branch och befintliga
+  Preview-session; `main`, Production, databas, hemligheter och kvoter är
+  orörda. Jämförelse med `gpt-6-luna` är ännu inte gjord.

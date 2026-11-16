@@ -50,6 +50,17 @@ function cognitiveLevelInstruction(level, lang) {
   return `${descriptions[level] || descriptions.C} ${alignment}`;
 }
 
+function multipleChoiceQualityGuidance(lang, level) {
+  const sv = lang === "sv";
+  const base = sv
+    ? "FLERVALS-SJÄLVKONTROLL: Alla tre alternativ ska vara direkta svar på exakt samma fråga, i samma semantiska kategori, med parallell grammatik och liknande detaljnivå. Före svar ska du själv kunna ange ett konkret skäl från materialet eller frågans villkor till varför vart och ett av de två felalternativen är fel, och vilken rimlig sammanblandning det bygger på. Välj inte två slumpmässiga ämnesord eller olika processer som distraktorer. Om ett alternativ är nonsens, uppenbart irrelevant, språkligt trasigt eller inte går att falsifiera entydigt: skriv om hela frågan eller välj ett bättre underbyggt innehåll. Behåll kvalitetskontrollerna som avgör om frågan faktiskt ska godkännas."
+    : "MULTIPLE-CHOICE SELF-CHECK: All three options must directly answer the exact same question, belong to the same semantic category, use parallel grammar, and have similar specificity. Before output, you must be able to give a concrete reason from the material or the question's conditions why each wrong option is false, and identify the reasonable confusion it represents. Do not choose random topic words or different processes as distractors. If an option is nonsense, clearly irrelevant, grammatically broken, or cannot be unambiguously falsified, rewrite the whole item or choose a better-supported content target. Keep the quality checks that decide whether the item is actually approved.";
+  if (level !== "A") return base;
+  return base + (sv
+    ? " A-NIVÅ I FLERVAL: Frågan ska kräva en verklig slutsats, jämförelse eller värdering som bygger på minst två skilda fakta från underlaget; en definition, ett direkt faktaminne eller en etikett som 'analysera' räcker inte. Distraktorerna ska spegla olika rimliga feltolkningar av dessa fakta, inte vara uppenbart orimliga. Om underlaget inte bär både resonemanget och tre trovärdiga alternativ ska du inte klä en lätt fråga i A-språk eller hitta på stöd."
+    : "A-LEVEL MULTIPLE-CHOICE: The item must require a real inference, comparison, or evaluation based on at least two distinct facts from the source; a definition, direct recall, or the label 'analyze' is insufficient. Distractors should represent different reasonable misreadings of those facts, not obviously implausible options. If the source cannot support both the reasoning and three credible options, do not dress up an easy recall item as A-level or invent support.");
+}
+
 function extractiveScienceShortAnswerGuidance(lang) {
   return lang === "sv"
     ? "NATURVETENSKAPLIGA KORTSVAR: Innan du skriver varje kortsvarsfråga, välj en eller flera hela källmeningar som faktiskt finns ordagrant i materialet och stöder svaret. Skriv model_answer som det kortaste sammanhängande utdraget som finns exakt i dessa meningar och ensamt besvarar frågan, med alla villkor, negationer, enheter och orsakssamband som behövs för ett precist svar. Om en kortare fras skulle tappa sådan betydelse, behåll den längre frasen, bisatsen eller meningen. Lägg inte till eller parafrasera något. Låt source_references visa hela källsammanhanget. Formulera fråga, poängkrav och matris så att utdraget fullt ut besvarar det som efterfrågas. Fråga inte efter en orsak, slutsats, jämförelse eller förklaring som källan inte stöder. På A-nivå får du bara skapa en fråga om materialet både stöder det exakta svaret och det självständiga resonemang som nivån kräver. Märk inte återgivning som analys. Om materialet inte räcker ska du inte sänka nivån, upprepa, bredda eller hitta på frågor."
@@ -1221,10 +1232,11 @@ function buildExamPrompts({ lang, level, course, qType, numQuestions, examQuesti
     "MC options must be plausible distractors (typical calculation mistakes) with exactly one correct. " +
     "For short-answer tasks, give each item ONE checkable final-answer target. At A level, make the work challenging through several explicit mathematical steps using supplied values, not through open-ended 'analyze' or 'discuss' wording. State every condition and exactly what the student must find, such as a specified root, axis of symmetry, or extremum. Each task must be independently solvable from the material and question text.";
 
+  const mcQualityGuidance = ["mc", "mix", "mixed"].includes(qType) ? multipleChoiceQualityGuidance(lang, level) : "";
   const systemPrompt =
     lang === "sv"
-      ? systemSvBase + (isMath ? (" " + systemSvMath) : "") + (requireExtractiveAnswers && qType !== "mc" && qType !== "graph" ? (" " + extractiveScienceShortAnswerGuidance("sv")) : "")
-      : systemEnBase + (isMath ? (" " + systemEnMath) : "") + (requireExtractiveAnswers && qType !== "mc" && qType !== "graph" ? (" " + extractiveScienceShortAnswerGuidance("en")) : "");
+      ? systemSvBase + (mcQualityGuidance ? (" " + mcQualityGuidance) : "") + (isMath ? (" " + systemSvMath) : "") + (requireExtractiveAnswers && qType !== "mc" && qType !== "graph" ? (" " + extractiveScienceShortAnswerGuidance("sv")) : "")
+      : systemEnBase + (mcQualityGuidance ? (" " + mcQualityGuidance) : "") + (isMath ? (" " + systemEnMath) : "") + (requireExtractiveAnswers && qType !== "mc" && qType !== "graph" ? (" " + extractiveScienceShortAnswerGuidance("en")) : "");
 
   const verifiedFocusTerms = normalizeSelectedFocusTerms(selectedFocusTerms, pastedText);
   const learnerFocusInstruction = verifiedFocusTerms.length
@@ -1500,7 +1512,7 @@ function alignRepairPromptQuestionCount(input, lang, numQuestions, repairCount, 
   return { input: alignedInput, aligned: true };
 }
 
-function buildRepairPayload(payload, { lang, numQuestions, existingQuestions = [], priorQuestions = [], comparisonQuestions = [], candidateCount, reviewFailureCodes = [], reviewFailureCounts = {}, solverFailureCounts = {}, structuralIssueCounts = {}, requireExtractiveAnswers = false, qType, missingTypes = null, questionCountOffset }) {
+function buildRepairPayload(payload, { lang, level = "C", numQuestions, existingQuestions = [], priorQuestions = [], comparisonQuestions = [], candidateCount, reviewFailureCodes = [], reviewFailureCounts = {}, solverFailureCounts = {}, structuralIssueCounts = {}, requireExtractiveAnswers = false, qType, missingTypes = null, questionCountOffset }) {
   const repairFactualAnswerInstruction = requireExtractiveAnswers
     ? (lang === "en"
       ? "For factual short answers, use the shortest exact source excerpt that fully answers the question while preserving necessary conditions, negations, units, and causal relations; keep more context when needed."
@@ -1518,6 +1530,9 @@ function buildRepairPayload(payload, { lang, numQuestions, existingQuestions = [
   const existing = Array.isArray(existingQuestions) ? existingQuestions : [];
   const missingSlots = Math.max(1, numQuestions - existing.length);
   const repairCount = Math.min(6, Math.max(missingSlots, Number(candidateCount) || repairCandidateCountFor(missingSlots, missingTypes)));
+  const repairTypes = mixedRepairCandidateTypes(repairCount, missingTypes);
+  const repairIncludesMultipleChoice = qType == null || qType === "mc"
+    || (["mix", "mixed"].includes(qType) && repairTypes.mc > 0);
   const existingStems = existing.map((question) => ({
     concept: question?.concept_tag || question?.topic || "",
     question: question?.question || "",
@@ -1565,20 +1580,24 @@ function buildRepairPayload(payload, { lang, numQuestions, existingQuestions = [
       ? `Earlier candidates failed deterministic source checks: ${JSON.stringify(safeStructuralIssueCounts)}. ${safeStructuralIssueCounts.source_answer_not_extractable ? "A required short answer was not an exact contiguous source excerpt. Select the exact answer excerpt before writing the task; preserve its conditions and meaning, and do not paraphrase it. " : ""}${safeStructuralIssueCounts.source_reference_missing ? "No usable source excerpt remained for a candidate. Choose a task with an actual supporting excerpt and copy it verbatim into source_references; do not invent a citation. " : ""}`
       : `Tidigare kandidater föll i den strukturella källkontrollen: ${JSON.stringify(safeStructuralIssueCounts)}. ${safeStructuralIssueCounts.source_answer_not_extractable ? "Ett kortsvar som krävde källutdrag var inte ett exakt sammanhängande utdrag. Välj det exakta svarutdraget innan du skriver uppgiften; behåll villkor och betydelse och parafrasera inte svaret. " : ""}${safeStructuralIssueCounts.source_reference_missing ? "Inget användbart källutdrag återstod för en kandidat. Välj en uppgift med ett verkligt stödjande utdrag och kopiera det ordagrant till source_references; hitta inte på ett citat. " : ""}`)
     : "";
-  const requirementOptionsGuidance = safeStructuralIssueCounts.source_requirement_options_incomplete
+  const requirementOptionsGuidance = repairIncludesMultipleChoice && safeStructuralIssueCounts.source_requirement_options_incomplete
     ? (lang === "en"
       ? "A broad requirement question split a source-supported combination across separate options. Replace it with a more precise task or a complete combination and plausible distractors; independently check uniqueness again. Do not merely change the answer key. "
       : "En bred fråga om förutsättningar delade upp en källstödd kombination i separata alternativ. Ersätt den med en mer precis fråga eller en fullständig kombination och rimliga distraktorer; kontrollera entydigheten på nytt. Byt inte bara facitnyckel. ")
     : "";
-  const productOptionsGuidance = safeStructuralIssueCounts.source_product_options_ambiguous
+  const productOptionsGuidance = repairIncludesMultipleChoice && safeStructuralIssueCounts.source_product_options_ambiguous
     ? (lang === "en"
       ? "A broad product question split two source-supported outputs across separate options. Ask for one precisely qualified product or make the complete pair one answer; do not merely change the key. "
       : "En bred produktfråga delade två källstödda produkter i separata alternativ. Fråga efter en tydligt avgränsad produkt eller låt hela paret vara ett svar; byt inte bara facitnyckel. ")
     : "";
   const quantitySubjectGuidance = safeStructuralIssueCounts.source_quantity_subject_changed
     ? (lang === "en"
-      ? "A candidate changed the subject of a source relation: a property of an object became the object itself. Preserve the complete subject, relation, destination and context in both the keyed option and model answer. Select a different supported task if necessary; do not merely change the key. "
-      : "En kandidat ändrade subjektet i ett källsamband: en egenskap hos ett föremål blev själva föremålet. Behåll hela subjektet, relationen, målet och sammanhanget i både rätt alternativ och modellsvar. Välj en annan källstödd uppgift om det behövs; byt inte bara facitindex. ")
+      ? (repairIncludesMultipleChoice
+        ? "A candidate changed the subject of a source relation: a property of an object became the object itself. Preserve the complete subject, relation, destination and context in both the keyed option and model answer. Select a different supported task if necessary; do not merely change the key. "
+        : "A candidate changed the subject of a source relation: a property of an object became the object itself. Preserve the complete subject, relation, destination and context in the task and model answer. Select a different source-supported task if necessary; do not change the source claim. ")
+      : (repairIncludesMultipleChoice
+        ? "En kandidat ändrade subjektet i ett källsamband: en egenskap hos ett föremål blev själva föremålet. Behåll hela subjektet, relationen, målet och sammanhanget i både rätt alternativ och modellsvar. Välj en annan källstödd uppgift om det behövs; byt inte bara facitindex. "
+        : "En kandidat ändrade subjektet i ett källsamband: en egenskap hos ett föremål blev själva föremålet. Behåll hela subjektet, relationen, målet och sammanhanget i uppgift och modellsvar. Välj en annan källstödd uppgift om det behövs; ändra inte källpåståendet. "))
     : "";
   const circularTaskGuidance = safeStructuralIssueCounts.circular_location_task
     ? (lang === "en"
@@ -1593,19 +1612,19 @@ function buildRepairPayload(payload, { lang, numQuestions, existingQuestions = [
     : `Summerade lösarutfall (endast fasta kategorier, inga frågetexter eller facit): ${JSON.stringify(safeSolverFailureCounts)}.`;
   const reviewGuidance = lang === "en"
     ? [
-        failures.has("option_quality_failed")
+        repairIncludesMultipleChoice && failures.has("option_quality_failed")
           ? "The reviewer found weak or implausible answer options: prefer exactly three options total, and use only clear established subject concepts in the same category; for each distractor, check that it is a real, relevant misconception and not nonsense or an unrelated filler. Do not pad the options."
           : "",
-        solverFailures.has("solver_implausible_option")
+        repairIncludesMultipleChoice && solverFailures.has("solver_implausible_option")
           ? "The blind solver found an implausible option: replace every distractor with a natural, established subject term that fits the same category; do not invent words or use unrelated filler."
           : "",
-        solverFailures.has("solver_multiple_correct_options") || solverFailures.has("solver_no_single_answer")
+        repairIncludesMultipleChoice && (solverFailures.has("solver_multiple_correct_options") || solverFailures.has("solver_no_single_answer"))
           ? "The blind solver found that the options do not have exactly one defensible correct answer. Make the stem precise and ensure exactly one option is correct."
           : "",
-        solverFailures.has("solver_index_verdict_mismatch") || solverFailures.has("solver_disagrees_on_key")
+        repairIncludesMultipleChoice && (solverFailures.has("solver_index_verdict_mismatch") || solverFailures.has("solver_disagrees_on_key"))
           ? "The blind solver disagreed with the keyed answer. Solve the task independently and align the correct option, answer key, and model answer."
           : "",
-        solverFailures.has("solver_cannot_judge") || solverFailures.has("solver_low_confidence")
+        repairIncludesMultipleChoice && (solverFailures.has("solver_cannot_judge") || solverFailures.has("solver_low_confidence"))
           ? "The blind solver could not confidently judge the item. Narrow the question to one source-supported target and use distinct, unambiguous options."
           : "",
         failures.has("high_ambiguity") || failures.has("question_clarity")
@@ -1638,19 +1657,19 @@ function buildRepairPayload(payload, { lang, numQuestions, existingQuestions = [
           : "",
       ].filter(Boolean).join(" ")
     : [
-        failures.has("option_quality_failed")
+        repairIncludesMultipleChoice && failures.has("option_quality_failed")
           ? "Granskningen hittade svaga eller orimliga svarsalternativ: föredra exakt tre alternativ totalt och använd tydliga, etablerade ämnesbegrepp i samma kategori; kontrollera att varje distraktor är en verklig, relevant missuppfattning och inte nonsens eller utfyllnad. Bygg inte ut alternativen."
           : "",
-        solverFailures.has("solver_implausible_option")
+        repairIncludesMultipleChoice && solverFailures.has("solver_implausible_option")
           ? "Den blinda lösaren hittade ett orimligt alternativ: byt ut varje distraktor mot ett naturligt, etablerat ämnesbegrepp i samma kategori; hitta inte på ord eller använd orelaterad utfyllnad."
           : "",
-        solverFailures.has("solver_multiple_correct_options") || solverFailures.has("solver_no_single_answer")
+        repairIncludesMultipleChoice && (solverFailures.has("solver_multiple_correct_options") || solverFailures.has("solver_no_single_answer"))
           ? "Den blinda lösaren hittade inte exakt ett försvarbart rätt svar. Gör frågan precis och se till att exakt ett alternativ är korrekt."
           : "",
-        solverFailures.has("solver_index_verdict_mismatch") || solverFailures.has("solver_disagrees_on_key")
+        repairIncludesMultipleChoice && (solverFailures.has("solver_index_verdict_mismatch") || solverFailures.has("solver_disagrees_on_key"))
           ? "Den blinda lösaren höll inte med om facitnyckeln. Lös uppgiften självständigt och låt rätt alternativ, facitnyckel och exempelsvar stämma överens."
           : "",
-        solverFailures.has("solver_cannot_judge") || solverFailures.has("solver_low_confidence")
+        repairIncludesMultipleChoice && (solverFailures.has("solver_cannot_judge") || solverFailures.has("solver_low_confidence"))
           ? "Den blinda lösaren kunde inte bedöma frågan säkert. Avgränsa frågan till ett källstött mål och använd tydliga, entydiga alternativ."
           : "",
         failures.has("high_ambiguity") || failures.has("question_clarity")
@@ -1682,26 +1701,35 @@ function buildRepairPayload(payload, { lang, numQuestions, existingQuestions = [
           ? "Granskningen hittade ett problem som inte kunde klassificeras säkert. Ersätt kandidaten med en annan uppgift som stöds direkt av materialet, behåll den valda nivån, lös uppgiften självständigt och låt svar och matris stämma med exakt det frågan ber om; byt inte bara formulering."
           : "",
       ].filter(Boolean).join(" ");
-  const repairTypes = mixedRepairCandidateTypes(repairCount, missingTypes);
   const mixedTypeGuidance = ["mix", "mixed"].includes(qType)
     ? (lang === "en"
       ? `For this mixed exam, include exactly ${repairTypes.mc} multiple-choice candidate(s) and ${repairTypes.short} short-answer candidate(s), to fill the remaining type-specific slots. Do not return a different type mix.`
       : `För detta blandade prov ska du skapa exakt ${repairTypes.mc} flervalskandidat(er) och ${repairTypes.short} kortsvarskandidat(er), så att de saknade platserna av respektive typ kan fyllas. Returnera inte en annan typfördelning.`)
     : "";
+  const multipleChoiceRepairGuidance = repairIncludesMultipleChoice
+    ? (lang === "en"
+      ? `For multiple choice, use only plausible, relevant distractors in the same category as the correct option; never invent nonsense or unrelated choices. ${multipleChoiceQualityGuidance("en", level)}`
+      : `För flervalsfrågor: använd bara rimliga, relevanta distraktorer i samma kategori som det rätta alternativet; hitta aldrig på nonsens eller orelaterade svar. ${multipleChoiceQualityGuidance("sv", level)}`)
+    : "";
   const instruction = lang === "en"
-    ? `QUALITY REPAIR: The previous candidate set did not pass independent review. Create exactly ${repairCount} new question candidates of the already selected type and level to fill ${missingSlots} missing exam slot${missingSlots === 1 ? "" : "s"}. ${mixedTypeGuidance} Ground every question and answer in specific information from the supplied material; copy a verbatim excerpt from the material into source_references, not a paraphrase or invented heading. ${repairFactualAnswerInstruction} ${repairSourceReferenceInstruction} A source sentence may support multiple repairs only when each task has a different, clearly bounded answer target with its own exact answer excerpt; do not repeat or paraphrase a retained task. If no source answer is sufficient, replace the task instead of filling gaps from outside knowledge. ${requireExtractiveAnswers ? extractiveScienceShortAnswerGuidance("en") : ""} Mathematics may use a correctly derived solution. For short answer, use one self-contained task with a clear answer target; in mathematics, include every value and condition needed to solve it. Make the points and rubric assess only work explicitly requested by the question. For multiple choice, use only plausible, relevant distractors in the same category as the correct option; never invent nonsense or unrelated choices. ${reviewGuidance} ${reviewFailureSummary} ${solverFailureSummary} Do not repeat these questions already retained in the current draft: ${JSON.stringify(existingStems)}. ${comparisonInstruction} Avoid unsupported outside facts, ambiguous wording, overlapping concepts, and repeated stems. Check that each model_answer answers exactly what its question asks and that its scoring rubric agrees. Keep the same strict quality standards; output only the required JSON.`
-    : `KVALITETSREPARATION: Den första frågeuppsättningen klarade inte den oberoende granskningen. Skapa exakt ${repairCount} nya frågekandidater av den redan valda typen och nivån för att fylla ${missingSlots} saknade provplatser. ${mixedTypeGuidance} Förankra varje fråga och svar i konkreta uppgifter från materialet. ${repairFactualAnswerInstruction} ${repairSourceReferenceInstruction} En källmening får stödja flera reparationsfrågor bara om varje uppgift har ett eget, tydligt avgränsat svarsmål med ett eget exakt svarutdrag; upprepa inte eller parafrasera en fråga som redan finns kvar. Om källan inte räcker, byt uppgift i stället för att fylla kunskapsluckor med egen kunskap. ${requireExtractiveAnswers ? extractiveScienceShortAnswerGuidance("sv") : ""} Matematik får ha en korrekt härledd lösning. För kortsvar: skriv en självständig, tydligt avgränsad uppgift med ett klart svarsmål; i matematik ska alla värden och villkor som behövs för lösningen stå i frågan. Poäng och matris ska bara bedöma sådant som frågan uttryckligen ber eleven göra. För flervalsfrågor: använd bara rimliga, relevanta distraktorer i samma kategori som det rätta alternativet; hitta aldrig på nonsens eller orelaterade svar. ${reviewGuidance} ${reviewFailureSummary} ${solverFailureSummary} Upprepa inte de här frågorna som redan finns kvar i utkastet: ${JSON.stringify(existingStems)}. ${comparisonInstruction} Undvik obestyrkta fakta utifrån, tvetydiga formuleringar, överlappande begrepp och upprepade frågestammar. Kontrollera att varje model_answer faktiskt besvarar frågan och att bedömningsmatrisen stämmer. Behåll samma strikta kvalitetskrav och returnera endast JSON enligt schemat.`;
+    ? `QUALITY REPAIR: The previous candidate set did not pass independent review. Create exactly ${repairCount} new question candidates of the already selected type and level to fill ${missingSlots} missing exam slot${missingSlots === 1 ? "" : "s"}. ${mixedTypeGuidance} Ground every question and answer in specific information from the supplied material; copy a verbatim excerpt from the material into source_references, not a paraphrase or invented heading. ${repairFactualAnswerInstruction} ${repairSourceReferenceInstruction} A source sentence may support multiple repairs only when each task has a different, clearly bounded answer target with its own exact answer excerpt; do not repeat or paraphrase a retained task. If no source answer is sufficient, replace the task instead of filling gaps from outside knowledge. ${requireExtractiveAnswers ? extractiveScienceShortAnswerGuidance("en") : ""} Mathematics may use a correctly derived solution. For short answer, use one self-contained task with a clear answer target; in mathematics, include every value and condition needed to solve it. Make the points and rubric assess only work explicitly requested by the question. ${multipleChoiceRepairGuidance} ${reviewGuidance} ${reviewFailureSummary} ${solverFailureSummary} Do not repeat these questions already retained in the current draft: ${JSON.stringify(existingStems)}. ${comparisonInstruction} Avoid unsupported outside facts, ambiguous wording, overlapping concepts, and repeated stems. Check that each model_answer answers exactly what its question asks and that its scoring rubric agrees. Keep the same strict quality standards; output only the required JSON.`
+    : `KVALITETSREPARATION: Den första frågeuppsättningen klarade inte den oberoende granskningen. Skapa exakt ${repairCount} nya frågekandidater av den redan valda typen och nivån för att fylla ${missingSlots} saknade provplatser. ${mixedTypeGuidance} Förankra varje fråga och svar i konkreta uppgifter från materialet. ${repairFactualAnswerInstruction} ${repairSourceReferenceInstruction} En källmening får stödja flera reparationsfrågor bara om varje uppgift har ett eget, tydligt avgränsat svarsmål med ett eget exakt svarutdrag; upprepa inte eller parafrasera en fråga som redan finns kvar. Om källan inte räcker, byt uppgift i stället för att fylla kunskapsluckor med egen kunskap. ${requireExtractiveAnswers ? extractiveScienceShortAnswerGuidance("sv") : ""} Matematik får ha en korrekt härledd lösning. För kortsvar: skriv en självständig, tydligt avgränsad uppgift med ett klart svarsmål; i matematik ska alla värden och villkor som behövs för lösningen stå i frågan. Poäng och matris ska bara bedöma sådant som frågan uttryckligen ber eleven göra. ${multipleChoiceRepairGuidance} ${reviewGuidance} ${reviewFailureSummary} ${solverFailureSummary} Upprepa inte de här frågorna som redan finns kvar i utkastet: ${JSON.stringify(existingStems)}. ${comparisonInstruction} Undvik obestyrkta fakta utifrån, tvetydiga formuleringar, överlappande begrepp och upprepade frågestammar. Kontrollera att varje model_answer faktiskt besvarar frågan och att bedömningsmatrisen stämmer. Behåll samma strikta kvalitetskrav och returnera endast JSON enligt schemat.`;
   const { input: repairInput, aligned: countAligned } = alignRepairPromptQuestionCount(
     payload?.input, lang, numQuestions, repairCount, questionCountOffset,
   );
   if (questionCountOffset !== undefined && !countAligned) {
     throw new Error("Repair question-count instruction could not be aligned with its output schema");
   }
+  const repairSystemInput = !repairIncludesMultipleChoice
+    ? repairInput.map((item) => item?.role === "system" && typeof item.content === "string"
+      ? { ...item, content: item.content.replace(` ${multipleChoiceQualityGuidance(lang, level)}`, "") }
+      : item)
+    : repairInput;
   return {
     ...payload,
     text: { ...payload.text, format: buildMockExamSchema(repairCount, qType) },
     input: [
-      ...repairInput,
+      ...repairSystemInput,
       { role: "user", content: `${instruction}\n\n${structuralSourceGuidance}${requirementOptionsGuidance}${productOptionsGuidance}${quantitySubjectGuidance}${circularTaskGuidance}${repairFactualAnswerInstruction} ${repairSourceReferenceInstruction}` },
     ],
   };
@@ -2047,7 +2075,7 @@ module.exports = async function handler(req, res, internalContext = null) {
     if (internalBatch && internalContext.pipelineStage === "repair") {
       const feedback = normalizeRepairFeedback(internalContext.repairFeedback);
       payload = buildRepairPayload(payload, {
-        lang, numQuestions, candidateCount: numQuestions, qType, requireExtractiveAnswers: subjectProfile === "natural_sciences" && qType !== "mc" && qType !== "graph", questionCountOffset,
+        lang, level, numQuestions, candidateCount: numQuestions, qType, requireExtractiveAnswers: subjectProfile === "natural_sciences" && qType !== "mc" && qType !== "graph", questionCountOffset,
         priorQuestions,
         comparisonQuestions,
         reviewFailureCodes: Object.keys(feedback.reviewFailureCounts),
@@ -2232,7 +2260,7 @@ module.exports = async function handler(req, res, internalContext = null) {
           : null;
         const repairCount = repairCandidateCountFor(repairSlots, missingTypes);
         const repairPayload = buildRepairPayload(payload, {
-          lang, numQuestions, existingQuestions: exam.questions, candidateCount: repairCount, qType, missingTypes,
+          lang, level, numQuestions, existingQuestions: exam.questions, candidateCount: repairCount, qType, missingTypes,
           structuralIssueCounts: structuralSourceFailureCounts(gate),
           requireExtractiveAnswers: subjectProfile === "natural_sciences" && qType !== "mc" && qType !== "graph",
           priorQuestions,
@@ -2518,7 +2546,7 @@ module.exports = async function handler(req, res, internalContext = null) {
               repairSlots, missingTypes,
             );
             const repairPayload = buildRepairPayload(payload, {
-              lang, numQuestions, existingQuestions: round1ApprovedQuestions, candidateCount: repairCount,
+              lang, level, numQuestions, existingQuestions: round1ApprovedQuestions, candidateCount: repairCount,
               structuralIssueCounts: structuralSourceFailureCounts(gate),
               requireExtractiveAnswers: subjectProfile === "natural_sciences" && qType !== "mc" && qType !== "graph",
               priorQuestions,
