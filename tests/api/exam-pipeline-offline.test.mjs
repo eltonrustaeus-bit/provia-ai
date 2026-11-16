@@ -2565,7 +2565,7 @@ try {
   try {
     boundaryRepairedInternalBatch = await generateExam.generateVerifiedBatch({
       userId,
-      deadlineAt: simulatedNow + 46_001,
+      deadlineAt: simulatedNow + 51_001,
       pipelineJobId: "00000000-0000-4000-8000-000000000570",
       payload: {
         lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
@@ -2599,9 +2599,9 @@ try {
   assert.equal(boundaryRepairedInternalBatch.body.qualityDiagnostics.repairOutcomeStage, "repair_combined");
   assert.ok(boundaryGenerationTimeouts.includes(4_001),
     `the real internal repair stream receives exactly the first eligible 4,001 ms generation window: ${boundaryGenerationTimeouts.join(",")}`);
-  assert.deepEqual(boundaryVerifierTimeouts.slice(-2), [18_000, 8_000],
+  assert.deepEqual(boundaryVerifierTimeouts.slice(-2), [18_000, 13_000],
     "the initial and repair verifier receive their independently bounded review windows");
-  assert.deepEqual(boundarySolverTimeouts.slice(-2), [19_001, 8_000],
+  assert.deepEqual(boundarySolverTimeouts.slice(-2), [24_001, 13_000],
     "the parallel blind solver retains its computed initial and repair review windows");
   assert.ok(verifierInputs.slice(verifierCallsBeforeBoundaryRepair).some((batch) =>
     batch.questions.some((question) => question.id.startsWith("retry-"))),

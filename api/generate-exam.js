@@ -853,7 +853,8 @@ const MIN_GENERATION_MS = 15_000;       // below this, do not start a generation
 const PRE_GENERATION_RESERVE_MS = 6_000; // quota (5 s) and adaptive focus (4 s) run concurrently, plus margin
 const INTERNAL_PRE_GENERATION_RESERVE_MS = 5_000; // pipeline quota is already reserved; adaptive focus has a 4 s timeout
 const REGENERATION_MIN_GENERATION_MS = 4_000; // streamed repair may salvage complete candidates before timeout
-const REGENERATION_REVIEW_TIMEOUT_MS = 8_000; // optional retry; timeout safely falls back to round 1
+const REGENERATION_REVIEW_TIMEOUT_MS = 8_000; // short synchronous retry; timeout safely falls back to round 1
+const INTERNAL_REGENERATION_REVIEW_TIMEOUT_MS = 13_000; // multi-step pipeline: covers observed 9.3 s average / 11.4 s max verifier latency
 const REGENERATION_POST_REVIEW_RESERVE_MS = 14_000; // 5 s issuance + 6 s quota + 1.5 s usage + margin
 const INTERNAL_REGENERATION_POST_REVIEW_RESERVE_MS = 4_000; // internal batches skip issuance/quota and retain usage-flush margin
 
@@ -879,9 +880,13 @@ function regenerationPostReviewReserveMs(internalBatch = false) {
     : REGENERATION_POST_REVIEW_RESERVE_MS;
 }
 
+function regenerationReviewTimeoutMs(internalBatch = false) {
+  return internalBatch ? INTERNAL_REGENERATION_REVIEW_TIMEOUT_MS : REGENERATION_REVIEW_TIMEOUT_MS;
+}
+
 function regenerationGenerationTimeout(remainingMs, internalBatch = false) {
   const postReviewReserveMs = regenerationPostReviewReserveMs(internalBatch);
-  const verificationAndFinalization = REGENERATION_REVIEW_TIMEOUT_MS + postReviewReserveMs;
+  const verificationAndFinalization = regenerationReviewTimeoutMs(internalBatch) + postReviewReserveMs;
   if (remainingMs <= REGENERATION_MIN_GENERATION_MS + verificationAndFinalization) return null;
   return remainingMs - verificationAndFinalization;
 }
@@ -2636,12 +2641,12 @@ module.exports = async function handler(req, res, internalContext = null) {
                         .reduce((hints, [id, issue]) => hints.set(id, [...(hints.get(id) || []), issue]), new Map()),
                       comparisonQuestions: repairComparisonQuestions,
                       comparisonAnswerTargets: repairComparisonAnswerTargets,
-                      timeoutMs: Math.max(1000, Math.min(REGENERATION_REVIEW_TIMEOUT_MS, budget.remaining() - regenerationPostReviewReserveMs(internalBatch))),
+                      timeoutMs: Math.max(1000, Math.min(regenerationReviewTimeoutMs(internalBatch), budget.remaining() - regenerationPostReviewReserveMs(internalBatch))),
                     }),
                     solver.solveQuestions(candidateQuestions, {
                       userId: user.id,
                       apiKey, model, subjectProfile, lang, material: reviewMaterial,
-                      timeoutMs: Math.max(1000, Math.min(REGENERATION_REVIEW_TIMEOUT_MS, budget.remaining() - regenerationPostReviewReserveMs(internalBatch))),
+                      timeoutMs: Math.max(1000, Math.min(regenerationReviewTimeoutMs(internalBatch), budget.remaining() - regenerationPostReviewReserveMs(internalBatch))),
                     }),
                   ]);
                   const repairVerifierUsageEvent = recordUsage("verify_compare", v2.model, v2.usage, v2.latencyMs);

@@ -891,7 +891,7 @@ en:{
   mImprove:"My progress",mLang:"Svenska",mLogout:"Log out",
   step1:"Material",step1Sub:"Paste the material you're studying — headings, definitions, formulas, examples",
   pasteLabel:"Study material",pastePH:"Headings → bullet points → definitions/formulas → examples",
-  materialTooLong:"The material is too long. Shorten it to 12,000 characters or fewer before continuing.",
+  materialTooLong:"The material is too long. Shorten it to 16,000 characters or fewer before continuing.",
   ocrTitle:"Image → OCR (optional)",ocrBtn:"OCR into material",
   ocrHint:"Tip: sharp photo from above, good light, high contrast.",
   tip:"Tip: headings + bullet points produce more accurate questions and grading.",
@@ -1563,8 +1563,8 @@ function updateMaterialCounter(){
   const over=count>MATERIAL_CHAR_LIMIT;
   counter.className="stxt"+(over?" bad":"");
   counter.textContent=LANG==="sv"
-    ? `${count.toLocaleString("sv-SE")} / ${MATERIAL_CHAR_LIMIT.toLocaleString("sv-SE")} tecken · ${over?"Korta ner materialet innan du fortsätter.":count>12000?"Hela texten sparas; relevanta avsnitt väljs vid generering.":"Hela texten används."}`
-    : `${count.toLocaleString("en-US")} / ${MATERIAL_CHAR_LIMIT.toLocaleString("en-US")} characters · ${over?"Shorten the material before continuing.":count>12000?"All text is saved; relevant sections are selected during generation.":"All entered text is used."}`;
+    ? `${count.toLocaleString("sv-SE")} / ${MATERIAL_CHAR_LIMIT.toLocaleString("sv-SE")} tecken · ${over?"Korta ner materialet innan du fortsätter.":count>12000?"Hela texten sparas; relevanta avsnitt kan väljas för vissa provsteg.":"Hela texten används."}`
+    : `${count.toLocaleString("en-US")} / ${MATERIAL_CHAR_LIMIT.toLocaleString("en-US")} characters · ${over?"Shorten the material before continuing.":count>12000?"All text is saved; relevant sections may be selected for some exam steps.":"All entered text is used."}`;
 }
 
 function materialTooLongMessage(){return T[LANG].materialTooLong;}

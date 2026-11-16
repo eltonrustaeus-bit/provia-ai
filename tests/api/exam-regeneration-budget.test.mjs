@@ -40,14 +40,14 @@ assert.equal(regenerationGenerationTimeout(35_000), 13_000,
   "a normal short exam leaves a bounded repair window while preserving review and finalization time");
 assert.equal(13_000 + 8_000 + 14_000, 35_000);
 
-assert.equal(regenerationGenerationTimeout(15_999, true), null,
+assert.equal(regenerationGenerationTimeout(20_999, true), null,
   "internal batches keep their usage flush and response reserve but do not reserve ordinary quota/issuance work");
-assert.equal(regenerationGenerationTimeout(16_000, true), null,
+assert.equal(regenerationGenerationTimeout(21_000, true), null,
   "internal repair must exceed, not merely equal, its minimum generation window");
-assert.equal(regenerationGenerationTimeout(16_001, true), 4_001,
+assert.equal(regenerationGenerationTimeout(21_001, true), 4_001,
   "the first eligible internal-repair millisecond preserves just over four seconds for generation");
-assert.equal(regenerationGenerationTimeout(17_000, true), 5_000,
+assert.equal(regenerationGenerationTimeout(22_000, true), 5_000,
   "internal batches can use repair earlier while preserving the full independent review window");
-assert.equal(5_000 + 8_000 + 4_000, 17_000);
+assert.equal(5_000 + 13_000 + 4_000, 22_000);
 
 console.log("exam regeneration budget: generation, independent review and finalization remain bounded");

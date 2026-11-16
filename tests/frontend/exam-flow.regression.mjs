@@ -470,8 +470,15 @@ async function toMaterial(page) {
       (await area.inputValue()).length === 16001);
     await area.fill("x".repeat(16000));
     const atLimit = await page.locator("#xf .xf-screen[data-screen='material'] .xf-read[role='status']").textContent();
-    ok("exakt 16 000 tecken tillåts och hela texten används",
-      /16.?000 \/ 16.?000/.test(atLimit || "") && /hela texten används/.test(atLimit || "") && await next.isEnabled(), atLimit || "");
+    ok("exakt 16 000 tecken tillåts och urval för vissa provsteg beskrivs korrekt",
+      /16.?000 \/ 16.?000/.test(atLimit || "") && /hela texten sparas/i.test(atLimit || "")
+        && /kan väljas/i.test(atLimit || "") && await next.isEnabled(), atLimit || "");
+    await area.fill("x".repeat(13000));
+    const selectedSections = await page.locator("#xf .xf-screen[data-screen='material'] .xf-read[role='status']").textContent();
+    ok("långt material beskriver urval som möjligt, inte garanterat",
+      /hela texten sparas/i.test(selectedSections || "")
+        && /kan väljas/i.test(selectedSections || "")
+        && !/väljs vid generering/i.test(selectedSections || ""), selectedSections || "");
     const mobileOverflow = await page.evaluate(() => ({
       documentWidth: document.documentElement.scrollWidth,
       status: document.querySelector("#xf .xf-screen[data-screen='material'] .xf-read[role='status']")?.getBoundingClientRect().toJSON(),
@@ -486,6 +493,31 @@ async function toMaterial(page) {
   } finally {
     await ctx.close();
   }
+
+  const english = await mk();
+  try {
+    await signIn(english.page, "material-limit-user-en", "en");
+    await toMaterial(english.page);
+    const area = english.page.locator("#xf .xf-screen[data-screen='material'] .xf-area");
+    await area.fill("x".repeat(13000));
+    const longNotice = await english.page.locator("#xf .xf-screen[data-screen='material'] .xf-read[role='status']").textContent();
+    ok("English long-material notice does not promise section selection",
+      /all text is saved/i.test(longNotice || "")
+        && /may be selected/i.test(longNotice || "")
+        && !/are selected during generation/i.test(longNotice || ""), longNotice || "");
+    await area.fill("x".repeat(16000));
+    const englishAtLimit = await english.page.locator("#xf .xf-screen[data-screen='material'] .xf-read[role='status']").textContent();
+    ok("English accepts exactly 16,000 characters with accurate selection wording",
+      /16,000 \/ 16,000/.test(englishAtLimit || "")
+        && /all text is saved/i.test(englishAtLimit || "")
+        && /may be selected/i.test(englishAtLimit || ""), englishAtLimit || "");
+    await area.fill("x".repeat(16001));
+    const notice = await english.page.locator("#xf .xf-screen[data-screen='material'] .xf-read[role='status']").textContent();
+    ok("English over-limit notice matches the 16,000-character cap",
+      /16,000/.test(notice || "") && /shorten/i.test(notice || ""), notice || "");
+  } catch (e) {
+    ok("English material limit message is accurate", false, e.message);
+  } finally { await english.ctx.close(); }
 }
 
 // Felbanksträning is a separate path and must not silently slice its source.

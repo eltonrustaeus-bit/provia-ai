@@ -6023,3 +6023,26 @@ enda 12-frågetest. Offline- och mocktester bevisar inte live-modellens
   modell som lösning ännu. Nästa steg är att analysera varför de A-nivåfrågorna
   faller på nivå/källstöd/poängsättning och varför reparationsgranskningen
   timeoutar, med lokala/offline förbättringar före ytterligare betalda test.
+
+### Reparationstid och 16k-materialets elevtext — 2026-11-16
+
+- [x] Agentgranskning jämförde sanerad Luna-telemetri med kodens timeoutar:
+  interna reparationsgranskningar hade 8 s fast tak mot 9,3 s genomsnitt och
+  11,4 s observerad max. Detta gör timeouten till en kodstödd, sannolik
+  flaskhals; telemetrin bevisar inte det exakta förloppet för varje timeout.
+- [x] Interna, återupptagbara batchar får nu upp till 13 s för reparationsgranskare
+  och parallell blind lösare. Vanliga synkrona retries behåller 8 s. Faktisk
+  timeout begränsas fortfarande av återstående budget; generering startar inte
+  om minsta genererings-, gransknings- och finaliseringsfönster inte ryms.
+  Oberoende verifiering och blind lösning krävs fortfarande för varje kandidat.
+- [x] Den aktiva provguiden och reservvyn säger nu vid material över 12 000 tecken
+  att allt sparas och att relevanta avsnitt kan väljas för vissa provsteg.
+  Hårda gränsen 16 000 tecken är oförändrad. Svensk/engelsk webbläsarkontroll
+  passerade vid 13 000, 16 000 och 16 001 tecken.
+- [x] Riktade offline-tester för pipeline/reparation, tidsbudget, materialgräns,
+  källurval, frågebyte och idempotens passerade **23/23**. Syntaxkontroll och
+  `git diff --check` passerade.
+- [!] Den breda `exam-flow.regression.mjs`-körningen avbröts efter tre minuter
+  när den väntade i ett senare provflöde; den räknas inte som passerad. Ingen
+  ny betald AI-körning eller staging-/produktionsdatabasändring gjordes.
+  Ändringarna är lokala vid denna checkpoint; ingen Preview har verifierats.

@@ -1821,7 +1821,9 @@
       limitStatus.textContent = length.toLocaleString(locale) + " / " + MATERIAL_MAX.toLocaleString(locale) + " " + tx("tecken", "characters") +
         (overLimit
           ? tx(" · korta ner materialet innan du fortsätter.", " · shorten the material before continuing.")
-          : tx(" · hela texten används.", " · all entered text is used."));
+          : length > 12000
+            ? tx(" · hela texten sparas; relevanta avsnitt kan väljas för vissa provsteg.", " · all text is saved; relevant sections may be selected for some exam steps.")
+            : tx(" · hela texten används.", " · all entered text is used."));
       limitStatus.style.color = overLimit ? "var(--exgen-warning-text)" : "";
 
       read.innerHTML = "";
