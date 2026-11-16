@@ -6045,4 +6045,8 @@ enda 12-frågetest. Offline- och mocktester bevisar inte live-modellens
 - [!] Den breda `exam-flow.regression.mjs`-körningen avbröts efter tre minuter
   när den väntade i ett senare provflöde; den räknas inte som passerad. Ingen
   ny betald AI-körning eller staging-/produktionsdatabasändring gjordes.
-  Ändringarna är lokala vid denna checkpoint; ingen Preview har verifierats.
+  Oberoende granskning fann inga blockerare; den bad även om ett engelskt
+  exakt-16 000-test, som nu finns. Checkpoint `7f21f96` är pushad till den
+  befintliga feature-branchen; Vercel Preview `dpl_41TirqsEW47GQJ39fZh4st3uFqyS`
+  blev READY och den befintliga Preview-aliasen pekar på den. Ingen `main`,
+  Production eller databas ändrades.
