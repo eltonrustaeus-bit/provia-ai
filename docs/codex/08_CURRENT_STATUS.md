@@ -1,5 +1,36 @@
 # 08 Current Status
 
+## Replacement recovery and proof validation — 2026-11-17
+
+- The browser now rejects a replacement response unless every question carries
+  a fresh active-question proof. The trusted server already re-signs all
+  questions when it issues the child exam; the client guard prevents a stale
+  parent proof from being installed if a malformed response reaches the UI.
+- Added a browser regression for the difficult recovery boundary: server has
+  committed the child, but local persistence fails. Restoring the saved parent
+  and replaying the same request installs the same child, clears only the
+  replaced answer/help flag, and preserves the other answers and current index.
+  The browser test also proves that a child containing an unchanged parent
+  proof is rejected without losing the parent's saved answers.
+- Offline evidence: replacement browser recovery **6 scenarios passed**;
+  replacement API/revision/Postgres group **16/16**; material selection
+  **5/5** plus 16,000-character boundary check; changed JS and test syntax and
+  `git diff --check` passed. The first test attempt exposed a test-harness
+  reseeding issue on reload; the final test models a new browser session from
+  the persisted recovery snapshot instead. No product behavior was inferred
+  from the failed harness attempt.
+- No hosted replacement or model call has yet been run for this change. Staging
+  budget read: cap **$5.879071**, spent **$3.687971**, reserved **$0.282822**,
+  available **$1.908278**. The signed-in session is visible on the existing
+  Preview, but its home screen currently shows a prior result. No staging data,
+  budget, role, account, `main`, Production, or database change was made.
+- Next: independent final review, then push only the reviewed files to the
+  existing feature branch and verify the exact Preview deployment. If the same
+  signed-in session remains available and a fresh budget read allows it, run at
+  most the already approved bounded synthetic replacement journey; do not open
+  another tab or create a separate test exam unless needed to finish that one
+  journey.
+
 ## Definitive terminal-request cleanup — 2026-11-17
 
 - The authenticated Preview previously blocked a new start because failed

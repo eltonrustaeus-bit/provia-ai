@@ -2881,8 +2881,10 @@
       result.replacement?.oldQuestionId === oldId &&
       result.replacement?.newQuestionId === result.exam.questions[index]?.id &&
       result.exam.questions.every(function (q, n) {
-        return n === index || (q.id === originalExam.questions[n].id &&
-          q.grade_task === originalExam.questions[n].grade_task);
+        return typeof q.active_question_proof === "string" && q.active_question_proof.length > 0 &&
+          q.active_question_proof !== originalExam.questions[n].active_question_proof &&
+          (n === index || (q.id === originalExam.questions[n].id &&
+            q.grade_task === originalExam.questions[n].grade_task));
       }));
   }
 
