@@ -14,8 +14,9 @@
   Syntax checks and `git diff --check` passed.
 - This is local/offline evidence only. No new live model call, staging data
   mutation, `main`, Production, or production database action was performed.
-  The current Preview remains the feature deployment for `973e64b`; the
-  test-only follow-up still needs its own checkpoint before Preview includes it.
+  Feature checkpoint `98e5168` was pushed and its Vercel deployment reached
+  READY on the existing feature Preview alias. This test/documentation update
+  does not constitute live model verification.
 
 ## A-nivåinstruktion och verifierardiagnostik — 2026-11-16
 
