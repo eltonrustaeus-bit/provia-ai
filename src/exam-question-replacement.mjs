@@ -69,6 +69,7 @@ function comparisonQuestions(trusted) {
 }
 
 export default async function handler(req, res) {
+  const requestStartedAt = Date.now();
   res.setHeader("Cache-Control", "no-store");
   if (req.method !== "POST" && req.method !== "GET") {
     res.setHeader("Allow", "GET, POST");
@@ -171,7 +172,9 @@ export default async function handler(req, res) {
         comparisonQuestions: comparisonQuestions(trusted),
         ...(sourceExcerpt ? { sourceTarget: { excerpt: sourceExcerpt } } : {}),
       },
-      deadlineAt: Date.now() + 54_000,
+      // The same 60-second function still needs time for its atomic DB commit.
+      // Count auth and source lookup against the budget too.
+      deadlineAt: requestStartedAt + 51_000,
       pipelineStage: "repair",
     });
     const approved = batch.status === 200 && batch.body?.ok &&
