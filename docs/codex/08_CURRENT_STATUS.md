@@ -1,5 +1,31 @@
 # 08 Current Status
 
+## Question-revision foundation — 2026-11-16
+
+- Feature commit `a8883be` is on the existing feature branch and Vercel Preview
+  `dpl_67KFfL1gUTQsmpzdyaWsuNbzb7ui` is READY for that exact SHA. This proves
+  deployment of the material checkpoint, not live exam quality.
+- A local, unconnected `_exam-question-revision.cjs` module now opens a signed
+  exam, rejects wrong owner/material/submission or altered question proof,
+  accepts only a structurally valid candidate marked verified by the trusted
+  server generation path, checks retained-question conflicts, and creates a
+  fresh manifest, submission ID and P.E.R proofs. It is NOT exposed to clients.
+  An endpoint must never pass client-supplied candidate or verification status
+  to it; the independent verifier and blind solver must actually run first.
+- The safe replacement requires a service-only, atomic DB revision ledger:
+  authenticate and hash the exact request; claim one attempt per parent exam;
+  limit swaps per root exam; generate a same-type/same-points candidate without
+  consuming another exam quota; then in one transaction lock the old issuance,
+  refuse active grading/completion/stale revision, abandon old, issue child,
+  save replay response. Recover that same child after a lost response. Existing
+  generation replay and drafts must not resurrect the parent exam. The client
+  must preserve answers for retained IDs, clear replaced answer/help, persist
+  the new revision before showing it and abort old P.E.R streams.
+- The revision helper's focused tests and signing regressions passed 14/14.
+  The broad browser regression was stopped after hanging without output; this
+  is NOT a pass and needs targeted investigation. No database migration,
+  replacement endpoint/button, staged replacement or paid AI call is complete.
+
 ## Local 16k-material and source-selection checkpoint — 2026-11-16
 
 - Current feature work raises the material limit from 12,000 to 16,000 Unicode
