@@ -10,14 +10,14 @@ const requestId = "33333333-3333-4333-8333-333333333333";
 const oldExam = {
   exam_manifest: `v2.${oldId}.synthetic`,
   questions: [
-    { id: "q1", type: "mc", points: 1, question: "Vilken är lutningen för y = 2x + 3?", options: ["2", "3", "5"], grade_task: "sealed-q1" },
-    { id: "q2", type: "mc", points: 1, question: "Vad är skärningen med y-axeln?", options: ["2", "3", "5"], grade_task: "sealed-q2" },
+    { id: "q1", type: "mc", points: 1, question: "Vilken är lutningen för y = 2x + 3?", options: ["2", "3", "5"], grade_task: "sealed-q1", active_question_proof: "proof-old" },
+    { id: "q2", type: "mc", points: 1, question: "Vad är skärningen med y-axeln?", options: ["2", "3", "5"], grade_task: "sealed-q2", active_question_proof: "proof-q2" },
   ],
 };
 const newExam = {
   exam_manifest: `v2.${newId}.synthetic`,
   questions: [
-    { id: "q-new", type: "mc", points: 1, question: "Vad är y när x = 1?", options: ["3", "5", "6"], grade_task: "sealed-new" },
+    { id: "q-new", type: "mc", points: 1, question: "Vad är y när x = 1?", options: ["3", "5", "6"], grade_task: "sealed-new", active_question_proof: "proof-new" },
     oldExam.questions[1],
   ],
 };
@@ -114,6 +114,14 @@ try {
   const thirdPage = third.page;
   await thirdPage.getByRole("button", { name: /Fortsätt provet du började/ }).click();
   await thirdPage.waitForSelector(".xf-exam.on .xf-replace");
+  await thirdPage.evaluate(() => {
+    window.__replacementPerContexts = [];
+    const describe = window.PER?.describe?.bind(window.PER);
+    if (describe) window.PER.describe = context => {
+      window.__replacementPerContexts.push(context);
+      return describe(context);
+    };
+  });
   await thirdPage.getByRole("button", { name: /Fel fråga\? Generera ny/ }).click();
   assert.equal(await thirdPage.locator(".xf-dot").nth(1).isDisabled(), true,
     "question dots cannot change the target during a replacement");
@@ -123,6 +131,9 @@ try {
   assert.equal(thirdSaved.exam.exam_manifest, newExam.exam_manifest);
   assert.equal(thirdSaved.replacementPending, null);
   assert.deepEqual(thirdSaved.answers, { q2: "3" });
+  assert.equal(await thirdPage.evaluate(() => window.__replacementPerContexts.some(context =>
+    context.focus?.id === "q-new" && context.focus?.questionProof === "proof-new")), true,
+    "P.E.R receives the replacement question and proof");
   console.log("replacement live UI passed: dots locked, child saved, other answer preserved");
   await context.close();
   context = null;

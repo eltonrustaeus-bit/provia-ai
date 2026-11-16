@@ -2395,7 +2395,10 @@
           id: "q" + (n + 1),
           label: tx("Fråga " + (n + 1), "Question " + (n + 1)),
           hint: String(qq.question || "").slice(0, 90),
-          go: function () { S.idx = n; renderQuestion(); }
+          go: function () {
+            if (S.replacing || S.replacementPending) return;
+            S.idx = n; renderQuestion();
+          }
         };
       }),
       state: {
