@@ -83,6 +83,20 @@ for (const [requested, minimum] of [[3, 2], [6, 4], [12, 8]]) {
   assert.equal(generateExam.canDeliverVerifiedQuestions(verifiedQuestions.slice(1), { requested, qType: "mc" }), false,
     `${minimum - 1}/${requested} independently approved questions fails closed below the delivery floor`);
 }
+const indexedExcerpt = "Fotosyntesen omvandlar ljusenergi, vatten och koldioxid till druvsocker och syre i växtens gröna delar.";
+for (const lang of ["sv", "en"]) {
+  const targetedPrompt = generateExam.buildExamPrompts({
+    lang, level: "C", course: lang === "sv" ? "Biologi 1" : "Biology 1", qType: "short", numQuestions: 3,
+    pastedText: indexedExcerpt,
+    sourceTarget: { title: "Fotosyntes", excerpt: indexedExcerpt, index: 0 },
+  });
+  assert.match(targetedPrompt.userPrompt, lang === "sv"
+    ? /materialet som faktiskt skickats i detta genereringsanrop.*inte finns med i anropet/u
+    : /material actually included in this generation request.*omitted from the request/u,
+  `${lang} target guidance is limited to the source material present in this batch request`);
+  assert.doesNotMatch(targetedPrompt.userPrompt, lang === "sv" ? /hela materialet stöder/u : /supported by the full material/u,
+    `${lang} target guidance does not imply access to omitted source sections`);
+}
 assert.equal(generateExam.qualityRepairCandidateCountFor(3, null), 4,
   "a 0/3 first-pass result requests three slots plus one spare, not six candidates");
 assert.equal(generateExam.qualityRepairCandidateCountFor(2, null), 3,

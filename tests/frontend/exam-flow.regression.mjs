@@ -915,9 +915,13 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
       Boolean(terminalIdempotencyKey) && !failedRequestCleanup.durable && failedRequestCleanup.terminal
         && !failedRequestCleanup.recovery && !failedRequestCleanup.inputs,
       JSON.stringify(failedRequestCleanup));
-    await page.route("**/api/generate-exam*", route => route.fulfill({
-      status: 429, json: { ok: false, error: "Quota exceeded", count: 3, limit: 3, period: "2026-W43", periodUnit: "week" },
-    }));
+    let quotaIdempotencyKey = null;
+    await page.route("**/api/generate-exam*", route => {
+      try { quotaIdempotencyKey = route.request().postDataJSON()?.idempotencyKey || quotaIdempotencyKey; } catch {}
+      return route.fulfill({
+        status: 429, json: { ok: false, error: "Quota exceeded", count: 3, limit: 3, period: "2026-W43", periodUnit: "week" },
+      });
+    });
     await page.click("#xf .xf-screen[data-screen='contract'] .xf-btn.primary");
     await page.waitForFunction(() => document.querySelector("#xf .xf-screen[data-screen='contract'] .xf-say")
       ?.textContent === "Provkvoten är slut.", null, { timeout: 5000 });
@@ -926,7 +930,23 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
     ok("kvotstopp får ett eget besked och återställningstid i stället för ett generiskt genereringsfel",
       /veckan|måndag/i.test(quotaNotice) && !quotaNotice.includes("färre frågor") && !quotaError.trim(),
       JSON.stringify({ quotaNotice, quotaError }));
-    await page.route("**/api/generate-exam*", route => route.abort("failed"));
+    const quotaRequestCleanup = await page.evaluate(key => {
+      const durable = JSON.parse(localStorage.getItem("exgen_generation_request_v1") || '{"requests":[]}');
+      const terminal = JSON.parse(localStorage.getItem("exgen_generation_terminal_v1") || '{"requests":[]}');
+      const recovery = JSON.parse(sessionStorage.getItem("exgen_generation_recovery_v1") || '{"requests":[]}');
+      const inputs = JSON.parse(sessionStorage.getItem("exgen_pending_generation_input_v1") || '{"requests":[]}');
+      const contains = value => JSON.stringify(value).includes(key);
+      return { durable: contains(durable), terminal: contains(terminal), recovery: contains(recovery), inputs: contains(inputs) };
+    }, quotaIdempotencyKey);
+    ok("kvotavslag bevarar idempotensnyckel och flikens återupptagningsmaterial för säkert återförsök",
+      Boolean(quotaIdempotencyKey) && quotaRequestCleanup.durable && !quotaRequestCleanup.terminal
+        && quotaRequestCleanup.recovery,
+      JSON.stringify(quotaRequestCleanup));
+    let retryIdempotencyKey = null;
+    await page.route("**/api/generate-exam*", route => {
+      try { retryIdempotencyKey = route.request().postDataJSON()?.idempotencyKey || retryIdempotencyKey; } catch {}
+      return route.abort("failed");
+    });
     await page.click("#xf .xf-screen[data-screen='contract'] .xf-btn.primary");
     await page.waitForFunction(() => /Provet är inte färdigt ännu/.test(
       document.querySelector("#xf .xf-screen[data-screen='contract'] .xf-err")?.textContent || ""), null, { timeout: 7000 });
@@ -937,6 +957,25 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
     ok("återupptagbart genereringsfel bevarar elevens material",
       await page.locator("#xf .xf-screen[data-screen='material'] .xf-area").inputValue()
         .then(value => value.includes("Linjär funktion y = 2x + 1")));
+    ok("återförsök efter kvotstopp använder samma idempotensnyckel",
+      Boolean(quotaIdempotencyKey) && retryIdempotencyKey === quotaIdempotencyKey,
+      JSON.stringify({ quotaIdempotencyKey, retryIdempotencyKey }));
+    let inProgressStartCalls = 0;
+    await page.route("**/api/generate-exam*", route => {
+      inProgressStartCalls++;
+      return route.fulfill({ status: 409, json: { ok: false, error: "GENERATION_IN_PROGRESS", retryable: true } });
+    });
+    await page.click("#xf .xf-screen[data-screen='contract'] .xf-btn.primary");
+    await page.waitForFunction(() => /Provet är inte färdigt ännu/.test(
+      document.querySelector("#xf .xf-screen[data-screen='contract'] .xf-err")?.textContent || ""), null, { timeout: 7000 });
+    const inProgressRecovery = await page.evaluate(() => {
+      const durable = JSON.parse(localStorage.getItem("exgen_generation_request_v1") || '{"requests":[]}');
+      const recovery = JSON.parse(sessionStorage.getItem("exgen_generation_recovery_v1") || '{"requests":[]}');
+      return { durable: durable.requests.length, recovery: recovery.requests.length };
+    });
+    ok("versalt GENERATION_IN_PROGRESS behåller nyckeln och återupptagningskopian",
+      inProgressStartCalls === 4 && inProgressRecovery.durable > 0 && inProgressRecovery.recovery > 0,
+      JSON.stringify({ inProgressStartCalls, inProgressRecovery }));
   } catch (e) {
     const visibleState = await page.evaluate(() => ({
       error: document.querySelector("#xf .xf-screen[data-screen='contract'] .xf-err")?.textContent || "",

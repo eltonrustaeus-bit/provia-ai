@@ -1,5 +1,39 @@
 # 08 Current Status
 
+## Source-target grounding and safe retry after quota denial — 2026-11-17
+
+- The under-covered-section prompt now directs a question to the selected
+  excerpt and explicitly limits its evidence to the material included in that
+  specific generation request. It no longer tells the model that omitted
+  sections of the full source support the question. This fixes a real prompt
+  contract mismatch; it does not by itself prove better live question quality.
+- A local browser regression showed that quota denial retains the shared
+  idempotency key and same-tab recovery payload, allowing the exact request to
+  retry safely without a new model call or quota reservation. The app now says
+  plainly that a browser's five saved-attempt limit blocked the request, that
+  recovery text exists only in the original tab, and that no exam or AI call
+  started. It does not delete old keys whose server state is not confirmed.
+- When the server explicitly reports an expired request, the client now writes
+  the shared terminal marker before deleting durable and same-tab recovery
+  copies. Payload conflicts and transient/in-progress outcomes continue to
+  preserve recovery state. The 16,000-character recovery test now matches the
+  current material contract instead of the retired 12,000-character limit.
+- Verification on the current working tree: focused browser checkpoint
+  **94 passed, 0 failed**; `node --test` for the pipeline offline, resumable
+  progress, idempotency, terminal-request, and progress suites passed; syntax
+  checks and `git diff --check` passed. An independent read-only reviewer found
+  no blockers in the final diff. These are local/offline checks.
+- The existing signed-in Preview tab is still available. No live model call
+  was made during this checkpoint because the previous attempt stopped locally
+  at `PENDING_REQUEST_LIMIT` before reaching the API. Last verified staging
+  budget was **$1.908278 available**; this has not been refreshed in this
+  checkpoint and no cost or staging data changed. Do not remove unresolved
+  request IDs or start parallel tabs to bypass that guard.
+- Next: commit and push this reviewed checkpoint to the existing feature
+  branch, confirm the exact Vercel Preview deployment, then use the same
+  browser tab for one bounded synthetic test only if the request guard allows
+  it and a fresh budget check remains within the already approved limit.
+
 ## Replacement recovery and proof validation — 2026-11-17
 
 - The browser now rejects a replacement response unless every question carries

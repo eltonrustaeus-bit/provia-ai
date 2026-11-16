@@ -2477,7 +2477,7 @@ try{
         :error?.message==="DUPLICATE_PENDING_REQUEST"
         ?(LANG==="sv"?"Det finns flera väntande provbegäranden för samma material. Inget nytt jobb startades för att undvika dubbla prov eller kvotdrag. Behåll dina öppna ExGen-flikar och kontakta pilotansvarig för hjälp.":"Multiple pending exam requests exist for the same material. No new job was started to avoid duplicate exams or quota charges. Keep your open ExGen tabs and contact the pilot lead.")
         :error?.message==="PENDING_REQUEST_LIMIT"
-        ?(LANG==="sv"?"Flera provbegäranden väntar på återupptagning. Använd samma material och inställningar för att fortsätta ett väntande jobb; inga väntande jobb har tagits bort.":"Several exam requests are still available to resume. Use the same material and settings to continue a pending job; no pending job was removed.")
+        ?(LANG==="sv"?"Webbläsaren har nått gränsen för sparade provförsök. Återupptagningsmaterialet finns bara kvar i fliken där försöket startades. Gå till en tidigare ExGen-flik och fortsätt med samma material och inställningar. Inget nytt prov eller AI-anrop startades här; sparade nycklar upphör automatiskt inom sju dagar.":"This browser has reached its limit for saved exam attempts. Recovery material is available only in the tab where each attempt started. Return to an earlier ExGen tab and resume with the same material and settings. No exam or AI request started here; saved keys expire within seven days.")
         :error?.message==="CROSS_TAB_REQUEST_LOCK_UNAVAILABLE"
           ?(LANG==="sv"?"Den här webbläsaren saknar stöd för säker samordning av provstart mellan flikar. Uppdatera till en aktuell version av Chrome, Edge eller Safari och försök igen.":"This browser cannot safely coordinate exam starts across tabs. Update to a current version of Chrome, Edge, or Safari and try again.")
           :(LANG==="sv"?"Provet kunde inte startas säkert i den här fliken. Ladda om sidan och försök igen.":"Exam creation could not start safely in this tab. Reload the page and try again.");
@@ -2514,6 +2514,16 @@ try{
       setStatus(message,"warn");
       return{ok:false,error:message,errorCode:"auth_verification_unavailable"};
     };
+    const finalizeTerminalGenerationRequest=async()=>{
+      try{
+        const result=await window.ExGenGenerationRequest?.clearTerminalGeneration?.(idempotencyKey);
+        if(result?.terminalMarked!==true)return false;
+        let cleanupOk=result.durableCleared===true;
+        try{window.ExGenGenerationRequest?.clearPendingGeneration?.(idempotencyKey);}catch{cleanupOk=false;}
+        try{window.ExGenGenerationRequest?.clearPendingInput?.(idempotencyKey);}catch{cleanupOk=false;}
+        return cleanupOk;
+      }catch{return false;}
+    };
     const res=payload.qType==="graph"
       ?await postJson("/api/generate-exam",payload,{timeoutMs:62000,token:authSnapshot.token})
       :await runResumableGeneration(payload,onProgress,authSnapshot.token,authSnapshot.userId,async operationId=>{
@@ -2534,15 +2544,17 @@ try{
       return {ok:false,error:message,timedOut:res.timedOut,networkError:res.networkError};
     }
     if(res.status===429&&res.data?.error==="Quota exceeded"){
-      try{window.ExGenGenerationRequest?.clearPendingGeneration?.(idempotencyKey);}catch{}
-      try{window.ExGenGenerationRequest?.clearPendingInput?.(idempotencyKey);}catch{}
       if(typeof res.data.count==="number")localStorage.setItem(quotaStorageKey(generationRole, authSnapshot.userId), String(res.data.count));
       const msg = quotaLimitMessage(res.data.periodUnit || ROLE_LIMITS[currentRole]?.period);
       setBusy(false);clearGenerationPlaceholder();setStatus(msg,"bad");await refreshQuotaUi();
       return {ok:false,error:msg,quota:true};
     }
     if(!res.ok||!res.data||!res.data.ok){
-      if(!(res.status===202||res.status===401||res.data?.error==="generation_in_progress"||res.status>=500)){
+      const requestError=String(res.data?.error||"");
+      const isGenerationInProgress=requestError.toLowerCase()==="generation_in_progress";
+      const isPayloadConflict=requestError==="GENERATION_REQUEST_PAYLOAD_CONFLICT";
+      const isExpiredRequest=requestError==="GENERATION_REQUEST_EXPIRED";
+      if(!(res.status===202||res.status===401||isGenerationInProgress||isPayloadConflict||isExpiredRequest||res.status>=500)){
         try{window.ExGenGenerationRequest?.clearPendingGeneration?.(idempotencyKey);}catch{}
       }
       setBusy(false);
@@ -2593,11 +2605,17 @@ try{
       }
       if(res.status===409&&["GENERATION_REQUEST_EXPIRED","GENERATION_REQUEST_PAYLOAD_CONFLICT"].includes(res.data?.error)){
         let cleanupFailed=false;
-        try { await window.ExGenGenerationRequest.clear(idempotencyKey); } catch { cleanupFailed=true; }
-        try { window.ExGenGenerationRequest.clearPendingInput(idempotencyKey); } catch { cleanupFailed=true; }
-        const message=LANG==="sv"
-          ?"Den tidigare provbegäran kan inte återanvändas. Kontrollera materialet och starta ett nytt försök."
-          :"The earlier exam request cannot be reused. Check the material and start a new attempt.";
+        const payloadConflict=res.data?.error==="GENERATION_REQUEST_PAYLOAD_CONFLICT";
+        if(!payloadConflict){
+          cleanupFailed=!(await finalizeTerminalGenerationRequest());
+        }
+        const message=payloadConflict
+          ?(LANG==="sv"
+            ?"Den sparade provbegäran hör till ett annat material än det här försöket. Inget nytt jobb startades. Gå tillbaka till ursprungsfliken och använd samma material, eller kontakta pilotansvarig."
+            :"The saved exam request belongs to different material. No new job was started. Return to the original tab and use the same material, or contact the pilot lead.")
+          :(LANG==="sv"
+            ?"Den tidigare provbegäran har gått ut. Kontrollera materialet och starta ett nytt försök."
+            :"The earlier exam request has expired. Check the material and start a new attempt.");
         const cleanupMessage=cleanupFailed?(LANG==="sv"
           ?" Återupptagningsnyckeln kunde inte rensas säkert. Försök igen senare eller kontakta pilotansvarig; upprepa inte provstarten ännu."
           :" The resume key could not be safely cleared. Try again later or contact the pilot lead; do not restart generation yet."):"";
