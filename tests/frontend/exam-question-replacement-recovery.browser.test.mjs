@@ -36,7 +36,7 @@ try {
     state: { storage: { exgen_flow_draft_u1: draft } }, settle: 0,
     mocks: { extra: [
       ["**/api/abandon-exam*", route => route.fulfill({ json: { ok: true, exam_state: "active", submission_id: newId } })],
-      ["**/api/replace-exam-question*", route => {
+      ["**/api/generate-exam?questionReplacement=1*", route => {
         if (route.request().method() === "GET") return route.fulfill({ json: { ok: true, enabled: true } });
         calls += 1;
         const sent = route.request().postDataJSON();
@@ -69,7 +69,7 @@ try {
     state: { storage: { exgen_flow_draft_u1: freshDraft } }, settle: 0,
     mocks: { extra: [
       ["**/api/abandon-exam*", route => route.fulfill({ json: { ok: true, exam_state: "active", submission_id: oldId } })],
-      ["**/api/replace-exam-question*", route => {
+      ["**/api/generate-exam?questionReplacement=1*", route => {
         if (route.request().method() === "GET") return route.fulfill({ json: { ok: true, enabled: true } });
         calls += 1;
         return route.fulfill({ status: 500, json: { ok: false } });
@@ -102,7 +102,7 @@ try {
     state: { storage: { exgen_flow_draft_u1: freshDraft } }, settle: 0,
     mocks: { extra: [
       ["**/api/abandon-exam*", route => route.fulfill({ json: { ok: true, exam_state: "active", submission_id: oldId } })],
-      ["**/api/replace-exam-question*", async route => {
+      ["**/api/generate-exam?questionReplacement=1*", async route => {
         if (route.request().method() === "GET") return route.fulfill({ json: { ok: true, enabled: true } });
         calls += 1;
         await waitForResponse;
@@ -131,7 +131,7 @@ try {
     state: { storage: { exgen_flow_draft_u1: freshDraft } }, settle: 0,
     mocks: { extra: [
       ["**/api/abandon-exam*", route => route.fulfill({ json: { ok: true, exam_state: "active", submission_id: oldId } })],
-      ["**/api/replace-exam-question*", route => route.request().method() === "GET"
+      ["**/api/generate-exam?questionReplacement=1*", route => route.request().method() === "GET"
         ? route.fulfill({ json: { ok: true, enabled: true } })
         : route.fulfill({ status: 429, json: { ok: false, error: "REPLACEMENT_LIMIT_REACHED" } })],
     ] },

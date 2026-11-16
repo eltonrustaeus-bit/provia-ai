@@ -1701,6 +1701,11 @@ function buildRepairPayload(payload, { lang, numQuestions, existingQuestions = [
 
 module.exports = async function handler(req, res, internalContext = null) {
   if (!internalContext) {
+    const replacementMode = new URL(req.url || "/api/generate-exam", "https://exgen.invalid")
+      .searchParams.get("questionReplacement");
+    if (replacementMode === "1") {
+      return (await import("../src/exam-question-replacement.mjs")).default(req, res);
+    }
     const pipelineMode = new URL(req.url || "/api/generate-exam", "https://exgen.invalid").searchParams.get("pipeline");
     if (["start", "advance", "status"].includes(pipelineMode)) {
       const pipelineHandler = pipelineMode === "advance"

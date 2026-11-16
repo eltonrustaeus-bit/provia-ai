@@ -1,10 +1,10 @@
 import crypto from "node:crypto";
-import { requireAuth } from "./_auth.js";
-import generation from "./generate-exam.js";
-import completion from "./_exam-completion.cjs";
-import materialInput from "./_material.cjs";
-import revision from "./_exam-question-revision.cjs";
-import supabaseServer from "./_supabase-server-key.cjs";
+import { requireAuth } from "../api/_auth.js";
+import generation from "../api/generate-exam.js";
+import completion from "../api/_exam-completion.cjs";
+import materialInput from "../api/_material.cjs";
+import revision from "../api/_exam-question-revision.cjs";
+import supabaseServer from "../api/_supabase-server-key.cjs";
 
 const { getSupabaseUrl, getSupabaseAdminHeaders } = supabaseServer;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;

@@ -26,7 +26,7 @@ globalThis.fetch = async (url, init = {}) => {
   if (path.includes("/rest/v1/exam_question_replacements?")) return Response.json([]);
   throw new Error(`Unexpected request ${path}`);
 };
-const handler = (await import("../../api/replace-exam-question.js?http-test")).default;
+const handler = (await import("../../src/exam-question-replacement.mjs?http-test")).default;
 const gradeTasks = require("../../api/_grade-task.js");
 const completion = require("../../api/_exam-completion.cjs");
 const generation = require("../../api/generate-exam.js");
@@ -112,6 +112,10 @@ test("availability is limited to the selected exam with saved language and level
   const current = response();
   await handler(req, current);
   assert.equal(current.body.enabled, true);
+  const routed = response();
+  await generation({ method: "GET", url: `/api/generate-exam?questionReplacement=1&submissionId=${parent}`,
+    headers: { authorization: "Bearer synthetic" } }, routed);
+  assert.equal(routed.body.enabled, true, "the existing exam function dispatches replacement requests");
 });
 
 test("fresh replacement uses server-cached exam and internal verified batch", async () => {
