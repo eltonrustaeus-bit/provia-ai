@@ -176,6 +176,14 @@ export default async function handler(req, res) {
       // Count auth and source lookup against the budget too.
       deadlineAt: requestStartedAt + 51_000,
       pipelineStage: "repair",
+      // Preserve the learning target from the server-verified signed question.
+      // Never accept replacement focus from the browser request.
+      replacementFocus: {
+        concept: original.concept_tag || original.topic || original.question,
+        learningObjective: original.learning_objective || original.subtopic || original.question,
+        topic: original.topic,
+        subtopic: original.subtopic,
+      },
     });
     const approved = batch.status === 200 && batch.body?.ok &&
       Array.isArray(batch.body.questions) && batch.body.quality?.verifierApproved >= batch.body.questions.length &&
@@ -185,7 +193,7 @@ export default async function handler(req, res) {
     for (const candidate of approved) {
       revised = revision.reviseIssuedExam({
         userId: user.id, course, material, exam: canonical.exam, submissionId: parentSubmissionId,
-        questionId, candidate, lang, level,
+        questionId, candidate, lang, level, requiredTrainingFocusId: "focus-1",
       });
       if (revised) break;
     }

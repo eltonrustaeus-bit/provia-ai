@@ -6107,3 +6107,19 @@ enda 12-frågetest. Offline- och mocktester bevisar inte live-modellens
   valt A-läge, exakt materialstöd, fråga och poängmatris, samt klassificera
   `missing_output_text` tydligare. Ändra inte granskningsgrindarna utan ny
   evidens och riktade regressionsprov.
+
+### Ersättningsfråga behåller lärandemålet — 2026-11-16
+
+- [x] Frågebytesflödet härleder nu träningsmålet från den serververifierade,
+  signerade originalfrågan (`concept_tag`, `learning_objective`, `topic`,
+  `subtopic`). Webbläsarens egna fokusfält ignoreras.
+- [x] Målet förs separat genom intern batchkontext och ges till generatorn som
+  avgränsad etikettdata; kursmaterialet förblir enda faktakällan. Den oberoende
+  verifieraren måste också godkänna samma specifika mål. Revisionen avvisar
+  ersättningen om verifierad måltaggning saknas. Typ, poäng, frågegrindar,
+  solver, idempotens och ersättningsgränser är oförändrade.
+- [x] Offlinekontroller: generatorprompt, HTTP-route spoof-skydd,
+  revisionens fail-closed-fokuskrav och befintlig frågebytes-/revisionssvit
+  passerade **10/10**. Syntaxkontroller och `git diff --check` passerade.
+- [!] Detta verifierar kodvägen offline, inte semantisk kvalitet med live-modell.
+  Ingen betald modellkörning, migration, Preview eller produktionsändring gjordes.

@@ -291,6 +291,26 @@ const historyPrompt = generateExam.buildExamPrompts({
   pastedText: "Industrialiseringen förändrade samhället.", isMath: false,
   requireExtractiveAnswers: false,
 });
+const replacementPrompt = generateExam.buildExamPrompts({
+  lang: "sv", level: "C", course: "Matematik 1b", qType: "mc", numQuestions: 2,
+  pastedText: "För y = 2x + 3 är lutningen 2 och skärningen med y-axeln 3.", isMath: true,
+  replacementFocus: {
+    concept: "Linjär funktion", learningObjective: "Skilja lutning från skärning med y-axeln.",
+    topic: "Linjära funktioner", subtopic: "Tolka k och m",
+  },
+});
+assert.match(replacementPrompt.userPrompt, /ersättningsfråga för en signerad provfråga/i,
+  "replacement generation gets an explicit signed-question context");
+assert.match(replacementPrompt.userPrompt, /Skilja lutning från skärning med y-axeln/i,
+  "replacement generation keeps the original learning objective in focus");
+assert.match(replacementPrompt.userPrompt, /enda faktakällan/i,
+  "replacement focus metadata cannot become a factual source");
+assert.doesNotMatch(generateExam.buildExamPrompts({
+  lang: "sv", level: "C", course: "Historia 1b", qType: "short", numQuestions: 3,
+  pastedText: "Industrialiseringen förändrade samhället.", isMath: false,
+  replacementFocus: { learningObjective: "x".repeat(500) },
+}).userPrompt, /x{181}/,
+"replacement focus labels are bounded before they enter a prompt");
 assert.match(historyPrompt.systemPrompt, /För faktabaserade kortsvar ska model_answer bestå av en eller flera hela, sammanhängande meningar kopierade exakt ur materialet/i,
   "concise extractive answers remain scoped to the natural-science profile");
 assert.match(historyPrompt.systemPrompt, /source_references ska innehålla ett kort ordagrant utdrag på helst 5–12 ord/i,

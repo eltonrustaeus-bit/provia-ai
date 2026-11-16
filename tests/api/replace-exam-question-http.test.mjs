@@ -122,11 +122,15 @@ test("fresh replacement uses server-cached exam and internal verified batch", as
   const original = {
     id: "q1", type: "mc", points: 2,
     question: "Vad är lutningen i y = 2x + 3?", options: ["2", "3", "5"], correct_index: 0,
+    topic: "Linjära funktioner", subtopic: "Tolka k och m", concept_tag: "Linjär funktion",
+    learning_objective: "Skilja lutning från skärning med y-axeln.",
     source_references: ["För y = 2x + 3 är lutningen 2 och skärningen med y-axeln 3."],
   };
   const publicQuestion = {
     id: original.id, type: original.type, points: original.points,
     question: original.question, options: original.options,
+    topic: original.topic, subtopic: original.subtopic, concept_tag: original.concept_tag,
+    learning_objective: original.learning_objective,
     source_references: original.source_references,
     grade_task: gradeTasks.sealQuestion(original, undefined, gradeTasks.hashContext(material, course, userId)),
   };
@@ -142,14 +146,17 @@ test("fresh replacement uses server-cached exam and internal verified batch", as
     question: "Om y = 2x + 3, vad är y när x = 1?",
     options: ["3", "5", "6"], correct_index: 1,
     cognitive_level: "tillämpa", validation_status: "verified",
+    training_focus_matches: ["focus-1"],
     source_references: ["För y = 2x + 3 är lutningen 2 och skärningen med y-axeln 3."],
   };
   let batchCalls = 0;
+  let capturedBatchOptions = null;
   let loseCommitResponse = false;
   let replayResponse = null;
   const oldBatch = generation.generateVerifiedBatch;
-  generation.generateVerifiedBatch = async () => {
+  generation.generateVerifiedBatch = async (options) => {
     batchCalls += 1;
+    capturedBatchOptions = options;
     return { status: 200, body: { ok: true, questions: [candidate], quality: { verifierApproved: 1, solverApprovedMc: 1 } } };
   };
   routes = [];
@@ -180,9 +187,18 @@ test("fresh replacement uses server-cached exam and internal verified batch", as
     assert.equal(changedContext.statusCode, 409);
     assert.equal(changedContext.body.error, "EXAM_CONTEXT_UNAVAILABLE");
     assert.equal(batchCalls, 0);
-    const res = await invoke({ ...body, submissionId: issuedId });
+    const res = await invoke({
+      ...body, submissionId: issuedId,
+      replacementFocus: { learningObjective: "ATTACKER SUPPLIED FOCUS" },
+    });
     assert.equal(res.statusCode, 200);
     assert.equal(batchCalls, 1);
+    assert.deepEqual(capturedBatchOptions.replacementFocus, {
+      concept: "Linjär funktion",
+      learningObjective: "Skilja lutning från skärning med y-axeln.",
+      topic: "Linjära funktioner",
+      subtopic: "Tolka k och m",
+    }, "only the server-verified original question defines the replacement learning target");
     assert.equal(res.body.exam.questions[0].id, "q-new");
     assert.equal(res.body.exam.questions[0].correct_index, undefined);
     loseCommitResponse = true;

@@ -88,6 +88,21 @@ test("question revision binds an internally supplied verified candidate to a sig
   assert.equal(withMetadata.exam.level, "C");
 });
 
+test("question replacement can require an independent verifier match for the original learning target", () => {
+  const old = issued();
+  const input = { userId, course, material, ...old, questionId: "q1", candidate };
+  assert.equal(revision.reviseIssuedExam({ ...input, requiredTrainingFocusId: "focus-1" }), null,
+    "a verified candidate without a matching-target decision cannot replace the question");
+  assert.equal(revision.reviseIssuedExam({
+    ...input, candidate: { ...candidate, training_focus_matches: ["focus-1"] },
+    requiredTrainingFocusId: "focus-1",
+  })?.replacementQuestionId, "q3");
+  assert.equal(revision.reviseIssuedExam({
+    ...input, candidate: { ...candidate, training_focus_matches: ["focus-2"] },
+    requiredTrainingFocusId: "focus-1",
+  }), null, "an unrelated or malformed focus ID fails closed");
+});
+
 test("question revision refuses forged, stale, unreviewed and duplicated input", () => {
   const old = issued();
   const input = { userId, course, material, ...old, questionId: "q1", candidate };
