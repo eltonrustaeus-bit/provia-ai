@@ -103,6 +103,14 @@ test("co-produced outputs cannot be separately keyed in a broad transformation M
     options: ["Vatten", "Koldioxid", "Syre"] },
   "Under kondensationen omvandlas vattenånga till vatten och förbränning av metan bildar vatten och koldioxid."), false,
   "a newly named process is separated even when its name uses a different morphology");
+  assert.equal(ambiguousProduct({ ...candidate, question: "Vad omvandlas vattenånga till under kondensationen?",
+    options: ["Vatten", "Koldioxid", "Syre"] },
+  "Under kondensationen omvandlas vattenånga till vatten; förbränning av metan bildar vatten och koldioxid."), false,
+  "a semicolon separates a different process before its paired products");
+  assert.equal(ambiguousProduct({ ...candidate, question: "Vad omvandlas vattenånga till under kondensationen?",
+    options: ["Vatten", "Koldioxid", "Syre"] },
+  "Under kondensationen omvandlas vattenånga till vatten; förbränning av metan sker också. Den bildar vatten och koldioxid."), false,
+  "a pronoun continuation belongs to the final semicolon clause, not the earlier process");
   assert.equal(ambiguousProduct(candidate,
     "Fotosyntesen använder koldioxid och vatten, men bildar glukos och syre."), true,
   "a following clause with an omitted subject remains linked to the named process");

@@ -74,13 +74,18 @@ function hasCoordinatedProductAmbiguity(question, material) {
     for (let index = 0; index < sentences.length; index += 1) {
       const sentence = sentences[index];
       const next = sentences[index + 1] || "";
-      const clauses = sentence.split(/\b(?:medan|däremot|samtidigt)\b|\b(?:men|och)\s+(?!(?:då|sedan|även|också|därmed)\b)[\p{L}-]+(?:\s+[\p{L}-]+){0,4}\s+(?=(?:bildar|producerar|använder|omvandlar)\b)/u)
+      // A semicolon separates independent clauses just as strongly as a
+      // sentence boundary here. Never let a later process lend its products
+      // to the earlier process named by the question stem.
+      const clauses = sentence.split(/\s*;\s*/u).flatMap(part =>
+        part.split(/\b(?:medan|däremot|samtidigt)\b|\b(?:men|och)\s+(?!(?:då|sedan|även|också|därmed)\b)[\p{L}-]+(?:\s+[\p{L}-]+){0,4}\s+(?=(?:bildar|producerar|använder|omvandlar)\b)/u))
         .map(normalized);
       const products = /\b(?:bilda|bildar|bildas|producera|producerar|produceras|omvandlas till) ([\p{L}-]+) och ([\p{L}-]+)$/u;
-      for (const clause of clauses) {
+      for (const [clauseIndex, clause] of clauses.entries()) {
         if (!clause.includes(stem[1]) || !new RegExp(`\\b${stem[2]}\\b`, "u").test(clause)) continue;
         const pair = clause.match(products) ||
-          (/^(?:den|det) (?:bildar|producerar)\b/u.test(next) ? next.match(products) : null);
+          (clauseIndex === clauses.length - 1 && /^(?:den|det) (?:bildar|producerar)\b/u.test(next)
+            ? next.match(products) : null);
         if (!pair) continue;
         const left = pair[1], right = pair[2];
         if (left === right) continue;
