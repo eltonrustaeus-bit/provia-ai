@@ -59,7 +59,7 @@ JavaScript access to those tokens.
    would lock out other admins, while allowing bearer-only first enrollment
    would let a stolen bearer register an attacker's credential. A separate
    admin-write proof, safe enrollment/recovery path and UI are required.
-   A local, unreleased guard now prevents self-demotion (including uppercase
+   A feature-Preview guard now prevents self-demotion (including uppercase
    UUID spelling), prevents any existing administrator from being demoted by
    the ordinary role route, and makes approval a conditional update of an
    existing non-privileged profile. Synthetic route tests passed. This does
@@ -72,7 +72,7 @@ effective in the reviewed production catalog.
 
 ## Feature-branch changes
 
-- A local, unreleased follow-up makes one-time admin passkey challenges
+- A feature-Preview follow-up makes one-time admin passkey challenges
   consume only when the conditional delete returns the row. This closes the
   read-then-delete race where two concurrent requests could both use the same
   challenge. Both `auth` and `register` kinds have focused mocked tests; a
@@ -165,12 +165,15 @@ effective in the reviewed production catalog.
   without a further reason. A separate readback found zero test users,
   classes, exams and P.E.R. rows after the rejection. Account deletion remains
   unverified on the hosted service; do not infer it from the FK catalog.
-- Staging's Supabase security advisor reports leaked-password protection
-  disabled, plus warnings for some executable definer functions and mutable
-  search paths. The no-policy RLS notices need grant checks before being
-  treated as exposure. Supabase's [current password-security documentation](https://supabase.com/docs/guides/auth/password-security)
-  says leaked-password protection requires Pro or above; verify the projects'
-  actual plan and cost before proposing that setting as a zero-cost fix.
+- Staging's and production's Supabase security advisors both report
+  leaked-password protection disabled. A read-only organization lookup on
+  2026-11-18 returned `free` for their organization. Supabase's
+  [password-security documentation](https://supabase.com/docs/guides/auth/password-security)
+  says leaked-password protection requires Pro or above, so this is not a
+  zero-cost setting change on the observed plan. Recheck the current plan and
+  price before an upgrade decision. The advisors also report some executable
+  definer functions and mutable search paths; no-policy RLS notices need
+  grant checks before being treated as exposure.
 - Production's security advisor lists six anon-executable definer functions.
   Two are the confirmed exam-count RPC exposure. The four others return
   `trigger` or `event_trigger` (`handle_new_user`, `rls_auto_enable`,
@@ -224,6 +227,13 @@ effective in the reviewed production catalog.
   headers. The served runtime script contained the staging project ref
   `yhcinqejsocpmmetazpz`, not the production ref. Live authenticated class
   API behavior has not been verified on this deployment.
+- The later feature checkpoint `46238d9a1aab802840e91db4ea5f143daf1eff8c`
+  was separately approved and pushed. Vercel deployment
+  `dpl_Efkkm9D886o9zTeR389PSfkHNW66` reports `READY`, target `preview`,
+  the expected feature branch and that exact Git SHA. This confirms delivery
+  to Preview, not a hosted admin-role or account-deletion behavior test.
+  The follow-up deletion-status correction `cfd6e5d` remains local and was
+  not included in the approved push.
 - A POST to `/api/check-role` that passed Vercel's Preview protection but
   carried no Supabase bearer token reached the application and returned HTTP
   401 with `{"error":"Unauthorized"}`
