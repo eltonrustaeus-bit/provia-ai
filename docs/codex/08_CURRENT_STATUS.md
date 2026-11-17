@@ -1,5 +1,21 @@
 # 08 Current Status
 
+## Security follow-up in local feature worktree — 2026-11-18
+
+- Production's approved class/profile permission changes remain applied and
+  verified as recorded below. No new production change was made in this
+  follow-up. PR #128 remains draft.
+- Local fixes address concurrent passkey challenge consumption, OpenAI Responses
+  application-state storage (`store:false`), raw payment failure logs, and
+  fail-closed retry for checkout events missing account/plan metadata.
+- Focused local tests passed for passkey challenges, AI budget/provider body,
+  Stripe idempotency/error safety. An attempted account-deletion browser fix
+  failed independent race review and was excluded from this checkpoint. A
+  hosted synthetic deletion transaction was rejected by the staging SQL tool
+  before execution; no hosted deletion claim is made. The detailed evidence
+  and remaining release gates are in
+  `docs/security/pilot-security-status-2026-11-17.md`.
+
 ## Production class/profile access restrictions — 2026-11-17
 
 - With separate explicit approval, the existing migrations

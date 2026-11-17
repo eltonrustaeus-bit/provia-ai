@@ -64,6 +64,34 @@ effective in the reviewed production catalog.
 
 ## Feature-branch changes
 
+- A local, unreleased follow-up makes one-time admin passkey challenges
+  consume only when the conditional delete returns the row. This closes the
+  read-then-delete race where two concurrent requests could both use the same
+  challenge. Both `auth` and `register` kinds have focused mocked tests; a
+  hosted passkey ceremony remains untested.
+- The shared OpenAI Responses wrapper now sends `store:false` for ordinary and
+  staging-budgeted calls. This reduces provider application-state retention,
+  but does not eliminate abuse-monitoring or other provider retention. Local
+  provider-boundary tests passed; the change is not yet on Production.
+- Checkout and Stripe webhook failure logs now contain only fixed phases,
+  allowlisted event types, a short event hash and boolean metadata presence.
+  Raw provider/database errors, customer IDs and emails are excluded from
+  these paths. A checkout event with missing/invalid account or plan metadata
+  now fails and remains retryable instead of being marked complete without
+  granting access. A signed synthetic webhook handler test confirms HTTP 500,
+  claim release, and no profile update/completion for invalid metadata.
+  An unfinished duplicate now returns HTTP 500 while a completed one returns
+  200, so an overlapping delivery is not falsely acknowledged. A failed
+  claim release is logged safely and falls back to the stale-claim retry
+  window. Retry alone cannot fix invalid metadata in Stripe's event snapshot;
+  manual reconciliation, alerting and hosted payment tests remain open.
+- Account-deletion cleanup was reviewed but not changed: concurrent login in
+  another tab can race with clearing shared browser caches, while a revoked
+  session can leave the deleted account's local cache behind. A safe design
+  needs account-scoped storage or coordinated Auth/cache writes. This remains
+  a release gate. The staging SQL tool rejected a synthetic hosted deletion
+  transaction before execution, so hosted deletion readback is also unverified.
+
 - `vercel.json`: adds `nosniff`, referrer, geolocation and frame protections.
   The CSP currently restricts framing only; full script-source restrictions
   need a separate staged change because the app uses inline scripts.

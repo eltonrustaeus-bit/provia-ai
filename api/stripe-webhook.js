@@ -15,6 +15,24 @@ const PLAN_NAMES = { basic: "Basic", premium: "Premium" };
 const RESEND_FROM = MAIL_FROM;
 const ADMIN_EMAIL = "elton.rustaeus@gmail.com";
 
+function logWebhookFailure(phase, event = {}, metadataFlags = null) {
+  // Keep a correlation marker without writing event payloads, customer IDs,
+  // email addresses, database errors or provider error bodies to Vercel logs.
+  const eventHash = typeof event.id === "string"
+    ? crypto.createHash("sha256").update(event.id).digest("hex").slice(0, 12)
+    : null;
+  const type = ["checkout.session.completed", "customer.subscription.updated",
+    "invoice.payment_succeeded", "invoice.payment_failed",
+    "customer.subscription.deleted"].includes(event.type) ? event.type : "unknown";
+  const diagnostic = { event: "stripe_webhook_failure", phase, type, eventHash };
+  if (phase === "missing_metadata") {
+    diagnostic.hasUserId = metadataFlags?.hasUserId === true;
+    diagnostic.hasPlan = metadataFlags?.hasPlan === true;
+    diagnostic.validPlan = metadataFlags?.validPlan === true;
+  }
+  console.error(JSON.stringify(diagnostic));
+}
+
 // ── Stripe signature ──
 function verifyStripeSignature(rawBody, sigHeader, secret) {
   const parts = sigHeader.split(",");
@@ -262,13 +280,22 @@ export async function completeEvent(eventId, supabaseClient = supabase, now = Da
   // Best-effort: the work is already done and the customer is already upgraded. An
   // unmarked claim goes stale and may be reprocessed once, which costs a duplicate
   // email — the failure this whole table exists to make rare, not impossible.
-  if (error) console.error("stripe-webhook: could not mark event complete", eventId, error);
+  if (error) logWebhookFailure("complete", { id: eventId });
 }
 
 async function releaseEvent(eventId) {
   try {
-    await supabase.from("stripe_webhook_events").delete().eq("event_id", eventId);
-  } catch { /* best-effort — a stuck claim just costs one retry window, not correctness */ }
+    const { error } = await supabase.from("stripe_webhook_events").delete().eq("event_id", eventId);
+    if (error) logWebhookFailure("release", { id: eventId });
+  } catch { logWebhookFailure("release", { id: eventId }); }
+  // A failed release leaves an incomplete claim. The duplicate path responds
+  // with 500 until a later retry can reclaim the stale row.
+}
+
+async function eventCompleted(eventId) {
+  const { data, error } = await supabase.from("stripe_webhook_events")
+    .select("completed_at").eq("event_id", eventId).maybeSingle();
+  return !error && Boolean(data?.completed_at);
 }
 
 // ── Handler ──
@@ -295,12 +322,15 @@ export default async function handler(req, res) {
   let claimed;
   try {
     claimed = await claimEvent(event.id);
-  } catch (err) {
-    console.error("stripe-webhook: claim failed", err);
+  } catch {
+    logWebhookFailure("claim", event);
     return res.status(500).json({ error: "Could not record event" }); // let Stripe retry
   }
   if (!claimed) {
-    return res.status(200).json({ received: true, duplicate: true });
+    if (await eventCompleted(event.id)) {
+      return res.status(200).json({ received: true, duplicate: true });
+    }
+    return res.status(500).json({ error: "Event still processing" });
   }
 
   try {
@@ -314,7 +344,12 @@ export default async function handler(req, res) {
       const amountKr = session.amount_total != null ? String(Math.round(session.amount_total / 100)) : "—";
 
       if (!userId || !plan || !PLAN_ROLES[plan]) {
-        console.error("stripe-webhook: missing metadata", { userId, plan });
+        logWebhookFailure("missing_metadata", event, {
+          hasUserId: Boolean(userId), hasPlan: Boolean(plan), validPlan: Boolean(PLAN_ROLES[plan]),
+        });
+        // Do not acknowledge a purchase that could not grant access. Keep the
+        // event retryable and visible to operations for manual reconciliation.
+        throw new Error("checkout metadata cannot identify an account and plan");
       } else {
         if (session.mode === "subscription") {
           const subscriptionId = session.subscription;
@@ -401,8 +436,8 @@ export default async function handler(req, res) {
         }
       }
     }
-  } catch (err) {
-    console.error("stripe-webhook: processing failed, releasing claim for retry", event.id, event.type, err);
+  } catch {
+    logWebhookFailure("processing", event);
     await releaseEvent(event.id);
     return res.status(500).json({ error: "Processing failed" }); // Stripe will retry
   }

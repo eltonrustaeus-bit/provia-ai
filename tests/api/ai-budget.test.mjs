@@ -194,6 +194,26 @@ test("a failed staging reservation prevents the outbound model call", async () =
   assert.equal(providerCalls, 0);
 });
 
+test("Responses requests disable provider application-state storage in both environments", async () => {
+  for (const [userId, env] of [
+    ["ordinary-user", { ...stagingEnv, SUPABASE_URL: "https://production.supabase.co" }],
+    [PILOT_USER_ID, stagingEnv],
+  ]) {
+    let providerBody;
+    const fetchImpl = async (url, init) => {
+      if (url.includes("/rpc/reserve_ai_spend")) return Response.json({ ok: true });
+      providerBody = JSON.parse(init.body);
+      return Response.json({ output: [], usage: { input_tokens: 1, output_tokens: 1 } });
+    };
+    await budgetedOpenAIFetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      body: JSON.stringify({ model: "gpt-6-luna", input: "synthetic study text", store: true }),
+    }, { userId, env, fetchImpl });
+    assert.equal(providerBody.store, false, "even an accidental caller override cannot retain a response");
+    assert.equal(providerBody.input, "synthetic study text");
+  }
+});
+
 test("generation streams settle unknown outcomes conservatively without freeing budget", async () => {
   const { streamGeneration } = require("../../api/generate-exam.js");
   const previousFetch = globalThis.fetch;

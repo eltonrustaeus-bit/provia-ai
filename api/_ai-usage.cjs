@@ -160,7 +160,12 @@ async function budgetedOpenAIFetch(url, init, { userId, fetchImpl = globalThis.f
   let pathname = "";
   try { pathname = new URL(url).pathname; } catch {}
   const embedding = pathname.endsWith("/embeddings");
-  const reservation = await reserveAiSpend({ userId, model: body?.model, body, embedding }, { env, fetchImpl });
+  // Responses otherwise retain application state by default. All app callers
+  // pass through this wrapper, including P.E.R., grading, OCR and exams.
+  const privacyBody = pathname.endsWith("/responses") && body && typeof body === "object" && !Array.isArray(body)
+    ? { ...body, store: false }
+    : body;
+  const reservation = await reserveAiSpend({ userId, model: privacyBody?.model, body: privacyBody, embedding }, { env, fetchImpl });
   if (!reservation.ok) {
     const response = Response.json({
       ok: false,
@@ -170,7 +175,9 @@ async function budgetedOpenAIFetch(url, init, { userId, fetchImpl = globalThis.f
     response.aiBudgetBlocked = true;
     return response;
   }
-  const nextInit = reservation.enforced ? { ...init, body: JSON.stringify(reservation.body) } : init;
+  const nextInit = reservation.enforced
+    ? { ...init, body: JSON.stringify(reservation.body) }
+    : privacyBody !== body ? { ...init, body: JSON.stringify(privacyBody) } : init;
   let response;
   try {
     response = await fetchImpl(url, nextInit);

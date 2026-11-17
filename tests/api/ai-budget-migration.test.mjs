@@ -67,7 +67,7 @@ test("failed settlement keeps the SQL cap closed and conservative recovery is id
   const db = new PGlite();
   const env = { SUPABASE_URL: "https://yhcinqejsocpmmetazpz.supabase.co", SUPABASE_SECRET_KEY: "synthetic-key" };
   const body = { model: "gpt-6-luna", input: "synthetic budget recovery" };
-  const estimate = estimateWorstCaseUsd(normalizeBudgetBody(body), body.model);
+  const estimate = estimateWorstCaseUsd(normalizeBudgetBody({ ...body, store: false }), body.model);
   let reservationArgs;
   let providerCalls = 0;
   let settlementUnavailable = true;
@@ -97,6 +97,7 @@ test("failed settlement keeps the SQL cap closed and conservative recovery is id
         return Response.json(result.rows[0].result);
       }
       assert.equal(url, "https://api.openai.com/v1/responses");
+      assert.equal(args.store, false, "the billed request does not retain provider response state");
       providerCalls++;
       throw providerError;
     };

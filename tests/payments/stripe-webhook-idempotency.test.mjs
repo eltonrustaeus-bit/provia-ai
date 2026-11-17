@@ -162,10 +162,19 @@ const iso = (ms) => new Date(ms).toISOString();
   // The work is already done and the customer already upgraded when this runs. Throwing
   // here would turn a bookkeeping failure into a 500 and make Stripe retry a payment it
   // has already been charged for.
-  const sb = fakeSupabase({ updateError: { code: "08006", message: "connection failure" } });
+  const privateMarker = "synthetic-student@example.test";
+  const sb = fakeSupabase({ updateError: { code: "08006", message: `connection failure for ${privateMarker}` } });
+  const logged = [];
+  const originalError = console.error;
   let threw = false;
-  try { await completeEvent("evt_1", sb, NOW); } catch { threw = true; }
+  try {
+    console.error = (...args) => logged.push(args.map(String).join(" "));
+    await completeEvent("evt_1", sb, NOW);
+  } catch { threw = true; }
+  finally { console.error = originalError; }
   check("a failure to mark completion does not throw", threw === false);
+  check("completion failure logs no customer detail from the database error",
+    logged.length === 1 && !logged[0].includes(privateMarker));
 }
 
 // ── the window itself ──────────────────────────────────────────────────────
