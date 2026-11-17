@@ -1,6 +1,6 @@
 # 08 Current Status
 
-## Single-route staging recovery hotfix — 2026-11-17 (in progress)
+## Single-route stale-attempt recovery and live religion test — 2026-11-17
 
 - The first recovery checkpoint (`0ef8106`) was pushed to the existing
   feature branch, but its Preview build failed because the added API route
@@ -12,13 +12,29 @@
   fail-closed behavior. The extra serverless route has been removed; no
   history, saved material, exam, or quota rows are targeted.
 - Local tests after this integration: cleanup API + browser terminal-state
-  tests **4/4**; idempotency + pending-input tests **2/2**; syntax and
-  `git diff --check` passed. The full exam-flow regression is running. A
-  read-only independent review of this integration is pending.
-- Not yet committed, pushed, or live-verified. Next: finish the broad
-  regression, commit/push to the existing feature branch, verify the Preview
-  reaches READY under the function limit, then use the same signed-in tab for
-  one synthetic 10-question Buddhism/Hinduism test and complete it.
+  tests **4/4**; idempotency + pending-input tests **2/2**; exam-flow browser
+  regression exited successfully (**256 checks passed**); syntax and
+  `git diff --check` passed. The independent reviewer found and the writer
+  fixed a missing public dispatcher entry, then confirmed no blocker remained.
+- Commit `01ed96c` is pushed to the existing feature branch. Vercel deployment
+  `dpl_DNiDUjLwQybxTkS1ehzHzLSK2bMV` is READY for that SHA and carries the
+  stable feature Preview alias. This avoids the Hobby 12-function limit by
+  reusing the existing generation route. No merge to `main` or Production
+  deploy occurred.
+- Live staging check in the same Preview tab: generated a complete
+  Religionskunskap 1 C-level mixed exam with **10/10 questions**, replaced
+  question 6 in place, answered all questions, submitted, and received a
+  server-verified result of **100%** for 10 questions. The database record
+  was read back from staging; generation and grading were not inferred from
+  local tests. The budget moved from `$3.687971` spent / `$0.282822` reserved
+  to `$3.698834` spent / `$0.282822` reserved (`$1.897415` available).
+- The test did not delete saved exams or prior result history. Cleanup is
+  intentionally limited to exact browser request IDs that staging confirms
+  are old, failed, inactive and safe to expire. The live test proved the
+  normal new-exam flow and one in-place replacement; it did not prove that the
+  stale-limit cleanup route was invoked for this account in that run. No
+  production data, `main`, production database, user roles, or quota settings
+  were changed.
 
 ## Safe recovery from the saved-attempt limit — 2026-11-17
 
