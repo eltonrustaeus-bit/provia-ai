@@ -53,6 +53,10 @@ JavaScript access to those tokens.
 5. `api/admin.js` allows role changes and approval using an admin bearer
    session without a fresh passkey step-up. The existing passkey flow is
    owner-scoped; design a compatible admin UI/auth change before enforcing it.
+   Independent review found that extending the current owner gate directly
+   would lock out other admins, while allowing bearer-only first enrollment
+   would let a stolen bearer register an attacker's credential. A separate
+   admin-write proof, safe enrollment/recovery path and UI are required.
 
 These are distinct from Supabase advisor warnings on internal trigger and
 event-trigger functions. `user_exams` currently combines permissive allow
@@ -102,6 +106,11 @@ effective in the reviewed production catalog.
   claim that revocation is complete. `PER_OWNER_USER_ID` and
   `PASSKEY_STEPUP_SECRET` are scoped to Production, so an admin passkey change
   needs a separate staging setup before it can be verified there.
+- Aggregate staging metadata shows zero admin accounts and passkeys; production
+  shows one admin account, two passkeys and zero recovery-code rows. These
+  counts do not establish who owns a device or whether recovery is possible.
+  They explain why an unconditional passkey gate cannot be safely enabled in
+  staging without a staged admin/bootstrap path.
 - The P.E.R. answer-cache design can store free-form question and answer text
   without a user ID, so account deletion cannot attribute those rows. It has
   no working age-based purge in the reviewed path. A hosted aggregate check
