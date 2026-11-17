@@ -24,11 +24,18 @@ JavaScript access to those tokens.
 
 ## Confirmed access findings and prepared fixes
 
-1. Production `get_weekly_exam_count(uuid)` and
-   `get_monthly_exam_count(uuid)` accept arbitrary user IDs from `anon` and
-   `authenticated`; they expose activity counts. The reviewed local
-   `20261012103951_restrict_exam_count_rpc_access.sql` revokes browser execution
-   and pins the search path, but is absent from production migration history.
+1. The production `get_weekly_exam_count(uuid)` and
+   `get_monthly_exam_count(uuid)` exposure is now closed after separate approval.
+   The reviewed `20261012103951_restrict_exam_count_rpc_access.sql` was applied
+   through Supabase as hosted version `20261117223909`. Readback confirms
+   `anon` and `authenticated` have no EXECUTE grant, `service_role` retains it,
+   and both functions now pin `search_path=pg_catalog, pg_temp`. Actual calls
+   under both browser roles were denied for a synthetic UUID; service-role
+   calls returned zero. No student rows were returned. `exgen.se/app.html`
+   returned HTTP 200 immediately after the change. The post-change Supabase
+   security advisor lists four anon-executable definer functions, down from
+   six; these are the separately reviewed trigger/event-trigger cases. Its
+   mutable-search-path count is now two, down from four.
 2. Production `class_members` permits a user to insert their own membership
    for any known class ID, bypassing the server's join-code check. The local
    `20261012103949_restrict_direct_class_joins.sql` removes direct browser
@@ -78,8 +85,9 @@ effective in the reviewed production catalog.
   insert class memberships but could update/delete memberships and write
   classes. The later readback below confirms those remaining class writes are
   now denied in staging.
-- Production catalog ACLs confirm anon and authenticated can still execute
-  both exam-count RPCs. Authenticated can insert/update/delete `classes`,
+- The pre-change production catalog showed anon and authenticated could execute
+  both exam-count RPCs; the new post-change check above supersedes that finding.
+  Authenticated can still insert/update/delete `classes`,
   `class_members` and `profiles`. These are permissions, not proof that every
   attempted write succeeds; the class-creation/known-class join bypasses
   additionally follow from the current policies reviewed above.
@@ -94,6 +102,21 @@ effective in the reviewed production catalog.
   claim that revocation is complete. `PER_OWNER_USER_ID` and
   `PASSKEY_STEPUP_SECRET` are scoped to Production, so an admin passkey change
   needs a separate staging setup before it can be verified there.
+- The P.E.R. answer-cache design can store free-form question and answer text
+  without a user ID, so account deletion cannot attribute those rows. It has
+  no working age-based purge in the reviewed path. A hosted aggregate check
+  found zero cache rows in both projects; the flag is `false` in production
+  and absent in staging (the code treats absence as off). Thus this is a
+  latent design risk, not evidence of currently retained cache content.
+  Keep the flag off until the cache is redesigned or removed; do not infer
+  that a text filter makes the content anonymous.
+- Fresh hosted catalog checks in staging and production found that every
+  reviewed public-table `user_id`, `student_id`, `teacher_id` and `owner_id`
+  column, plus `profiles.id` and `user_profiles.id`, has a cascading foreign
+  key to Auth or a cascading parent. This is a schema-level result; it does
+  not prove Auth deletion was completed, nor cover unkeyed caches, Storage,
+  backups or external-provider retention. The P.E.R. cache above is one
+  deliberate unkeyed exception and currently has zero rows.
 - Staging's Supabase security advisor reports leaked-password protection
   disabled, plus warnings for some executable definer functions and mutable
   search paths. The no-policy RLS notices need grant checks before being
@@ -110,7 +133,7 @@ effective in the reviewed production catalog.
   `auth.uid()` and `user_id`, and existing PGlite tests cover owner/non-owner
   readback. A two-account hosted staging test remains necessary. The mutable-path
   warning on `sync_report_count` concerns a legacy driving-question trigger;
-  other path warnings are the two exam-count functions and the invoker
+  other pre-change path warnings were the two exam-count functions and the invoker
   `match_knowledge_chunks` function.
 
 ## Verification and release gates
@@ -128,7 +151,19 @@ effective in the reviewed production catalog.
   authenticated INSERT, and authenticated UPDATE/DELETE, on both class tables;
   service_role retains all three write privileges. The existing open Preview
   loads the app, but its account was not established as a disposable synthetic
-  account, so no class mutation or two-account data test was run through it.
+  account, so no authenticated class mutation or cross-account API test was
+  run through it.
+- The Supabase connector assigned hosted ledger versions different from the
+  repository filenames for both the staging class fix and production count
+  fix. Reconcile migration history deliberately before any future CLI push;
+  do not replay either SQL blindly or edit the ledger without review.
+- The open staging Preview is logged in as the existing ExGen staging account,
+  but `konto.html` deliberately hides the class card and skips
+  `student_classes` in pilot mode. This UI cannot establish teacher
+  create/student join/leave behavior after the migration. The server route uses
+  a service-role client and the local class tests pass, but an authenticated
+  hosted API check still needs a safe test path before claiming end-to-end
+  compatibility.
 - Security commit `5967b0f` was pushed to the existing feature branch after
   separate approval. Vercel created a READY Preview at
   `provia-cbw1n9o5v-eltons-projects-4adfb1a3.vercel.app` for that exact SHA.
@@ -177,11 +212,12 @@ effective in the reviewed production catalog.
 
 ## Execution order before a school pilot
 
-1. **Close confirmed access paths.** Complete hosted functional verification
-   of the applied staging class-write fix, then package the already staging-tested count-RPC, direct-join and
-   profile-insert restrictions with the new class-write migration. Production
-   application requires a separate, exact approval and a check for active
-   class operations. Success means browser roles cannot call count RPCs or
+1. **Close remaining class and profile access paths.** The count RPCs are now
+   restricted in production. Complete hosted authenticated API verification
+   of the applied staging class-write fix, then package the staging-tested
+   direct-join and profile-insert restrictions with the new class-write
+   migration. Production application requires a separate, exact approval and
+   a check for active class operations. Success means browser roles cannot
    write class membership/classes directly, while teacher creation, coded
    student join/leave and own-class reporting still work through the API.
 2. **Harden privileged accounts.** Require a fresh passkey step-up for
