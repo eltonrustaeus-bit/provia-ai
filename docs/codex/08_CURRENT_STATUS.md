@@ -1,5 +1,33 @@
 # 08 Current Status
 
+## Safe recovery from the saved-attempt limit — 2026-11-17
+
+- The authenticated generation start previously stopped locally at
+  `PENDING_REQUEST_LIMIT` after five saved browser request IDs. It made no
+  provider call, but offered no safe way to clear stale attempts in this tab.
+- On a user-initiated new start, the app now checks only the current account's
+  saved keys. Old `retryable` rows are conditionally changed to `expired` only
+  when they have been unchanged for at least 15 minutes and their pipeline
+  jobs are terminal. The conditional row update fences a competing retry; the
+  endpoint then re-reads state and refuses missing, active, recent, or unknown
+  attempts. The old server rows remain as idempotency records; the app clears
+  only matched browser request/recovery/input copies. Exam history and saved
+  study material are not targeted.
+- Local evidence: cleanup API + browser-store tests passed **4/4**; generation
+  idempotency and pending-input tests passed **2/2**; full exam-flow browser
+  regression passed **256/256**; syntax and `git diff --check` passed. The
+  separate `exam-pending-resume` test timed out at its 30-second initial UI
+  wait and is not counted as passing. Independent read-only review found no
+  blocking or high race/false-safe issue.
+- Not yet published or live-tested as of this checkpoint. No staging, account,
+  quota, `main`, Production, or database action has occurred. The cleanup
+  endpoint's conditional update is scoped to the authenticated staging user
+  and exact request keys supplied by this browser.
+- Next: push this checkpoint to the existing feature branch, verify the
+  matching READY Preview, then run one synthetic 10-question Buddhism and
+  Hinduism exam in the already-open signed-in Preview tab, finish it, and
+  report the actual generated count and result.
+
 ## Generation-only issuance and in-place question replacement — 2026-11-17
 
 - The blocking semantic AI review/solver/repair stages have been removed from

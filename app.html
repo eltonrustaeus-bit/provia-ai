@@ -2472,16 +2472,37 @@ try{
         ?await window.ExGenGenerationRequest.getExistingIdempotencyKey(authSnapshot.userId,payload,resumeRequest.idempotencyKey)
         :await window.ExGenGenerationRequest.getIdempotencyKey(authSnapshot.userId,payload);
     } catch (error) {
+      if(error?.message==="PENDING_REQUEST_LIMIT"&&!resumeRequest){
+        try{
+          const oldRequests=window.ExGenGenerationRequest?.listPendingRequestKeys?.()||[];
+          if(oldRequests.length){
+            const status=await postJson("/api/cleanup-stale-exam-generation-attempts",{requests:oldRequests},{timeoutMs:12000,token:authSnapshot.token});
+            const checks=status?.data?.checks;
+            if(status.ok&&status.data?.ok===true&&Array.isArray(checks)&&checks.length===oldRequests.length&&checks.every(check=>check?.safeToClear===true)){
+              const cleared=await window.ExGenGenerationRequest.clearVerifiedTerminalGenerations(checks);
+              if(cleared?.cleared===oldRequests.length&&cleared.cleanupOk===true){
+                idempotencyKey=await window.ExGenGenerationRequest.getIdempotencyKey(authSnapshot.userId,payload);
+                setStatus(LANG==="sv"?"Gamla, inaktiva provförsök rensades säkert. Startar ditt nya prov.":"Old inactive exam attempts were safely cleared. Starting your new exam.","warn");
+              }
+            }
+          }
+        }catch{}
+      }
+      if(idempotencyKey){
+        // The verified cleanup freed the browser's bounded recovery registry.
+        // Continue below without re-entering the original catch path.
+      }else{
       const message=error?.message==="PENDING_REQUEST_UNAVAILABLE"
         ?(LANG==="sv"?"Den sparade provbegäran finns inte längre eller matchar inte underlaget. Inget nytt prov startades; gå tillbaka och välj ett nytt provförsök.":"The saved exam request is unavailable or no longer matches its input. No new exam was started; go back and choose a new attempt.")
         :error?.message==="DUPLICATE_PENDING_REQUEST"
         ?(LANG==="sv"?"Det finns flera väntande provbegäranden för samma material. Inget nytt jobb startades för att undvika dubbla prov eller kvotdrag. Behåll dina öppna ExGen-flikar och kontakta pilotansvarig för hjälp.":"Multiple pending exam requests exist for the same material. No new job was started to avoid duplicate exams or quota charges. Keep your open ExGen tabs and contact the pilot lead.")
         :error?.message==="PENDING_REQUEST_LIMIT"
-        ?(LANG==="sv"?"Webbläsaren har nått gränsen för sparade provförsök. Återupptagningsmaterialet finns bara kvar i fliken där försöket startades. Gå till en tidigare ExGen-flik och fortsätt med samma material och inställningar. Inget nytt prov eller AI-anrop startades här; sparade nycklar upphör automatiskt inom sju dagar.":"This browser has reached its limit for saved exam attempts. Recovery material is available only in the tab where each attempt started. Return to an earlier ExGen tab and resume with the same material and settings. No exam or AI request started here; saved keys expire within seven days.")
+        ?(LANG==="sv"?"Webbläsaren har nått gränsen för sparade provförsök. Äldre försök kunde inte rensas säkert, så inget nytt prov eller AI-anrop startades. Kontrollera att det inte finns ett aktivt prov och försök igen senare.":"This browser has reached its limit for saved exam attempts. Older attempts could not be safely cleared, so no new exam or AI request started. Check for an active exam and try again later.")
         :error?.message==="CROSS_TAB_REQUEST_LOCK_UNAVAILABLE"
           ?(LANG==="sv"?"Den här webbläsaren saknar stöd för säker samordning av provstart mellan flikar. Uppdatera till en aktuell version av Chrome, Edge eller Safari och försök igen.":"This browser cannot safely coordinate exam starts across tabs. Update to a current version of Chrome, Edge, or Safari and try again.")
           :(LANG==="sv"?"Provet kunde inte startas säkert i den här fliken. Ladda om sidan och försök igen.":"Exam creation could not start safely in this tab. Reload the page and try again.");
       setStatus(message,"bad");return {ok:false,error:message};
+      }
     }
     payload.idempotencyKey=idempotencyKey;
     let recoverySaved=false;

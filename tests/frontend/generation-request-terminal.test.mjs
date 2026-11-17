@@ -191,4 +191,85 @@ await assert.rejects(request.getExistingIdempotencyKey(userId, restoreFirstPaylo
 }), error => error.message === "GENERATION_REQUEST_TERMINAL",
 "a recovery that wins the first lock cannot reuse the ID after the queued terminal marker is committed");
 
-console.log("generation terminal request checks passed: 22 assertions");
+const verifiedValues = new Map();
+const verifiedStorage = {
+  getItem(key) { return verifiedValues.get(key) || null; },
+  setItem(key, value) { verifiedValues.set(key, value); },
+  removeItem(key) { verifiedValues.delete(key); },
+};
+const verifiedSessionValues = new Map();
+const verifiedSession = {
+  getItem(key) { return verifiedSessionValues.get(key) || null; },
+  setItem(key, value) { verifiedSessionValues.set(key, value); },
+  removeItem(key) { verifiedSessionValues.delete(key); },
+};
+const verifiedA = await request.getIdempotencyKey(userId, { ...payload, pastedText: "Äldre försök A" }, {
+  storage: verifiedStorage, crypto: webcrypto, now: 8_000,
+});
+const verifiedB = await request.getIdempotencyKey(userId, { ...payload, pastedText: "Äldre försök B" }, {
+  storage: verifiedStorage, crypto: webcrypto, now: 8_100,
+});
+const active = await request.getIdempotencyKey(userId, { ...payload, pastedText: "Aktivt försök" }, {
+  storage: verifiedStorage, crypto: webcrypto, now: 8_200,
+});
+await request.savePendingGeneration(userId, { ...payload, pastedText: "Äldre försök A" }, verifiedA, null, {
+  storage: verifiedSession, crypto: webcrypto, now: 8_000,
+});
+await request.savePendingInput(userId, { ...payload, pastedText: "Äldre försök A" }, verifiedA, {
+  storage: verifiedStorage, inputStorage: verifiedSession, crypto: webcrypto, now: 8_000,
+});
+const listed = request.listPendingRequestKeys({ storage: verifiedStorage });
+assert.equal(listed.length, 3, "cleanup preflight exposes only opaque keys and expiry metadata");
+assert.equal(JSON.stringify(listed).includes("Äldre försök"), false, "cleanup preflight never returns study material");
+await assert.rejects(request.clearVerifiedTerminalGenerations(listed.map((item) => ({ ...item, safeToClear: false })), {
+  storage: verifiedStorage, recoveryStorage: verifiedSession, inputStorage: verifiedSession, now: 9_000,
+}), /Verified generation cleanup unavailable/, "cleanup fails closed unless every key is server-verified safe");
+assert.equal(request.listPendingRequestKeys({ storage: verifiedStorage }).length, 3,
+  "an unsafe preflight does not alter any local request or recovery copy");
+const verifiedChecks = listed.filter(item => item.idempotencyKey !== active).map(item => ({ ...item, safeToClear: true }));
+const verifiedCleanup = await request.clearVerifiedTerminalGenerations(verifiedChecks, {
+  storage: verifiedStorage, recoveryStorage: verifiedSession, inputStorage: verifiedSession, now: 9_000,
+});
+assert.deepEqual(verifiedCleanup, { cleared: 2, cleanupOk: true }, "verified stale attempts clear together");
+assert.deepEqual(request.listPendingRequestKeys({ storage: verifiedStorage }).map(item => item.idempotencyKey), [active],
+  "cleanup preserves keys not present in the server-verified selection");
+assert.deepEqual(await request.getPendingGenerations(userId, {
+  storage: verifiedSession, durableStorage: verifiedStorage, crypto: webcrypto, now: 9_001,
+}), [], "a stale recovery copy cannot resurrect an attempt after the shared terminal tombstone");
+assert.deepEqual(await request.getPendingInputs(userId, {
+  storage: verifiedStorage, inputStorage: verifiedSession, crypto: webcrypto, now: 9_002,
+}), [], "same-tab material copies are removed only for verified stale keys");
+
+let blockDurableWrites = false;
+const tombstoneRaceValues = new Map();
+const tombstoneRaceStorage = {
+  getItem(key) { return tombstoneRaceValues.get(key) || null; },
+  setItem(key, value) {
+    if (blockDurableWrites && key === request.STORAGE_KEY) throw new Error("temporary storage write failure");
+    tombstoneRaceValues.set(key, value);
+  },
+  removeItem(key) { tombstoneRaceValues.delete(key); },
+};
+const tombstonedRegistryIds = [];
+for (let index = 0; index < 5; index++) {
+  tombstonedRegistryIds.push(await request.getIdempotencyKey(userId, {
+    ...payload, pastedText: `Terminaltombstone ${index}`,
+  }, { storage: tombstoneRaceStorage, crypto: webcrypto, now: 10_000 + index }));
+}
+blockDurableWrites = true;
+assert.deepEqual(await request.clearTerminalGeneration(tombstonedRegistryIds[0], {
+  storage: tombstoneRaceStorage, now: 10_100,
+}), { terminalMarked: true, durableCleared: false }, "tombstone remains authoritative if durable cleanup temporarily fails");
+blockDurableWrites = false;
+const restoredFreshId = await request.restoreIdempotencyKey(userId, {
+  ...payload, pastedText: "Nytt försök efter terminaltombstone",
+}, "00000000-0000-4000-8000-000000000099", {
+  storage: tombstoneRaceStorage, crypto: webcrypto, now: 10_101,
+});
+assert.equal(restoredFreshId, "00000000-0000-4000-8000-000000000099",
+  "a tombstoned stale registry entry does not consume a slot during restore");
+assert.equal(request.listPendingRequestKeys({ storage: tombstoneRaceStorage }).some((item) =>
+  item.idempotencyKey === tombstonedRegistryIds[0]), false,
+"restore removes the stale tombstoned ID before adding the new attempt");
+
+console.log("generation terminal request checks passed: 34 assertions");

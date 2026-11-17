@@ -456,7 +456,13 @@
         throw new Error("GENERATION_REQUEST_TERMINAL");
       }
       var storedRecords = readRecords(storage, digest);
-      var records = storedRecords.filter(function (record) { return record.expiresAt > now; });
+      var terminalRecords = readTerminalRecords(storage, now);
+      var records = storedRecords.filter(function (record) {
+        return record.expiresAt > now && !hasTerminalKey(terminalRecords, record.idempotencyKey);
+      });
+      if (records.length !== storedRecords.length && !writeRecords(records, storage)) {
+        throw new Error("Durable request ID storage unavailable");
+      }
       var matches = records.filter(function (record) { return record.fingerprint === digest; });
       if (matches.length > 1 || (matches.length === 1 && matches[0].idempotencyKey !== idempotencyKey)) {
         throw new Error("GENERATION_RECOVERY_IDENTITY_CONFLICT");
@@ -526,6 +532,60 @@
       if (["Terminal request storage unavailable", "Durable request ID storage unavailable", "CROSS_TAB_REQUEST_LOCK_UNAVAILABLE"].includes(error?.message)) throw error;
       throw new Error("Terminal request cleanup unavailable");
     }
+  }
+
+  function listPendingRequestKeys(options) {
+    var opts = options || {};
+    var target = opts.storage || defaultStorage();
+    if (!target) throw new Error("Durable request ID storage unavailable");
+    return readRecords(target).map(function (record) {
+      return { idempotencyKey: record.idempotencyKey, expiresAt: record.expiresAt };
+    });
+  }
+
+  async function clearVerifiedTerminalGenerations(checks, options) {
+    var opts = options || {};
+    var target = opts.storage || defaultStorage();
+    var now = Number.isFinite(opts.now) ? opts.now : Date.now();
+    if (!target || !Array.isArray(checks) || !checks.length || checks.length > MAX_PENDING_REQUESTS ||
+        checks.some(function (item) {
+          return item?.safeToClear !== true || !UUID_RE.test(item.idempotencyKey || "") || !Number.isFinite(item.expiresAt);
+        }) || new Set(checks.map(function (item) { return item.idempotencyKey; })).size !== checks.length) {
+      throw new Error("Verified generation cleanup unavailable");
+    }
+    var keys = checks.map(function (item) { return item.idempotencyKey; });
+    var durableCleared = await withStorageLock(function () {
+      var current = readRecords(target);
+      if (checks.some(function (item) {
+        return !current.some(function (record) {
+          return record.idempotencyKey === item.idempotencyKey && record.expiresAt === item.expiresAt;
+        });
+      })) throw new Error("Generation request registry changed");
+
+      var terminal = readTerminalRecords(target, now).filter(function (record) { return !keys.includes(record.idempotencyKey); });
+      keys.forEach(function (idempotencyKey) { terminal.push({ idempotencyKey: idempotencyKey, expiresAt: now + TTL_MS }); });
+      if (!writeTerminalRecords(terminal, target)) throw new Error("Terminal request storage unavailable");
+
+      var remaining = current.filter(function (record) { return !keys.includes(record.idempotencyKey); });
+      var saved = false;
+      try {
+        if (remaining.length) saved = writeRecords(remaining, target);
+        else {
+          target.removeItem(STORAGE_KEY);
+          saved = target.getItem(STORAGE_KEY) === null;
+        }
+      } catch { saved = false; }
+      return saved;
+    }, opts.locks, target);
+
+    var cleanupOk = durableCleared;
+    keys.forEach(function (idempotencyKey) {
+      try { clearPendingGeneration(idempotencyKey, opts.recoveryStorage); }
+      catch { cleanupOk = false; }
+      try { clearPendingInput(idempotencyKey, { inputStorage: opts.inputStorage }); }
+      catch { cleanupOk = false; }
+    });
+    return { cleared: keys.length, cleanupOk: cleanupOk };
   }
 
   function pendingInputStorage(options) {
@@ -649,6 +709,8 @@
     getExistingIdempotencyKey: getExistingIdempotencyKey,
     clear: clear,
     clearTerminalGeneration: clearTerminalGeneration,
+    listPendingRequestKeys: listPendingRequestKeys,
+    clearVerifiedTerminalGenerations: clearVerifiedTerminalGenerations,
     savePendingInput: savePendingInput,
     getPendingInputs: getPendingInputs,
     clearPendingInput: clearPendingInput,
