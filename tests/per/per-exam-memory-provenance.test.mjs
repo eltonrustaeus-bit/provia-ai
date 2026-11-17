@@ -42,6 +42,10 @@ assert.deepEqual(signals.mockWeakConcepts, ["Linjär funktion", "Enheter"]);
 assert.deepEqual(signals.felBankWeakConcepts, signals.mockWeakConcepts);
 assert.deepEqual(signals.felBankErrorTypes, ["Metod", "Enhet"]);
 assert.deepEqual(signals.felBankCourses, ["Fysik 1"]);
+assert.deepEqual(signals.mockCourseResults, [
+  { course: "Matematik 1b", percent: 80, weakConcepts: ["Linjär funktion"], errorTypes: ["Metod"] },
+  { course: "Fysik 1", percent: 45, weakConcepts: ["Enheter"], errorTypes: ["Enhet"] },
+], "course associations survive without importing unverified results");
 assert.ok(!JSON.stringify(signals).includes("Förfalskat"));
 
 const unavailable = await enrichMemoryFromExamData({

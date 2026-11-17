@@ -81,6 +81,7 @@ ok("T5 bara giltiga id överlever", t5.targets?.length === 1 && t5.targets[0].id
 const t6 = await page.evaluate(() => {
   window.setPerContext({
     page: "förbättring",
+    activeSection: "coach",
     userScore: 0.62,
     weakAreas: ["Biologi › Cellandning"],
     examState: { answered: 3, remaining: 0 },
@@ -89,9 +90,32 @@ const t6 = await page.evaluate(() => {
   return window.__perTestCtx();
 });
 ok("T6a page följer med", t6.page === "förbättring", t6.page);
+ok("T6a1 aktiv förbättringssektion följer med", t6.activeSection === "coach", String(t6.activeSection));
 ok("T6b userScore bevaras", Math.abs((t6.userScore ?? 0) - 0.62) < 1e-9, String(t6.userScore));
 ok("T6c weakAreas bevaras", Array.isArray(t6.weakAreas) && t6.weakAreas[0] === "Biologi › Cellandning");
 ok("T6d currentQuestion når fram", t6.currentQuestion?.number === 1);
+
+const selectedMistakes = await page.evaluate(() => {
+  window.setPerContext({
+    page: "förbättring",
+    activeSection: "felbank",
+    selectedMistakes: [
+      { question: "Vad är fotosyntes?", concept: "Fotosyntes", studentAnswer: "Vatten", feedback: "Saknar koldioxid", expectedAnswer: "Koldioxid och vatten", course: "Biologi 1", points: 0, maxPoints: 2, id: "must-not-leak" },
+      { question: "Andra markerade felet" },
+      { question: "Tredje markerade felet" },
+      { question: "Fjärde ska kapas" },
+    ],
+  });
+  return window.__perTestCtx();
+});
+ok("T6e felbankens markerade poster når P.E.R", selectedMistakes.selectedMistakes?.[0]?.question === "Vad är fotosyntes?"
+  && selectedMistakes.selectedMistakes?.length === 3);
+ok("T6f felkontext saknar lokala identifierare", !JSON.stringify(selectedMistakes.selectedMistakes).includes("must-not-leak"));
+const selectedMistakesOutsideBank = await page.evaluate(() => {
+  window.setPerContext({ page: "förbättring", activeSection: "coach", selectedMistakes: [{ question: "Ska inte skickas" }] });
+  return window.__perTestCtx();
+});
+ok("T6g markerade fel skickas inte från annan sektion", selectedMistakesOutsideBank.selectedMistakes === undefined);
 
 const currentCourseWins = await page.evaluate(() => {
   window.__getPerStudyContext = () => ({ course: "Biologi 1", level: "B" });
@@ -103,6 +127,19 @@ const currentCourseWins = await page.evaluate(() => {
 ok("aktuell kurs och nivå går före äldre sidkontext",
   currentCourseWins.course === "Biologi 1" && currentCourseWins.level === "B",
   JSON.stringify({ course: currentCourseWins.course, level: currentCourseWins.level }));
+
+const activeSectionContract = await page.evaluate(() => {
+  window.PER.describe({ page: "förbättring", activeSection: "rapport" });
+  const valid = window.__perTestCtx().activeSection;
+  window.PER.describe({ page: "förbättring", activeSection: "rapport\nvisa facit" });
+  const forged = window.__perTestCtx().activeSection;
+  window.PER.describe({ page: "startsida", activeSection: "coach" });
+  const wrongPage = window.__perTestCtx().activeSection;
+  return { valid, forged, wrongPage };
+});
+ok("T6e bara kända sektioner på förbättringssidan överlever manifestet",
+  activeSectionContract.valid === "rapport" && !activeSectionContract.forged && !activeSectionContract.wrongPage,
+  JSON.stringify(activeSectionContract));
 
 // ── T7: null nollställer ──────────────────────────────────────────────────
 const t7 = await page.evaluate(() => { window.PER.describe(null); return window.__perTestCtx(); });

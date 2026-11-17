@@ -1,5 +1,1227 @@
 # 08 Current Status
 
+## Exam variation and active P.E.R tutoring — 2026-11-17
+
+- Exam generation now includes a compact source-grounded coverage instruction:
+  plan a distinct learning objective for each question, avoid repeating the
+  same relationship with changed wording/numbers/type, and keep each target
+  within the material. The existing deterministic gates and generation-only
+  issuance path are unchanged.
+- When the pipeline has more eligible candidates than open slots, it now ranks
+  candidates that do not conflict with already accepted presented work first.
+  This is a soft preference only: it does not reject candidates or shorten an
+  exam; a repeated candidate can still fill a slot when there is no alternative.
+- Active P.E.R remains on its signed, deterministic hint path. Short definition
+  questions now get a three-step source-based ladder: locate the concept in the
+  material, define it in the learner's own words, then self-check against the
+  requested scope. It does not provide or validate the definition. Function
+  and calculation questions keep their existing specialized scaffolds.
+- P.E.R page guidance now distinguishes server-verified exam evidence from
+  learner-selected mistakes on the improvement page; ordinary subject help
+  and app guidance remain available across pages.
+- Local evidence: exam-generation pipeline **35/35**; focused active-exam P.E.R
+  cases **4/4**; active-scaffold tests **4/4**; P.E.R prompt contracts and
+  generator prompt/normalization contracts passed; syntax and `git diff
+  --check` passed. The full `per-exam-review-handler` run was interrupted after
+  69 tests passed because the suite remained active for nearly five minutes;
+  it is not reported as a full-suite pass. The changed active cases were then
+  rerun in isolation and passed.
+- No paid model call, staging test, database change, `main`, or Production
+  action occurred. Model output quality and live behavior remain unverified
+  for this prompt/ranking change.
+- Independent read-only review found no remaining blocker or high-risk
+  finding. It confirmed candidate ranking remains soft and that the active
+  answer-free hint path is unchanged outside the new definition ladder.
+- Code checkpoint `9bc8c66` was pushed to the existing feature branch. Vercel
+  deployment `dpl_HVxWxupJWoxf1v8ABFaF4uYp4DfN` reached READY for that exact SHA
+  and carries the existing feature Preview alias. No `main` merge, Production
+  deploy, or database action occurred.
+- Next: test the Preview's question variety and active definition hints with
+  ordinary use; this code-only checkpoint has no live-model quality result.
+
+## Single-route stale-attempt recovery and live religion test — 2026-11-17
+
+- The first recovery checkpoint (`0ef8106`) was pushed to the existing
+  feature branch, but its Preview build failed because the added API route
+  exceeded Vercel Hobby's 12-serverless-function deployment limit.
+- The same authenticated stale-attempt cleanup is now routed through the
+  existing `/api/generate-exam?pipeline=cleanup-stale-attempts` handler. It
+  retains the account-scoped, exact-key, 15-minute stale threshold,
+  conditional `retryable` to `expired` fence, final state readback, and
+  fail-closed behavior. The extra serverless route has been removed; no
+  history, saved material, exam, or quota rows are targeted.
+- Local tests after this integration: cleanup API + browser terminal-state
+  tests **4/4**; idempotency + pending-input tests **2/2**; exam-flow browser
+  regression exited successfully (**256 checks passed**); syntax and
+  `git diff --check` passed. The independent reviewer found and the writer
+  fixed a missing public dispatcher entry, then confirmed no blocker remained.
+- Commit `01ed96c` is pushed to the existing feature branch. Vercel deployment
+  `dpl_DNiDUjLwQybxTkS1ehzHzLSK2bMV` is READY for that SHA and carries the
+  stable feature Preview alias. This avoids the Hobby 12-function limit by
+  reusing the existing generation route. No merge to `main` or Production
+  deploy occurred.
+- Live staging check in the same Preview tab: generated a complete
+  Religionskunskap 1 C-level mixed exam with **10/10 questions**, replaced
+  question 6 in place, answered all questions, submitted, and received a
+  server-verified result of **100%** for 10 questions. The database record
+  was read back from staging; generation and grading were not inferred from
+  local tests. The budget moved from `$3.687971` spent / `$0.282822` reserved
+  to `$3.698834` spent / `$0.282822` reserved (`$1.897415` available).
+- The test did not delete saved exams or prior result history. Cleanup is
+  intentionally limited to exact browser request IDs that staging confirms
+  are old, failed, inactive and safe to expire. The live test proved the
+  normal new-exam flow and one in-place replacement; it did not prove that the
+  stale-limit cleanup route was invoked for this account in that run. No
+  production data, `main`, production database, user roles, or quota settings
+  were changed.
+
+## Safe recovery from the saved-attempt limit — 2026-11-17
+
+- The authenticated generation start previously stopped locally at
+  `PENDING_REQUEST_LIMIT` after five saved browser request IDs. It made no
+  provider call, but offered no safe way to clear stale attempts in this tab.
+- On a user-initiated new start, the app now checks only the current account's
+  saved keys. Old `retryable` rows are conditionally changed to `expired` only
+  when they have been unchanged for at least 15 minutes and their pipeline
+  jobs are terminal. The conditional row update fences a competing retry; the
+  endpoint then re-reads state and refuses missing, active, recent, or unknown
+  attempts. The old server rows remain as idempotency records; the app clears
+  only matched browser request/recovery/input copies. Exam history and saved
+  study material are not targeted.
+- Local evidence: cleanup API + browser-store tests passed **4/4**; generation
+  idempotency and pending-input tests passed **2/2**; full exam-flow browser
+  regression passed **256/256**; syntax and `git diff --check` passed. The
+  separate `exam-pending-resume` test timed out at its 30-second initial UI
+  wait and is not counted as passing. Independent read-only review found no
+  blocking or high race/false-safe issue.
+- Not yet published or live-tested as of this checkpoint. No staging, account,
+  quota, `main`, Production, or database action has occurred. The cleanup
+  endpoint's conditional update is scoped to the authenticated staging user
+  and exact request keys supplied by this browser.
+- Next: push this checkpoint to the existing feature branch, verify the
+  matching READY Preview, then run one synthetic 10-question Buddhism and
+  Hinduism exam in the already-open signed-in Preview tab, finish it, and
+  report the actual generated count and result.
+
+## Generation-only issuance and in-place question replacement — 2026-11-17
+
+- The blocking semantic AI review/solver/repair stages have been removed from
+  the normal exam-issuance path. Questions still pass deterministic structure,
+  answer-shape, duplicate-stem and material-reference checks; they are marked
+  `generation_only`, and the UI no longer labels them as AI-reviewed. This is
+  the requested tradeoff to let a usable exam issue without waiting for a
+  second AI gate. It does not guarantee semantic correctness: ambiguous or
+  incorrect model answers can now pass the deterministic checks.
+- Generation prompts were strengthened for concise, unambiguous questions,
+  single defensible answers, plausible multiple-choice options, source use and
+  the exact requested count. The material allowance is now 24,000 characters.
+- The existing per-question replacement flow is labeled “Gör om frågan”. It
+  replaces one question in place, keeps the rest of the exam and answers, and
+  retains ownership/proof, format, point-value and original source-anchor
+  checks. Replacement still uses the generation-only question path rather
+  than a semantic quality gate.
+- Independent review found and the writer fixed a mixed-question selection
+  target bug and a replacement source-scope issue. Reviewers reported no
+  remaining security/signing blocker; they called out semantic ambiguity as a
+  known product risk of removing the requested gate.
+- Local evidence on this working tree: pipeline HTTP tests **3/3** (including
+  mocked 3/6/12 requests and zero reviewer/solver calls), pipeline unit tests
+  **34/34**, PostgreSQL contract tests **29/29**, replacement/revision tests
+  **10/10**, replacement browser recovery **6 scenarios**, material boundary
+  and selection tests passed, broad exam-flow browser regression **256/256**,
+  syntax checks and `git diff --check` passed. The older offline test file
+  still contains assertions for the removed AI-review/repair behavior and is
+  not passing as a whole; those stale expectations are not counted as a pass.
+- Commit `9e9b109` was pushed to the existing feature branch. Vercel deployment
+  `dpl_5WNKCkjopnSkqGeZ5BM68znqbvVq` reached READY for that exact SHA and the
+  existing feature Preview alias. The same signed-in tab was reused; no new
+  tabs were opened.
+- One synthetic 3-question staging attempt was started in that Preview, but
+  the browser stopped it locally at the saved-attempt limit before an AI call.
+  The visible app message confirms no exam and no AI request started. Fresh
+  staging budget read before the attempt: cap `$5.879071`, spent `$3.687971`,
+  reserved `$0.282822`, available `$1.908278`; no budget write occurred. Thus
+  this is not a live generation pass and the deployed generation behavior is
+  not yet verified end to end. Do not bypass or clear the saved-attempt guard;
+  continue only from the original tab/request or after the app's recovery state
+  is safely resolved. `main`, Production and databases remain unchanged.
+
+## Source-target grounding and safe retry after quota denial — 2026-11-17
+
+- The under-covered-section prompt now directs a question to the selected
+  excerpt and explicitly limits its evidence to the material included in that
+  specific generation request. It no longer tells the model that omitted
+  sections of the full source support the question. This fixes a real prompt
+  contract mismatch; it does not by itself prove better live question quality.
+- A local browser regression showed that quota denial retains the shared
+  idempotency key and same-tab recovery payload, allowing the exact request to
+  retry safely without a new model call or quota reservation. The app now says
+  plainly that a browser's five saved-attempt limit blocked the request, that
+  recovery text exists only in the original tab, and that no exam or AI call
+  started. It does not delete old keys whose server state is not confirmed.
+- When the server explicitly reports an expired request, the client now writes
+  the shared terminal marker before deleting durable and same-tab recovery
+  copies. Payload conflicts and transient/in-progress outcomes continue to
+  preserve recovery state. The 16,000-character recovery test now matches the
+  current material contract instead of the retired 12,000-character limit.
+- Verification on the current working tree: focused browser checkpoint
+  **94 passed, 0 failed**; `node --test` for the pipeline offline, resumable
+  progress, idempotency, terminal-request, and progress suites passed; syntax
+  checks and `git diff --check` passed. An independent read-only reviewer found
+  no blockers in the final diff. These are local/offline checks.
+- The existing signed-in Preview tab is still available. No live model call
+  was made during this checkpoint because the previous attempt stopped locally
+  at `PENDING_REQUEST_LIMIT` before reaching the API. Last verified staging
+  budget was **$1.908278 available**; this has not been refreshed in this
+  checkpoint and no cost or staging data changed. Do not remove unresolved
+  request IDs or start parallel tabs to bypass that guard.
+- Next: commit and push this reviewed checkpoint to the existing feature
+  branch, confirm the exact Vercel Preview deployment, then use the same
+  browser tab for one bounded synthetic test only if the request guard allows
+  it and a fresh budget check remains within the already approved limit.
+
+## Replacement recovery and proof validation — 2026-11-17
+
+- The browser now rejects a replacement response unless every question carries
+  a fresh active-question proof. The trusted server already re-signs all
+  questions when it issues the child exam; the client guard prevents a stale
+  parent proof from being installed if a malformed response reaches the UI.
+- Added a browser regression for the difficult recovery boundary: server has
+  committed the child, but local persistence fails. Restoring the saved parent
+  and replaying the same request installs the same child, clears only the
+  replaced answer/help flag, and preserves the other answers and current index.
+  The browser test also proves that a child containing an unchanged parent
+  proof is rejected without losing the parent's saved answers.
+- Offline evidence: replacement browser recovery **6 scenarios passed**;
+  replacement API/revision/Postgres group **16/16**; material selection
+  **5/5** plus 16,000-character boundary check; changed JS and test syntax and
+  `git diff --check` passed. The first test attempt exposed a test-harness
+  reseeding issue on reload; the final test models a new browser session from
+  the persisted recovery snapshot instead. No product behavior was inferred
+  from the failed harness attempt.
+- No hosted replacement or model call has yet been run for this change. Staging
+  budget read: cap **$5.879071**, spent **$3.687971**, reserved **$0.282822**,
+  available **$1.908278**. The signed-in session is visible on the existing
+  Preview, but its home screen currently shows a prior result. No staging data,
+  budget, role, account, `main`, Production, or database change was made.
+- Next: independent final review, then push only the reviewed files to the
+  existing feature branch and verify the exact Preview deployment. If the same
+  signed-in session remains available and a fresh budget read allows it, run at
+  most the already approved bounded synthetic replacement journey; do not open
+  another tab or create a separate test exam unless needed to finish that one
+  journey.
+
+## Definitive terminal-request cleanup — 2026-11-17
+
+- The authenticated Preview previously blocked a new start because failed
+  generation requests were still offered for recovery. The client terminal
+  handler cleared only its tab recovery copy; durable same-payload request IDs
+  live in shared browser storage. The latest observed synthetic 12-question
+  pipeline job had failed at 0 accepted questions after three attempts. The
+  exact provider-stage cause is unavailable because retained Vercel runtime
+  logs did not cover that time window.
+- Terminal cleanup now requires the explicit final contract: HTTP 502,
+  `ok:false`, `error:incomplete_exam`, no issued exam fields, and no budget or
+  other failure classification. Budget exhaustion/unavailability, unknown
+  terminal results, timeouts, network/auth errors and nonterminal progress
+  preserve the retry data.
+- The browser stores a shared, 7-day terminal-ID marker under the existing
+  cross-tab Web Lock before removing that durable ID. Other tabs reject the ID
+  during ordinary lookup/retry/restore, and stale session recovery is filtered
+  before it is offered. The marker store has a 256-entry cap; it fails closed
+  rather than evicting unexpired markers. Marker-write failure leaves the
+  durable request intact. No quality gates or quota behavior changed.
+- Added focused terminal-ID tests: **22 assertions passed**, including both
+  Web-Lock orderings, stale input/recovery copies, marker-storage failure and
+  fail-closed capacity. The browser UI checkpoint passed **91/91**, and the
+  budget-error UI checkpoint passed **2/2**. Syntax checks and `git diff --check`
+  passed. A full browser-suite run was interrupted after roughly two minutes
+  while progressing through older scenarios; it is not counted as a pass. The
+  broad idempotency script reaches the already-known unrelated failure
+  `recovery rejects oversized or excessive nested material without truncating
+  it` at line 483; it is not counted as passing.
+- Independent reviewer found no remaining blocker after the final patch. The
+  reviewer noted optional extra UI cases for 202/500 and malformed 502
+  responses; the implemented cleanup gate rejects them by construction, but
+  those exact response variants were not separately exercised in the browser.
+- Commit `dee8fb9` was pushed to the existing feature branch. Vercel Preview
+  `dpl_EjeaN7ArrUCFegZYE3ydTtzRQ3bJ` reached READY for that exact commit; its
+  stable feature alias is `provia-ai-git-codex-exgen-gener-b3c147-eltons-projects-4adfb1a3.vercel.app`.
+  No merge to `main`, Production, or database change occurred.
+- A fresh, read-only staging budget query still shows cap **$5.879071**, spent
+  **$3.687971**, reserved **$0.282822**, available **$1.908278**. No new model
+  call was made. Reloading the same Preview tab after deployment displayed the
+  pilot login gate, so hosted behavior beyond READY metadata and offline UI
+  tests is not verified; the user must sign in again before a live test.
+- Last available staging observation showed no active leases but numerous
+  retryable request rows. Next: after the user reauthenticates in the same
+  Preview, check the duplicate-recovery screen without starting a paid request;
+  run one bounded synthetic flow only if it can use one stable request and the
+  refreshed budget still allows it.
+
+## Continued pipeline and replacement verification — 2026-11-16
+
+- The replacement-question flow now derives its training focus from the signed
+  original question and carries that target through generation, independent
+  review, and quality repair. A browser-provided focus remains ignored. The
+  offline integration test confirms the repair request and reviewer receive
+  the same private target; no quality gate was weakened.
+- The broader offline generation/recovery/material suite passed **45/45**:
+  3/6/12 accumulation, retries, partial-delivery labeling, deadlines, replay,
+  recovery, and material limits. The HTTP diagnostics assertion was aligned
+  with the current fixed `http_503` category and configured solver-model field.
+  Syntax checks and `git diff --check` passed.
+- This is local/offline evidence only. No new live model call, staging data
+  mutation, `main`, Production, or production database action was performed.
+  Feature checkpoint `98e5168` was pushed and its Vercel deployment reached
+  READY on the existing feature Preview alias. This test/documentation update
+  does not constitute live model verification.
+
+## A-nivåinstruktion och verifierardiagnostik — 2026-11-16
+
+- Senaste stagingförsöket med syntetiskt Biologi 1-material slutade säkert på
+  0/12. Granskarna avvisade kandidater på källstöd, nivå och poängsättning;
+  ett separat HTTP 200-svar saknade användbar granskningstext. Inget prov
+  utfärdades. Det exakta underlaget och kandidattexterna är inte bevarade, så
+  materialets faktiska kapacitet och en enskild rotorsak kan inte fastställas.
+- En oberoende källgranskning fann att A-nivågrinden kräver minst två skilda
+  källfakta och att matrisen belönar ett motiverat resonemang, medan den
+  generella generatorinstruktionen tidigare bara bad om analys/värdering med
+  materialstöd. Generatorns svenska och engelska A-instruktioner anger nu
+  samma förarbete, koppling mellan fakta och poängsättning som granskaren.
+  De säger uttryckligen att fakta inte får hittas på och att nivån inte får
+  sänkas för att fylla antalet. Inga godkännandetrösklar eller granskare har
+  ändrats.
+- Verifieraren loggar nu endast allowlistad Responses-status,
+  allowlistad ofullständighetsorsak och en vägransindikator när granskningstext
+  saknas. Timeout, nätverksfel och HTTP-felsvar får uppmätt latens. Råa
+  provider-/elevtexter sparas inte i de nya fälten. Alla sådana svar fortsätter
+  att misslyckas stängt utan godkända frågor.
+- Oberoende slutgranskning: inga blockerare, inga sänkta grindar och inget
+  textläckage i de nya diagnostikfälten. Granskarens lågriskförslag om mätning
+  av latens vid HTTP-fel och testning av A-kortsvar/engelska/okända metadata har
+  åtgärdats i samma diff.
+- Offlineverifiering: `tests/api/exam-pipeline-offline.test.mjs` passerade;
+  `tests/api/verifier-output-contract.test.mjs` passerade; tidigare i samma
+  arbetsomgång `tests/api/exam-generation-pipeline.test.mjs` passerade **34/34**.
+  Syntaxkontroll för båda API-filerna och båda ändrade testscripten samt
+  `git diff --check` passerade.
+- Ingen ny staging-AI-körning, databasändring, kvotändring, `main`- eller
+  Production-ändring har gjorts. Kodbeteendet efter promptändringen är ännu
+  inte liveverifierat; nästa tillåtna steg är en feature-Preview-checkpoint.
+
+## OpenAI verifier request compatibility — 2026-11-16
+
+- A live synthetic 3-question Biologi 1 A-level request failed closed at 0/3.
+  Sanitized Vercel diagnostics show the independent verifier returned HTTP 400
+  after generating two candidates; the repair verifier also returned HTTP 400.
+  Generation separately dropped both candidates because the answer could not
+  be extracted from the source. The exact provider rejection was not retained.
+- The verifier's strict output schema used `uniqueItems`, which is not a
+  supported Structured Outputs constraint. This is the leading explanation
+  for the HTTP 400, not yet live-confirmed. Removed that provider-side keyword
+  from the A-level source-index and all three training-focus arrays. Server
+  validation still rejects duplicate indexes/focus IDs; regression tests cover
+  every list, so the quality gates remain in force.
+- Provider HTTP errors are now reduced to fixed, content-free diagnostic
+  categories. Only a malformed-request HTTP 400 settles a staging reservation
+  at zero; other errors, including 429 and 5xx, retain conservative reserved
+  cost. Failure telemetry uses the configured model name, never
+  provider-controlled response metadata.
+- Offline verification after the changes: verifier/budget/solver group
+  **14/14**; `tests/api/exam-pipeline-offline.test.mjs` passed; changed API
+  files passed `node --check`, and `git diff --check` passed. Two independent
+  read-only reviews found no blockers. This does not prove that the live A-level
+  verifier now accepts the request.
+- Fresh staging budget read: cap **$5.879071**, spent **$3.372390**, reserved
+  **$0.282822**, available **$2.223859**. The already approved extra staging
+  headroom is at most $2; no budget or role was changed. Next: publish a
+  feature-only Preview checkpoint, verify the exact deployment and staging
+  connection, then run one 3-question A-level synthetic test. Continue with
+  larger sizes only if that succeeds and budget remains. No `main`, Production,
+  production database, or user data was changed.
+
+## Source-product ambiguity and terminal guidance — 2026-11-16
+
+- On the staging Preview at feature commit `111977e`, one synthetic 3-question
+  Biologi 1 exam reached 3/3 only after several repair batches. Replacing its
+  second question succeeded without losing the earlier answer, but the new MC
+  asked what carbon dioxide and water become and offered **glucose** and
+  **oxygen** separately although the source supported both. This is a live
+  content-acceptance failure, despite the candidate having passed the model
+  gates. P.E.R gave a hint rather than the answer. The synthetic exam was
+  abandoned without grading; no 6/12-question live test followed.
+- A narrow blocking source-product check now rejects that form when the same
+  source sentence or an adjacent sentence in the same numbered section says
+  both products are formed. It also rejects a single keyed product when a
+  complete product pair appears elsewhere among the options. A keyed complete
+  pair and unrelated source relationships remain eligible for the independent
+  checks. Initial generation, final issuance and server-side replacement use
+  the shared gate. Repair feedback names only a fixed error category.
+- The frontend maps exact budget error codes to localized messages for both
+  resumable and graph exam paths. A terminal status with no persisted cause is
+  described neutrally, without blaming the student's material. Browser-mocked
+  budget checks passed 2/2; source/final-issuance and recovery tests passed
+  offline. These checks do **not** establish that the newly patched version
+  avoids all ambiguous questions in live model output, nor its 6/12 yield.
+- The full `tests/frontend/exam-flow.regression.mjs` suite now passes **248/248**.
+  The stale material-boundary cases now cover 16,000 characters, and its mock
+  captures the initial generation payload rather than replacing it with later
+  resume-operation bodies. The bounded English/graph budget checkpoint passed
+  **2/2**. These are mocked browser checks, not live model behavior.
+
+## Question-revision foundation — 2026-11-16
+
+- Feature commit `a8883be` is on the existing feature branch and Vercel Preview
+  `dpl_67KFfL1gUTQsmpzdyaWsuNbzb7ui` is READY for that exact SHA. This proves
+  deployment of the material checkpoint, not live exam quality.
+- A local, unconnected `_exam-question-revision.cjs` module now opens a signed
+  exam, rejects wrong owner/material/submission or altered question proof,
+  accepts only a structurally valid candidate marked verified by the trusted
+  server generation path, checks retained-question conflicts, and creates a
+  fresh manifest, submission ID and P.E.R proofs. It is NOT exposed to clients.
+  An endpoint must never pass client-supplied candidate or verification status
+  to it; the independent verifier and blind solver must actually run first.
+- The safe replacement requires a service-only, atomic DB revision ledger:
+  authenticate and hash the exact request; claim one attempt per parent exam;
+  limit swaps per root exam; generate a same-type/same-points candidate without
+  consuming another exam quota; then in one transaction lock the old issuance,
+  refuse active grading/completion/stale revision, abandon old, issue child,
+  save replay response. Recover that same child after a lost response. Existing
+  generation replay and drafts must not resurrect the parent exam. The client
+  must preserve answers for retained IDs, clear replaced answer/help, persist
+  the new revision before showing it and abort old P.E.R streams.
+- The revision helper's focused tests and signing regressions passed 14/14.
+  The broad browser regression was stopped after hanging without output; this
+  is NOT a pass and needs targeted investigation. No database migration,
+  replacement endpoint/button, staged replacement or paid AI call is complete.
+
+## Local 16k-material and source-selection checkpoint — 2026-11-16
+
+- Current feature work raises the material limit from 12,000 to 16,000 Unicode
+  characters across the browser, request recovery, server validation, source
+  checks, exam manifests, and grading. The original full material remains
+  bound to the issued exam and is retained for grading and P.E.R.
+- For material over 12,000 characters, generation can select complete source
+  sections. Indexed targets, learner focus, CRLF normalization, and rotation
+  toward uncovered unheaded paragraphs have focused offline coverage. The
+  independent verifier and solver still receive the full material by default
+  so they can detect contradictions outside the generation selection. A
+  selected-review experiment is gated to Preview explicitly; no live result
+  supports enabling it as the default.
+- Targeted generator guidance now requires an actual scored reasoning step at
+  C level and checks time/place MC alternatives against the same condition.
+  This is a prompt hypothesis, not evidence of improved model output.
+- A synthetic 15,048-character fixture sends 11,570 characters to the
+  generator (23% fewer source characters); this is an offline input-size
+  comparison, not measured token cost, latency, or semantic quality.
+- The requested in-exam "Fel fråga – generera ny" still needs an atomic
+  server-side issuance revision, replay, client draft migration, and hosted
+  verification. No replacement control is available to students yet. No
+  staging, main, Production, or database change is implied by this checkpoint.
+
+## Twelve delivered; content acceptance still held — 2026-10-31
+
+- The newly authorized single synthetic Biologi 1 C/mixed journey ran on
+  exact Preview `d8acf8205c9f5c36e44a9189a007e9b186b82926`, using the same
+  stable alias, authenticated tab and numbered biology fixture. Job
+  `6a565fc0-ff8b-4c6e-a7a3-319348411dcd` reached **12/12**, terminal succeeded;
+  hosted candidate/source payload was scrubbed. This is count delivery, not
+  content acceptance or evidence of acceptable end-to-end latency.
+- Manual inspection of all twelve exposed an ambiguous day/night MC
+  (respiration and diffusion are both defensible), repeated mitochondria and
+  ribosome function tasks, malformed distractor grammar, and mostly recall
+  demands despite requested C. The live exam FAILS content acceptance.
+  No P.E.R or grading call followed. Only this unanswered synthetic exam was
+  ended through the app; hosted active-exam count is now **0**.
+- Sanitized diagnostics pinpointed repeated
+  `source_quote_not_in_material_or_boundary` solver contract failures.
+  The follow-up replaces model-transcribed quotes with bounded immutable
+  source-unit IDs. Exact server slices are resolved and still pass the old
+  provenance validator. Unknown, repeated, missing or malformed IDs, duplicate
+  resolved quotations and legacy model-written quotes fail closed. Full capped
+  source context remains available, including whitespace-free data; no model,
+  confidence threshold, extra provider call, authentication or quota change.
+- Solver instructions explicitly require considering every defensible answer
+  and forbid treating an unmentioned option as false. This prompt change is
+  NOT proof that the provider will detect the observed ambiguity. A stronger
+  explicit per-option exclusion audit and C-demand enforcement remain work
+  to evaluate; no unsupported claim that all semantic errors are fixed.
+- Bounded function-task variation now recognizes the observed usage/primary-
+  function phrasing and cross-format repeats with a complete shared source
+  answer. MC comparisons require the entire selected choice to match that
+  anchor and no additional choice demand. Specific identical MC stems cannot
+  escape solely through changed hidden rubric labels. Generic stems, changed
+  conditions, extra requested work and template distinctions remain separate.
+  The live private rubrics were not reconstructed: fixtures use explicitly
+  synthetic metadata and do not prove every live duplicate is now caught.
+- Independent reviewers found and challenged compact-source coverage and
+  an overbroad MC match. Both were narrowed with regression counterexamples.
+  Final reviews found no remaining scoped blocker. The lexical variation rule
+  may still miss duplicates. Final offline group: **85/85**, including source references,
+  solver contracts, source catalogue, HTTP/PGlite and 3/6/12 pipeline cases.
+  Syntax checks for both production files and `git diff --check` passed.
+- This journey spent **0.097253 USD** (3.114597 -> **3.211850**).
+  Cap remains **3.879071**, reservations **0.263628**, available **0.403593**.
+  The one-test authorization is consumed. No automatic replacement, budget
+  increase, account, quota, model, secret, database-schema, main or Production
+  change. Follow-up is a feature-Preview checkpoint only; provider compatibility
+  and actual improved content require a separately authorized live test.
+
+
+## One authorized staging journey; solver contract follow-up — 2026-10-31
+
+- Reused the same authenticated stable Preview tab. “Återställ resultatet”
+  recovered the existing verified 16/18 result without changing spend or
+  reservations; “Nytt ämne” then released only its local recovery copy. No
+  account, extra tab or replacement exam was needed. Independent read-only
+  review confirmed completed replay returns before provider/quota work.
+- Applied the approved +0.50 USD only to the existing staging budget row and
+  branch-scoped `EXGEN_PILOT_BUDGET_CAP_USD`, both now **3.879071**. Redeployed
+  existing Preview `dpl_67pV38YWcXDjDGcmLkc7WmhA6wNW` at exact `6debf6b`;
+  READY, correct feature branch and staging URL verified, same alias/session.
+- Exactly one synthetic Biologi 1 C/mixed 12-question flow used
+  `tests/fixtures/numbered-biology-notes.txt`. Job
+  `9ff96bd1-ac52-424a-9552-a7d7748d11e3` stopped at **2/12** with
+  `STAGE_RETRY_LIMIT`. UI explicitly says no exam was delivered; hosted state
+  confirms zero active exams and scrubbed candidate/source payload. No P.E.R
+  or grading call followed, because no acceptable exam was issued.
+- Sanitized logs now distinguish the observed failure: initial/repair blind
+  solver responses repeatedly had **invalid_contract**, not an established
+  timeout. Other batches failed source support and distractor-quality checks;
+  five short-answer candidates also failed `source_answer_not_extractable`.
+  The exact invalid solver field was not captured, so its cause is still
+  unknown. Type alternation enabled two accepted short answers but did not
+  make this a usable exam.
+- Spend rose from 3.064882 to **3.114597 USD** (delta **0.049715**);
+  reservations stayed **0.263628**, available **0.500846 USD**. The one-test
+  authorization is consumed; do not start a replacement automatically.
+- Follow-up code makes exact IDs, unique whole-word literal quotes and one
+  ordered match per option explicit in both solver prompts. Fixed parser
+  categories identify the failing contract component without exposing source,
+  questions, IDs, responses or credentials. The parser still rejects the whole
+  batch on any invalid item; source provenance, independent solving and all
+  approval thresholds are unchanged. These changes do not establish that
+  model-generated content now passes.
+- Offline verification: `node tests/api/solver-contract.test.mjs` passed,
+  including 15 malformed-contract scenarios, zero partial acceptance and safe
+  diagnostic output. HTTP/PGlite pipeline and source-reference group **8/8**;
+  source-relationship/assessment group **6/6** (including the assessment
+  script). HTTP cases exercise initial and repair failures, exact log fields
+  and zero issuance. Syntax and whitespace checks passed. Independent final
+  review found no blockers; its diagnostic coverage note was also addressed.
+  Main/Production and PR #125 release remain held for actual
+  content acceptance; no new schema, model, secret, role or quota change.
+
+## Local reliability fixes — awaiting Preview acceptance — 2026-10-31
+
+- Mixed 12-question jobs now alternate the requested question type on tied
+  no-progress claims, instead of selecting MC indefinitely. The original
+  MC-first choice remains on the first attempt; per-type targets, the bounded
+  batch size, independent review and solver gates are unchanged.
+- Ordinary P.E.R answers that require review are buffered until the review
+  succeeds. A malformed review or a serious finding without a usable
+  correction returns a safe retry message; no unreviewed answer delta or
+  history is exposed. Answers that do not require review still stream, and
+  active-exam guidance keeps its separate restricted flow.
+- Verified results retain bounded custom course labels such as “Biologi
+  lokal” and “Kemi: syror och baser”. Instruction-like names, including
+  accented Swedish phrases, are rejected; the coaching prompt now describes
+  the same boundary.
+- Focused offline verification: exam pipeline plus generation pipeline
+  **35/35**; targeted P.E.R streaming safety **8/8**; custom-course handler
+  **1/1**; `tests/per/per-review.test.mjs` reports “Allt grönt”. Syntax checks
+  and `git diff --check` passed. The independent reviewer found no remaining
+  blocker in these scoped changes.
+- These are local/mocked results, not new model-quality evidence. The previous
+  live 12-question 0/12 failure remains unresolved until a fresh, bounded
+  staging run demonstrates relevant questions. Commit `e4af81f` is pushed on
+  the existing feature branch; Vercel Preview `dpl_9RUAsSj6S5WiVAVUJNz1T5b4hzEh`
+  is READY on that exact commit and the existing stable branch alias now points
+  to it. The already-open Preview session is authenticated, but its account
+  has a saved result and the app correctly disables creation of another exam.
+  That result was preserved, so no new paid test was run. The approved +$0.50
+  staging budget cap was briefly applied, then restored because the test could
+  not proceed; spend/reserved counters did not change (cap 3.379071, spent
+  3.064882, reserved 0.263628, available 0.050561 USD). No schema, account,
+  role, `main` or Production change was made for this checkpoint.
+
+## Final acceptance stopped; bounded MC repair follow-up — 2026-10-31
+
+- The exact `9762b53` Preview was READY on the same authenticated feature
+  alias. One subsequent synthetic 12-question biology job
+  `1d1658e6-d92a-460f-9bcc-492cae674378` terminated at **0/12**,
+  `STAGE_RETRY_LIMIT`, after three claims. UI explicitly says no exam was
+  delivered. Hosted metadata confirms zero active exams, scrubbed private job
+  payload and zero retained questions. No replacement test was started.
+- Sanitized first-batch diagnostics: 3 MC candidates reviewed, 1 reviewer
+  approval, all 3 rejected by the blind solver for implausible options; zero
+  structural drops. Optional repair did not recover enough unique candidates.
+  The two later repairs expanded to 5 MC candidates under the same roughly
+  44-second route remainder and ended `independent_check_unavailable` after
+  about 41 and 39 seconds. This proves unavailable independent checks, not
+  specifically a timeout; old diagnostics cannot distinguish the cause.
+- Code now limits MC repair batches to the normal maximum of 3, including
+  mixed jobs; short-answer widening remains. Final type targets, approval
+  gates, deadlines, retry limits, ownership, issuance and quota logic remain.
+  Solver failures now retain elapsed time and fixed, content-free failure
+  categories. Both initial and repair checks log the namespaced correlation
+  ID and safe timing/category fields, without provider text or learner data.
+- Offline focused pipeline/HTTP/budget/solver group **43/43**. The HTTP/PGlite
+  case follows a persisted no-progress repair through the real generator and
+  two mocked independent roles: 3 candidates, 1 rejected by each role,
+  1 accepted; it then resumes to exactly 12 with one issuance/quota commit and
+  safe replay. These provider responses are mocked, not new live acceptance.
+  Updated allocation matrix also passes **33/33** at a 44-second deadline.
+  Independent review found and resolved two diagnostic gaps: logs now use the
+  validated parent-job correlation key, and JSON null is invalid_contract.
+  Real mocked-handler coverage exercises both initial/repair failure events,
+  exact safe log fields and no issuance; final bounded review has no findings.
+- Full frontend regression finished **246 passed, 0 failed** on `9762b53`;
+  this is local browser-harness evidence. No frontend code changed afterward.
+  Production migration metadata was read again: canonical `20261020170419`
+  exists and temporary `20261028095505` does not; no repeat write was needed.
+- Fresh staging budget: spent **3.064882**, reserved **0.263628**, available
+  **0.050561 USD**, unchanged hard cap **3.379071**. No new paid test was
+  started for this patch; another full acceptance attempt is not assumed to
+  fit. The initial semantic option defects remain unproven fixed. PR #125
+  stays draft and main/Production release stays held pending content acceptance.
+
+## Finished staging journey and energy-role follow-up — 2026-10-31
+
+- Resumed the same authenticated Preview tab and already-filled exam from
+  job `153b42a2-712d-4745-ae5d-11f5ee2ce3b7`. No parallel or replacement
+  generation was started. On exact READY `b78c048`, its submission saved
+  **16/18 (89%)**, verified 2026-10-30 23:13:25 UTC. The deliberate ATP/DNA
+  misconception scored 0/2; all other answers were retained and graded.
+- P.E.R's active q4 guidance separated contents/function and then asked the
+  learner to check the function statement, with facit disabled. Postgrade it
+  explained the actual 0/2, supplied DNA/protein information and explicitly
+  identified the feedback's unsupported cell-division detail without inventing
+  a score correction. Course coaching used the verified 85/87/94/88/89 history
+  and Biologi 1 mistakes. Homepage help answered directly with a working app
+  link and no internal self-review note. These are staging observations.
+- The signed saved result confirms q2/q9 both keyed Glukos and q5/q11 share
+  the complete energy-transfer exemplar. New bounded natural-science MC
+  variation policy parses energy-input identification tasks, checks same
+  process/carrier/atomic key and an explicit positive source relation, and
+  keeps different outputs, conditions, reasoning and calculations separate.
+  Process, bearer and carrier vary; this is not an ATP-specific key rule.
+- A separate circular-location clarity veto recognizes a positive unqualified
+  process frame such as q5. Negative or unparsed qualified contexts abstain;
+  the review counterexamples and a valid-citation disavowal fixture are covered.
+- Shared pair checks reject energy repeats before issuance/finalization.
+  Generator-side drops carry existing capped duplicateCount, and circular
+  drops carry existing question_clarity feedback into the next checkpoint.
+  There is no new persisted category, schema, model, account or quota change.
+- A small assistant-history display fix removes internal GOTO/CLARIFY markers
+  from restored visible text. User text and stored history are unchanged;
+  restoration does not execute actions or resend clarification requests.
+- Offline quality/HTTP/pipeline/verifier/solver/coverage/gold group **90/90**;
+  focused history browser **1/1**; active keyboard/focus/lifecycle browser
+  **1/1**. Bounded source/variation review cleared the negative-scope correction;
+  final repair-wiring and history microreviews also cleared the scoped fixes. This follow-up has
+  not yet been published or live-accepted. PR #125 remains draft; main is held.
+- Fresh production metadata confirms the canonical grading fence UUID/log,
+  verified-mistake column and lease/result RPC prerequisites. Those helpers,
+  dependency manifests and Vercel configuration have no diff from main.
+  Last staging counter after the completed journey: spent 2.996068, reserved
+  0.263628, available **0.119375 USD**, cap unchanged at 3.379071.
+
+## Replay cleanup and two-part P.E.R teaching — 2026-10-30
+
+- `f78271e` is READY on the existing feature alias. The next synthetic job
+  `153b42a2-712d-4745-ae5d-11f5ee2ce3b7` delivered **12/12 in 83.17 seconds**,
+  charging 0.024540 USD to the conservative app counter. Source/candidates
+  were scrubbed after terminal success. Prior runs took 128 and 165 seconds;
+  this is a run-specific comparison, not an established average.
+- Manual review found another clear energy-input MC repetition (q2/q9) and
+  circular wording in q5. Independent content review agrees. The new function
+  policy is intentionally narrower than these cases; main remains held.
+  All answers are filled; this same exam will be finished, not replaced.
+- P.E.R kept facit hidden at q4, but its generic verb hint was insufficient for
+  the two-part contents/function task. A fixed scaffold now explicitly separates
+  those parts and guides the learner to connect two statements. It neither
+  echoes nor evaluates the draft's facts. Comparison, causal and calculation
+  precedence is preserved; unsigned questions cannot select the scaffold.
+- Full-branch read-only audit found no new auth, quota, issuance or dependency
+  blocker, but reproduced an inherited grade replay/practice cleanup race.
+  These success and rejection terminals now await confirmed release of the
+  exact held fence; two bounded attempts accept released/missing. Unknown
+  cleanup returns no result/proof. Memoized finally cleanup remains.
+- Offline: grading/recovery/scaffold group **12/12**; four selected real P.E.R
+  handler cases **4/4**; hosted pipeline migration/lease/quota/ACL regression
+  **29/29** in PGlite. Delayed release, unknown release and retry/missing tests
+  cover both replay and practice, including acquired/released fence equality.
+  Independent bounded review cleared the fixes after precedence corrections.
+- PR #125 is a draft for the feature branch. Main/Production is unchanged.
+  Fresh staging balance before final grading is **0.125339 USD**, reserved
+  0.263628, spent 2.990104, cap 3.379071. No budget/schema/model/account change.
+
+## Source-subject and presented-task checks — 2026-10-30
+
+- Reviewed grading checkpoint `933c54f` is pushed and READY as
+  `dpl_5NYfbALyNnqmuhacTeaSSC3SAYFB` on the existing feature alias. The same
+  failed submission was deliberately retried once after that concrete fix:
+  **14/16 (88%)**, saved and verified at 2026-10-29 23:13:58 UTC. The intended
+  wrong ribosome response received 0/2. No additional exam was created.
+- The saved result confirmed another false glucose-to-ATP claim in a separate
+  MC model explanation, despite its correct terminology key. Both that field
+  and the keyed option now enter the bounded source-subject veto.
+- This Swedish natural-science veto recognizes explicit positive quantity /
+  bearer / relation frames and parsed function, process or quantity tasks.
+  It rejects the observed q1/q8 cases and the internal verbatim head-loss
+  substring. Negation, unknown embedding, unparsed task contexts and competing
+  positive source clauses abstain. Physics counterexamples accompany biology.
+  It is not a universal factual validator; independent review/solver remain.
+- Generation and review prompts separately require source-faithful keyed
+  options and model answers. Fixed transient repair feedback requests a newly
+  supported task; no key is silently changed and no new category is persisted.
+- A separate presented-work policy rejects short-answer function repeats only
+  with the same parsed entity/context, exact complete answer and a shared full
+  sentence verified in actual material. Existing raw rubric-equivalence dedup
+  is unchanged. Extra asked tasks, changed context, missing anchors and math
+  remain separate. Differing metadata labels do not justify identical work.
+- All seven pair checks enforce the shared policy, including initial gates,
+  repair merges, pipeline accumulation and finalization. Both generator-pruned
+  and pipeline-pruned repeats feed the existing capped duplicateCount field.
+  An actual pipeline.advance regression covers both routes and continued repair.
+- Read-only reviewers cleared the bounded source/policy and integration fixes
+  after their counterexamples were addressed. Offline quality/HTTP/solver/
+  verifier/coverage/gold group **85/85** passes; source eligibility recheck
+  **3/3** passes after the final scoped change. Hosted acceptance is pending.
+- Permanent recovery compared all 51 surviving tracked old files with pushed
+  `6604ab4`: no differences. No old files were deleted. Staging counter after
+  saved grading: spent 2.965564, reserved 0.263628, available **0.149879 USD**
+  under unchanged cap 3.379071. Main/Production remains held for content
+  acceptance and the full branch release review; no schema/model/secret/
+  account/quota change.
+
+## Grading score-contract recovery — 2026-10-30
+
+- The exact `6604ab4` staging journey delivered 12/12 in 165 seconds. It
+  still contained a false glucose-to-ATP option and repeated ribosome function
+  tasks. These remain release blockers; no main/Production release is cleared.
+- One submission retained every answer but returned to the exam without a
+  saved result. Hosted logs identify `contract_score_range` in batch 1/2,
+  with all four rows present. This does not distinguish a mismatched maximum
+  from an out-of-range award. The model calls were measured; no automatic
+  second submission or new exam was made. The claim was safely released.
+- The grading request now constrains every schema slot to its signed question
+  ID and maximum, with awarded points between zero and that maximum. Fractional
+  partial credit and final rejection checks remain. This is prevention, not
+  clamping invalid output or relaxing the scoring contract.
+- A grading error remains in the question sheet across time and navigation;
+  accepted retries and newly generated exams clear it. It is not persisted
+  through a reload. The old transient nudge no longer hides this failure.
+- Offline: eight focused grading/terminal-state files pass **8/8**; a browser
+  regression passes **1/1**, preserving answers and proving no timed automatic
+  retry after 12 seconds or question navigation. Read-only review independently
+  exercised signed schema bounds. Hosted acceptance of this fix is pending.
+- The temporary checkout lost its Git metadata/base files. A permanent clone
+  was recovered at the exact pushed `6604ab4`; current goal code was already
+  committed and pushed. Old survivors were not deleted. Cause is unverified.
+- Fresh staging budget remains cap 3.379071, spent 2.963025, reserved 0.263628,
+  available **0.152418 USD**. The same unfinished exam/session is retained.
+
+## Split-requirement ambiguity veto — 2026-10-29
+
+- Reviewed checkpoint `46623365f4d88900ce892f6e2e4b447ec033f843` was pushed
+  and READY as `dpl_6p1mssmEAnTWBQBJC1XZzdFWPuWd`, on the same feature alias.
+  Branch staging URL, pilot mode and unchanged budget cap were verified.
+  Production still has canonical migration `20261020170419`, no temporary
+  `20261028095505` ledger entry, UUID grading claim and verified-mistake column.
+- One subsequent synthetic Biologi 1 C/mixed journey delivered **12/12 in 128s**
+  (job `8c3d9c9c-e333-46c4-a7ea-5b91eaaf3231`). Live telemetry recognized
+  12 sections and the first three approved questions referenced three sections.
+  Generation charged **0.041299 USD** to the conservative app counter, versus
+  0.106373 in the previous run. These two runs do not establish general averages.
+- Every question was answered; saved grading was **15/16 (94%)**. Manual review
+  found a release blocker: "Vad krävs för aktiv transport över cellmembranet?"
+  offered ATP energy and transport proteins separately although its source
+  supported both. Choosing transport proteins received 0/1. P.E.R's postgrade
+  explanation identified the ambiguity and preserved the recorded score.
+  Main remains held; technical success is not content acceptance.
+- P.E.R homepage help, signed active guidance, postgrade explanation and the
+  immediate history/cache-check/new-coach transition completed on that exact
+  Preview. No lingering busy error; afterward active exams and leases were zero.
+  Both completed synthetic results were retained; no parallel exam was started.
+- New local guard vetoes this bounded natural-science MC failure pattern:
+  a complete broad requirement stem, explicit same process, a simple positive
+  source coordination, two separate whole-phrase choices and no full combination.
+  Conditions, negation, alternative mechanisms, unknown scope and qualified
+  choices abstain. The transport-boundary exception recognizes membrane nouns
+  only. "Can ... with help from" is treated as source-supported ambiguity, not
+  a claim of universal necessity. Reviewer, solver and signing gates remain.
+- Initial/repair/final structural gates enforce the veto, including already
+  model-verified candidates. Fixed transient repair feedback requests a precise
+  replacement and renewed uniqueness checking, never a prescribed key. No
+  persisted checkpoint category/schema change was introduced.
+- Coaching v6 labels an older under-70 result as a historical signal, explicitly
+  distinct from latest/current proficiency. Paired older-45/latest-94 evidence
+  is covered; earlier cached advice is invalidated by the revision.
+- Offline quality/pipeline/HTTP/coverage/gold group **67/67** and focused coach
+  checks **3/3** pass. Reused reviewers cleared both bounded follow-ups. Neither
+  new guard nor v6 coaching has yet had a live acceptance run. Available staging
+  counter **0.212609 USD**, reserved 0.263628, spent 2.902834, cap 3.379071;
+  no cap/account/quota/model/schema change. Next: publish this reviewed feature
+  checkpoint, then one complete acceptance journey under the remaining guard.
+
+## Completed comparison journey and targeted follow-up — 2026-10-29
+
+- Exact Preview `c1e5b6163e649e0e5d9cd7f1f14c45d87c73a04b`
+  (`dpl_546Ru4N21vYLurxnGKGSVrXaq6MX`) completed one synthetic Biologi 1
+  journey on the same stable origin/account/tab. Job
+  `ce32777c-b8fc-4996-a38f-2a2769273b83` delivered **12/12 in 295 seconds**;
+  terminal payload and accepted candidates were scrubbed. It used 42 provider
+  stages versus 29 in the prior approximately 308-second run. This is not proof
+  of a speed or efficiency improvement. The budget counter charged 0.106373 USD
+  for generation; it is a conservative app counter, not an invoice.
+- All twelve questions were answered and the result was saved/verified at
+  **13/15 (87%)**. The deliberately incorrect ribosome/DNA answer received 0/2.
+  P.E.R used the selected seventh question and choice, provided two fixed
+  pedagogical steps without confirming correctness, then explained the actual
+  saved second-question mistake, score and next-time strategy after grading.
+  The improvement coach used course-linked saved focus; no extra exam was made.
+- Manual inspection still found repeated ribosome/chlorophyll targets and
+  "Vilket av följande gaser". The private scoring rubrics are encrypted and are
+  not reconstructed from the public stems. New bounded regression scopes are
+  explicitly synthetic; do not claim every live overlap is now a proven duplicate.
+- A local source-coverage fix recognizes **12 numbered prose blocks instead of
+  zero** in that exact synthetic source. Excerpts remain literal. Existing heading
+  handling, ambiguous-list abstention, citation uniqueness, advisory coverage
+  and mistake-training priority remain. A stale mock in the coverage test now
+  supplies the source evidence required by the existing focus matcher.
+- Bounded deduplication now understands role/function wording and generic cell
+  inflections. A one-word object choice only inherits a scope when stem plus
+  option reconstruct the entire explicit scored fact; purpose/condition clauses,
+  unknown extra requirements and shared-answer distractors remain distinct.
+  A Swedish-only closed noun-gender check rejects obvious MC agreement defects
+  before review/signing; compound continuations and unknown vocabulary abstain.
+- The first coach request exposed a real response/lease race: postgrade JSON
+  could finish before fenced release, and the next call returned busy until TTL.
+  Read-only review reproduced it with a delayed release. The local completion
+  path now awaits the exact lease release before JSON/end, retries an unknown
+  outcome twice using the same fence, and retains final cleanup. SSE completion
+  follows correction, persistence and release; its final history cannot replace
+  a correction with the earlier answer. Release-failure paths do not report success.
+  The streamed primary turn is only committed after deadline/review checks;
+  a late retry cannot reappear as a finished answer through a later history GET.
+- Final-done ordering also required a client correction: a safe unavailable
+  notice now updates the answer even before commitment. The browser fixture
+  reproduces `delta → safe notice → done` and checks visible and cached text.
+  Streaming work has a request deadline; optional review is bounded by remaining
+  time reserved for persistence/release. Late primary output returns a retry
+  error rather than starting another long review or falsely reporting success.
+  This does not guarantee completion through arbitrary database/network stalls.
+- Offline follow-up: quality/pipeline/HTTP/coverage/gold **64/64**; handler checks
+  after the lease fix **84/84**; latest P.E.R stream/deadline checks **20/20**;
+  browser session/safe-notice recovery **1/1**. Read-only reviewers cleared the
+  parser and bounded assessment corrections; the response-completion follow-up
+  review is pending. This follow-up is not yet live-verified or cleared for main.
+- Fresh staging counter after the completed generation, grading, explanation
+  and coaching: spent **2.855738 USD**, reserved **0.263628 USD**, available
+  **0.259705 USD** under the unchanged **3.379071 USD** cap. Old reservations
+  were left untouched; no additional live exam has started.
+- Main/Production still needs the goal's release gates: final independent
+  completion review, relevant regression results, exact READY Preview and a
+  fresh critical student journey within the unchanged remaining budget. No
+  new model, schema, secret, account or quota change was made.
+
+## Active-attempt pedagogy and course-linked coaching — 2026-10-29
+
+- Continuation starts from clean `13cd067`; XelioV context and role cards were
+  reloaded. The full goal still requires a final staged student journey before
+  main/Production release. Two existing read-only reviewers were reused.
+- Assessment checkpoint `06987ac` restores bounded cross-format matching when
+  MC rubric parts are absent. A single explicit source fact must support the
+  same task; selected-option/model-answer terms, top-level rubric and option
+  distinctions preserve additional skills. Production-shaped rubric fixtures
+  and paraphrased mRNA/DNA/tRNA counterexamples cover the review findings.
+  Unknown paraphrases remain conservative false negatives; historical scrubbed
+  rubrics are not reconstructed or claimed fixed by these synthetic fixtures.
+- Active P.E.R now reads structural features of the bounded learner attempt:
+  missing calculation steps, one-sided comparisons, causal links, slope ratios,
+  selected-MC reasoning and canonical graph draft states. Fixed prompts perform
+  no arithmetic/correctness assessment, reflect no draft text, and require a
+  signed current active question. Task-specific MC guidance and unknown-graph
+  fallback are preserved. Counterexamples cover signed scalars, unit notation,
+  truncated excerpts and null graph slots.
+- Coaching retains course-linked mistake labels/error categories from the
+  authenticated verified-result rows. Labels are bounded untrusted grading
+  summaries, not scientific facts or instructions. Legitimate system-related
+  concepts survive filtering; equal-score focus changes invalidate the v5 cache.
+  The UI says "fokus från sparad rättning", including an 80% result with a
+  specific mistake. Postgrade guidance requires a transferable strategy and
+  prohibits inventing a changed score.
+- Offline: quality/pipeline/HTTP/gold group **54/54**; scoped P.E.R API **30/30**;
+  helper/provenance/identity group **5/5**; page-target browser checks **95/95**.
+  Independent final rechecks cleared the bounded assessment and P.E.R findings.
+  Legacy `tipsMode` still uses client-supplied exercise data; do not describe
+  that separate route as verified personal-mistake evidence.
+- The previously approved production fencing migration and its ledger version
+  were verified on 2026-10-28; source version is `20261020170419`. No further
+  production-database, schema, account, quota or model change is included;
+  code release remains conditional on the goal's stated release gates.
+- Fresh staging read: no active exams/jobs; available **0.370188 USD**. Prior
+  12-question usage was 128926 input / 18328 output tokens across 29 stages,
+  about **0.060672 USD** under the app's conservative counter (not an invoice).
+  Thus the prior blanket "insufficient" budget assessment was too categorical.
+  This was the preflight for the completed comparison journey recorded above;
+  it did not authorize a cap increase.
+
+## Scored-fact diversity checkpoint — 2026-10-28
+
+- Source-answer audit checkpoint `45631477bdc969d38ab8cdbbbbabbe1f8b71fdd0`
+  is pushed and READY as `dpl_DpW6ihCA2z2RYrmWRveZx8fU3yjF` on the same
+  feature alias. It has not yet received a new paid/live exam.
+- Assessment now compares explicit scored factual requirements before a
+  bounded source-anchored input/effect task match. Equal requirements and
+  complete shared source sentences can establish the same assessed fact
+  across short/MC wording; literal answer equality alone no longer suffices.
+  Raw additional requirements, input/output conflicts and unknown extra task
+  demands veto the factual shortcuts. Mathematical/logical precedence remains.
+- Independent review supplied counterexamples for unclassified extra skills,
+  high/low and mixed conditions, extra entities, appended demands, decimals and
+  wrapped source lines. They have regression controls. Source segmentation
+  preserves decimals and sentence-internal wrapping. No global similarity
+  threshold was reduced; missing/generic scoring scope cannot enable the new match.
+- Offline assessment/pipeline/HTTP/gold/mistake-training group passed 54/54.
+  Independent final recheck found no actionable issue in the last input-suffix
+  fix; its gate test retained the additional task and still removed the clean
+  duplicate. Syntax/diff checks passed.
+- Rubrics in the older issued public response were stripped and private job
+  payloads scrubbed. The new scoring fixtures are explicitly synthetic; this
+  checkpoint does not prove that every historical duplicate would be removed.
+  Unknown factual grammars/paraphrased scoring requirements remain conservative
+  false negatives for this added path. No new live exam or hosted data mutation.
+
+## Independent source-answer audit — 2026-10-28
+
+- New goal authorizes reviewed feature checkpoints and a main/Production release
+  only after relevant tests, independent review and critical staging journeys pass.
+  Database/schema, secrets, model settings, accounts and quota changes remain excluded.
+- The blind MC solver now emits a bounded source check before option votes:
+  premise validity, independent answer, factual/derived/unanswerable basis,
+  literal evidence and per-option answer matches. Both the answer audit and
+  existing option votes must identify the same sole answer and trusted key.
+  Unsupported premises, absent answers and malformed/invented evidence fail closed.
+  Existing confidence, plausibility, reviewer and issuance gates are retained.
+- Initial and repair approval both pass source material; the offline model-eval
+  harness passes its fixture material too. No extra provider call, model change,
+  failure-code category or database contract was introduced. Evidence strings
+  remain request-local and are not added to telemetry or browser responses.
+- The exact observed respiration stem/key is frozen in a synthetic regression.
+  A mocked independent answer of ATP with no matching option excludes the bad
+  question despite an agreeing reviewer/old option vote; normal bounded repair
+  fills the slot with a separately reviewed candidate. Valid input/output tasks,
+  synonym matching, energy conversion and derived calculations have controls.
+- Offline source/solver/handler/pipeline/HTTP/verifier/gold tests passed 43/43;
+  syntax and diff checks passed. Independent read-only review found no runtime
+  approval bypass; its P2 instruction conflict was corrected by explicitly
+  limiting absent-option rejection to MC questions in both verifier languages.
+- Important limit: these tests prove enforcement when the model supplies the
+  correct independent audit, not that a live model will do so. Consistently wrong
+  semantic judgments can still agree. The known semantic defect is not yet
+  proven fixed live. No new exam, paid call, main/Production or hosted data/config
+  mutation was made for this implementation.
+
+## Targeted duplicate and active-hint follow-up — 2026-10-28
+
+- Type-schema checkpoint `1492347c456289cee180a5d9cc99ea1d735021e7` is pushed;
+  `dpl_CuV53pLmDVSs7Ew8RneEjeGpnm79` is READY on the same stable Preview
+  alias. No new exam was created after the completed 12-question test.
+- One post-grade P.E.R explanation of the defective question 7 correctly
+  distinguished its stored glucose key from the source: glucose is used in
+  respiration and energy becomes available as ATP; ATP is missing from the
+  options. P.E.R explicitly attributed the problem to the question rather
+  than the learner. This is a successful critical post-grade explanation,
+  not a fix for the earlier reviewer/solver semantic miss.
+- Read-only metadata confirms q2/q8 share concept `Ribosomer`, identical
+  objective and the same source sentence. q4/q12 likewise share their
+  photosynthesis-input objective, and q5/q10 share their temperature-effects
+  objective. Independent local probes reproduced all three duplicate misses.
+  They also found a false positive: high- versus low-temperature conditions
+  could be collapsed by broad word overlap. Lowering global thresholds is
+  therefore not an acceptable fix.
+- Local assessment patch narrowly recognizes equivalent Swedish function
+  tasks: `Vad gör X ...?` and `Vad är X:s främsta funktion ...?`. It requires
+  the same entity/context, concept, exact objective, explicit source anchor
+  and substantial answer overlap. This resolves the observed ribosome pair
+  across MC/short formats without globally reducing token thresholds. A
+  separate condition guard preserves high/low temperature differences.
+  Photosynthesis and enzyme duplicate misses remain unresolved.
+- Local P.E.R patch replaces generic advice for verified MC transport-type
+  identification with a fixed three-level clue-comparison ladder: what moves,
+  what boundary is crossed and what direction the question states. It names
+  no transport type, gives no answer and confirms no student choice. An
+  independent finding that the first draft captured short calculations was
+  fixed by restricting dispatch to MC identification stems; signed short and
+  MC membrane calculations retain their calculation guidance.
+- Offline evidence: factual-duplicate tests 3/3; final seven-file assessment/
+  generation/HTTP/gold/mistake-training regression 48/48; focused active-exam P.E.R
+  regression 20/20. Syntax/diff checks passed. The first full P.E.R suite was
+  stopped after a focused new-test run found an overbroad test regex (`option
+  c` also matched `option conflicts`); the regex was corrected and the 20
+  relevant active-state tests passed. No full 77-test pass is claimed here.
+- Budget guard after the critical P.E.R explanation: spent 2.745255 USD,
+  reserved 0.263628, available 0.370188. The completed exam had 9 generator,
+  4 repair, 11 reviewer and 5 blind-solver provider stages, all 4o-mini; these
+  29 stages belong to one exam. No account, quota or configuration was changed.
+- Independent review found that the first temperature guard bypassed existing
+  quadratic dedupe when temperature was incidental context. The guard was
+  moved after quadratic/logical safeguards and the existing mathematical
+  positive match; the exact counterexample now has a bidirectional regression.
+  Final recheck confirmed that P2 resolved with no additional findings in the
+  reviewed precedence fix. The corrected hint dispatch had no further findings.
+  The existing reviewer was reused; the other historical agent remained at
+  model capacity, so no additional agents were created.
+- The reviewed assessment/hint follow-up is ready for the approved feature
+  checkpoint; its hosted hint behavior has not been retested in an active exam.
+  Goal remains incomplete: issued semantic
+  correctness, remaining duplicate targets, general active-hint usefulness,
+  six-question and mistake-training live journeys still need evidence.
+
+## Complete delivery exposed remaining semantic defects — 2026-10-28
+
+- Reviewed checkpoint `55d638e196d62db0d2d9b7063056eced9e5a57d4` is pushed;
+  deployment `dpl_H9PaAALHL9ExAZqE7qFVnAfNxmTr` is READY on the same stable
+  feature alias. Staging URL, pilot mode and budget cap were rechecked before
+  one new controlled request with the exact prior source/settings.
+- That request succeeded: database state `succeeded/terminal`, 12 requested,
+  12 delivered, `partial=false`. UI and stored response agree. Delivery was
+  about 308 seconds after the recorded UI start. No `invalid_part_mapping`
+  diagnostic was observed on this deployment; semantic source rejections,
+  missing quotes, distractor errors and empty short-answer rubrics still
+  occurred during candidate generation. One successful count is not a
+  reliability or semantic-quality claim.
+- Manual inspection found a real issued defect: question 7 asks which
+  energy-storing substance is generated from cell respiration, but offers
+  glucose, oxygen and carbon dioxide. After grading, the displayed key says
+  glucose and repeats that false relationship; its own source excerpt says
+  energy in glucose becomes available as ATP. Reviewer and blind-solver
+  agreement did not prevent this role/relationship error. This blocks a
+  pilot-ready quality claim and needs a concrete semantic regression.
+- Repeated targets also passed: ribosome function appears as short answer
+  (question 2) and MC (8); photosynthesis inputs/process recur in 4/9/12;
+  high-temperature enzyme effects recur in 5/10. Questions 4 and 12 have
+  especially close stems, while existing lexical/answer-target dedupe missed
+  them. The exact metadata still needs inspection before choosing a fix.
+- One active-exam P.E.R request returned an answer-free but generic study
+  hint. It did not name the answer or option, but did not provide the desired
+  task-specific pedagogical guidance. Do not record that as a full pedagogy
+  pass. Desktop screenshot showed the widget, while native AX output omitted
+  it; the existing desktop `aria-owns` behavior needs investigation before
+  claiming accessibility is verified.
+- The same synthetic exam was completed and graded once: 11/13 points,
+  including the deliberately wrong ribosome answer and the deliberately
+  unanswered defective MC. The user confirmed the app's unanswered-question
+  submission dialog after browser automation could not operate it. Result
+  feedback correctly identified the ribosome mistake. Readback confirmed
+  zero active exams and zero queued/running pipeline jobs. No further exam
+  was started.
+- Budget guard after generation and grading: spent 2.744343 USD, reserved
+  0.263628, available 0.371100 under the unchanged lower cap. These are guard
+  accounting amounts, not invoice totals.
+- Local type-schema follow-up addresses an observed batch where all five
+  short-answer candidates lacked a usable scoring rubric. Initial and repair
+  schemas now use the selected type; short-answer parts must contain 1–20
+  nonblank descriptions with positive point values. Mixed items use isolated
+  MC/short branches, preserving the MC empty-rubric allowance. Default and
+  graph schema calls remain unchanged. Structural and semantic runtime gates
+  are unchanged.
+- Offline controls: focused handler/schema file passed; the four-file
+  pipeline/HTTP/graph/gold regression passed 35/35. Ajv covers requested 3/6/12,
+  wrong type, empty/blank/nonpositive parts and the mixed-type exception;
+  handler fixtures assert both initial and repair calls emit the contract.
+  Syntax/diff checks passed. Independent review found no code/call-path defect;
+  its documentation question about `exclusiveMinimum` is resolved by the
+  [official supported-schema guide](https://developers.openai.com/api/docs/guides/structured-outputs?api-mode=responses),
+  which explicitly lists it for numbers. Hosted acceptance of this generation
+  schema has not been tested yet.
+- The type-schema follow-up is ready for an approved feature checkpoint.
+  Remaining work is substantive: semantic correctness, duplicate-target
+  control, useful active-exam P.E.R, and current six-question/mistake-training
+  live evidence. Continue offline from the identified counterexamples before
+  spending on another exam. Main/Production and database configuration remain
+  untouched.
+
+## Source-review cardinality and immediate repair follow-up — 2026-10-28
+
+- The user approved reviewed checkpoints on the existing feature Preview for
+  the remainder of this goal, using the same tab/session and one synthetic
+  exam at a time within the remaining budget. Main/Production, migrations,
+  secrets, accounts and quota settings remain excluded.
+- Source-index checkpoint `c4846538fc5268f0690688ebf2ad230fcadad508` is pushed;
+  deployment `dpl_9TQXfRUtGyAdcj1X3zohtahpNDza` is READY on the existing stable
+  branch alias. Read-only checks confirmed the exact branch, staging URL,
+  pilot mode and lower budget cap. The same browser session restored itself
+  after reload; no new tab, account or login was needed.
+- One comparison used the exact prior synthetic Biologi 1 material, level C,
+  12 mixed questions and no focus chips. It terminated with 6/12 approved,
+  `STAGE_RETRY_LIMIT`, about 301 seconds after the recorded UI start. No exam
+  was issued; the visible message correctly stated 6/12. Readback confirmed
+  zero active exams and zero queued/running pipeline jobs. The previous run
+  had 3/12; two stochastic runs do not establish a reliable yield improvement.
+- New content-free diagnostics recorded 12 `invalid_part_mapping` findings
+  and 7 `unsupported_verdict` findings across 10 reviewer events. These are
+  candidate-stage counts, not distinct exams or independent truth judgments.
+  No invalid-index finding was recorded. This establishes repeated reviewer
+  array-shape failures, while semantic source rejections also remain.
+- Local fix: the emitted reviewer schema now binds option verdict counts,
+  rubric-part verdict/evidence counts and accepted-answer verdict/evidence
+  counts to the actual submitted question. Equal shapes share an ID-bound
+  branch; heterogeneous shapes use nested `anyOf`, supported by the official
+  Structured Outputs guide linked below. Negative verdicts remain valid
+  schema output and are still rejected by the unchanged runtime gates.
+  Oversized rubrics exceeding the existing 20-part contract stop before the
+  paid reviewer call. General schema-inspection calls retain their old shape.
+- Independent source inspection also confirmed that deterministic source
+  failures were absent from immediate repair prompts. A separate transient
+  count argument now carries only `source_answer_not_extractable` and
+  `source_reference_missing`, capped at 20, into both zero-survivor and
+  post-review repairs. No candidate text or IDs are copied into that feedback.
+  Persisted feedback and the database contract are unchanged; cross-request
+  structural-feedback loss remains outside this patch.
+- Offline: the seven-file generation/HTTP/verifier/source/gold/decision
+  regression passed 43/43. New controls compile the emitted schema with Ajv,
+  reject wrong per-ID array sizes and unknown IDs, permit reordered results
+  and negative semantic verdicts, and verify runtime rejection when a provider
+  ignores the schema. Real-handler mocked-provider fixtures verify both
+  immediate repair paths, unchanged source, one repair and continued exclusion
+  of non-extractive candidates. These are offline controls, not live yield.
+- Guard accounting after the comparison: spent 2.577031 USD, reserved
+  0.263628, available 0.538412 under cap 3.379071. The comparison consumed
+  0.147952 in guard accounting; this is not an OpenAI invoice measurement.
+- Independent final review found no actionable defect in either code change.
+  The reviewer counted at most 20 schema branches and 741 declared properties
+  with A-level and training fields; these stay below the fetched provider's
+  5,000-property limit, with `anyOf` nested under results and the object root
+  unchanged. Runtime duplicate/missing-ID checks remain essential. Hosted
+  acceptance of the complete new schema still needs the controlled live run.
+  Syntax and diff checks passed.
+- These follow-up code changes are ready for the next approved feature
+  checkpoint. No additional paid retry has run.
+  Goal remains incomplete until current-version delivery, active-exam P.E.R,
+  six-question and mistake-training journeys have sufficient live evidence.
+
+## Current Preview live evidence and source-index follow-up — 2026-10-28
+
+- Deployed Preview is `be5eff97331b9bff1d91ac23cfa4673a0096f837`, deployment
+  `dpl_DPUMsZUhWcGTrMDwdUc1zpfeSsbK`, through the same stable branch alias.
+  It points to the verified staging project with pilot mode and the matching
+  lower budget cap. The existing browser session refreshed successfully; no
+  new tab, login, account, role or quota adjustment was needed.
+- Live homepage P.E.R passed two synthetic cases: choose Mockprov before
+  mistake training for a new learner, and explain how photosynthesis and cell
+  respiration are connected. Responses were direct and showed no self-review
+  note. Verified telemetry: two `gpt-6-luna` provider calls, 2934–4034 ms.
+- The improvement coach reused its saved recommendation without a new model
+  call. Visible latest score 100% and +17 percentage-point trend matched a
+  read-only aggregate of the five latest server-verified results (83 -> 100).
+  The recommendation distinguished historical weak results from recent success.
+- The previous synthetic three-question result was recovered as 6/6 through
+  server replay. P.E.R then correctly explained the selected 2/2 answer against
+  its actual rubric. No new model grading call was recorded. That result stays
+  on the account; only its local recovery copy was released via New topic to
+  prepare the next single synthetic exam.
+- One new Biologi 1, level C, mixed 12-question request used 12 numbered,
+  synthetic source paragraphs. It ended `failed/terminal` with
+  `STAGE_RETRY_LIMIT`, 3/12 approved, after 270.4 seconds of job time. No exam
+  was issued; the UI correctly displayed 3/12 and a final failure. Readback:
+  zero active exams and zero queued/running private pipeline jobs. There was
+  no new attempt after this terminal outcome.
+- Sanitized batch diagnostics show source-support rejections, occasional
+  non-extractive science answers, weak options and scoring/alignment findings.
+  Solver disagreement was not observed. Recorded exam-provider events: 6
+  generate, 3 repair, 10 reviewer, 2 blind solver, all `gpt-4o-mini-2024-07-18`.
+  These are stages of one request, not 21 separate exams. Source-support counts
+  combine malformed evidence and genuine unsupported claims; they do not prove
+  which subtype caused this run's rejections.
+- Budget guard before these controls: spent 2.277246 USD. After three P.E.R
+  calls and the one terminal exam request: spent 2.429079, reserved 0.263628,
+  available 0.686364 under cap 3.379071. These are guard accounting amounts,
+  not a claim about an OpenAI invoice.
+- Independent source review found a prompt/schema gap: evidence indices were
+  not explicitly zero-based and local to each question's quote array, while
+  runtime requires it. Quote length was bounded at runtime but not described
+  by the emitted quote schema. The local follow-up clarifies both languages
+  and adds a string pattern limiting quote size, a constraint supported by the
+  [official Structured Outputs schema guide](https://developers.openai.com/api/docs/guides/structured-outputs?api-mode=responses).
+  It also explicitly forbids duplicate quotes and explains index reuse. All
+  runtime and semantic approval gates remain unchanged.
+- The local follow-up also logs `exam_verifier_source_contract` with evaluated
+  count and fixed failure-count keys: invalid quote shape, quote absent from
+  source, duplicate quote, unsupported reviewer verdict, invalid support shape,
+  invalid index, and invalid part mapping. It emits no source/candidate text, notes, identities
+  or evidence indices, and a logging failure cannot change approval. Categories
+  may overlap and are not semantic truth judgments independent of the reviewer.
+- Local contract checks cover a paragraph-12 quote: own-array index 0 passes,
+  indices 1/12 fail, 500 characters pass, and 501 fail. Existing unsupported-
+  claim rejections remain. The focused four-file regression passed 39/39;
+  syntax and diff checks passed. Independent final follow-up found no remaining
+  findings in the reviewed prompt/schema/diagnostic scope.
+  This fix was subsequently deployed as `c484653`; the single comparison and
+  more specific findings are recorded in the section above. Its independent
+  effect on live yield remains unproven.
+- Goal remains incomplete: current 12-question live yield failed; 6-question
+  delivery, new mistake-training generation and active-exam P.E.R still need
+  current-version live evidence. Do not retry paid tests without an actionable
+  reviewed change and a fresh environment/budget check.
+
+## Saved-exam recovery checkpoint — 2026-10-28 (feature Preview scope)
+
+- Current working checkout: `codex/exgen-focused-mistake-evidence-2026-10-25`,
+  based on `0f9cb999f0672f1e86bb3a3eeb4fd8dde71d6159`. Local code/tests are
+  `js/exam-flow.js`, `tests/frontend/exam-flow.regression.mjs`, and
+  `tests/frontend/graph-exam-flow.test.mjs` (accept the new explicit confirmation).
+  The user approved committing these four files (including this status file)
+  and pushing to the existing feature branch for Preview. The deployment must
+  be checked against the resulting commit; production release is not included.
+- Fresh read-only Git and Vercel checks agree: remote feature branch
+  `codex/exgen-generation-quality-2026-10-20` and its existing stable Preview
+  are READY on `0f9cb99` (`dpl_38Ekf3nAmeSUFPdVAyKZWAMeNqmf`). `main` and
+  the deployment serving `exgen.se` remain on `ad60a68`
+  (`dpl_5jhXXmoq94bp3gqyPwtJvLgEycd1`). No release was performed.
+- Root cause: starting a new exam could overwrite the per-user local copy
+  of an existing signed exam/result. The local patch blocks ordinary and
+  prefilled generation while that copy needs attention, offers continuation
+  or result recovery, and requires explicit confirmation for its removal.
+- Recovery now retains expired/aged local answers, restores original course
+  and exam settings after confirmed replacement, keeps the result visible
+  after language changes, and rejects late recovery responses after navigation.
+  Deferred redraws check both saved-copy identity and current account.
+- A new complete save carries a random revision; small quota-fallback progress
+  is tied to that revision. This prevents an older fallback from masking a
+  later complete save if cleanup fails, without relying on timestamp ordering.
+  Legacy pairs retain their existing matching behavior until a versioned save.
+- Reading a draft no longer deletes fallback data and invalidates the caller's
+  own snapshot. Successful account-save retry updates the result's persistence
+  state; language changes wait for the in-flight save and cannot recreate a
+  false failure or a second save request.
+- Independent review identified those two P2 issues; both were fixed and
+  rechecked with no remaining findings in that follow-up. The broader review
+  also confirmed the expiry, settings, ownership and result-redraw fixes.
+- Offline results: core API/pipeline/source/gold/public-P.E.R 75/75,
+  P.E.R review handler 76/76, P.E.R exam-context frontend 104/104,
+  graph exam -> P.E.R -> mistake-focused training -> grading passed.
+  The final full exam-flow regression passed 246/246 on the reviewed code.
+  The goal audit also checked ordinary-chat correction display: 2/2 targeted
+  API tests passed, including persistence failure without a self-review note.
+  Syntax and diff checks passed. All provider/database responses were synthetic
+  or mocked; API-suite runtime is not a measurement of production response time.
+- Limits: localStorage snapshot comparison is not atomic across simultaneous
+  tab writes; this patch detects sequential conflicts, not every interleaving.
+  Legacy base/fallback records cannot prove recency when their metadata is
+  ambiguous. Do not describe either limitation as solved.
+- No new live AI request, database/account/quota/secret change, or user-browser
+  tab was made. The previous staging check found a saved result-recovery draft;
+  it remains untouched. Offline fixtures do not prove live model quality,
+  timing, 6/12-question yield, or the complete four-context P.E.R journey.
+- Next: execute the approved feature push and verify the exact Preview commit.
+  Reuse the stable Preview tab/session; verify environment and available budget
+  before one synthetic end-to-end run, and finish that same run before another.
+
 # Production exam-pipeline migrations — 2026-10-25
 
 - [x] Applied exactly migrations `20261024140557`, `20261024151433`,
@@ -205,6 +1427,50 @@
 öppet prov för syntetisk kontroll av startsida, aktiv provledtråd och
 förbättringscoach. Lämna befintliga prov orörda och gör inga betalda anrop
 utöver den verifierade kvarvarande staginggränsen.
+
+# P.E.R kontext på förbättringssidan och kvalitetskontrakt — 2026-10-25
+
+- [x] Förbättringssidan skickar en sektionsnyckel från en fast allowlist
+  (`hem`, `felbank`, `prov`, `coach`, `rapport`). Servern mappar bara kända
+  nycklar till fasta etiketter, och bara på förbättringssidan. Ändring av
+  sektion avbryter en pågående P.E.R-förfrågan.
+- [x] Aktivt prov får fortsatt endast answer-free, fråga-specifika ledtrådar.
+  Beräkningsstegen använder en begränsad avsiktsmatchning så biologins
+  "bestäm organell" och SO:s "räkna upp" inte felaktigt får matematikstöd.
+- [x] Resultatfrågan "Vad ska jag träna på nu?" går genom vanlig studiecoachning
+  efter verifierat resultat. Verifierade svagheter hämtas från servern; klientens
+  resultatsammanfattning och svarhistorik skickas inte vidare som bevis.
+- [x] Offline-regression kopplar ihop produktionsnormalisering och strukturell
+  grind, verifierarens riktiga parser med ett syntetiskt negativt svar,
+  `decideApproval` och `finalizeVerifiedExam`. Kandidaten avvisas före
+  slututfärdande. Detta bevisar kontraktet, inte att en riktig modell alltid
+  upptäcker semantiska fel.
+- [x] Verifiering på aktuell lokal diff: P.E.R API **76/76**; förbättringssidans
+  browserflöde **87/87**; manifest **31/31**; data-minimering **4/4**;
+  genereringspipeline **28/28**; source coverage **6/6**; HTTP-pipeline **2/2**;
+  offline pipeline **1/1**; ämnesrouting och eval-first-pass passerade;
+  verifierarkontrakt och offline quality-gold passerade. `per-context-pack`
+  passerade.
+- [x] Oberoende read-only-granskningar fann inga säkerhets-/kvotgrindar som
+  försvagats. En granskning bekräftade att det nya sammansatta offlinefallet
+  stänger den avgränsade verifierar-till-finaliserar-kontraktsluckan.
+- [x] Det tidigare saknade testberoendet `@electric-sql/pglite@0.5.10` finns nu
+  endast i arbetskopians ignorerade `node_modules`; `package.json` och
+  `package-lock.json` ändrades inte. Fullt HTTP-pipelinetest passerade **2/2**,
+  inklusive 3/6/12-frågeflöden, retry, 503 och tydlig partiell leverans.
+- [!] Aktuell Vercel Production är READY från `main` SHA
+  `ad60a68316a1dfaedb54a508e5b063bd1cc24bf4`. Senaste kontrollerade Preview
+  är READY från feature SHA `590ac554871231469c9f2612ce42a1445cf4cca0`.
+  De aktuella lokala ändringarna är ocommittade och finns inte i någon av dessa
+  deploymentar.
+- [!] Ingen staging-/produktionsdatabas, live-modell, betald AI-förfrågan,
+  push, merge eller deploy utfördes. Verklig modellrelevans och full livekedja
+  är därför ännu inte verifierade.
+
+**MÅLET FORTSÄTTER.** Nästa steg: granska källförankring och felbaserad
+generering mot syntetiska ämnesfall; gör sedan aktuell stagingbudget- och
+Preview-kontroll före en begränsad syntetisk liveverifiering. Ingen lokal
+ändring ska beskrivas som live innan exakt commit och deployment verifierats.
 
 # P.E.R sidhistorik och startsidesminne — 2026-10-25
 
@@ -4187,3 +5453,962 @@ read-only preflight.
   funktions- och constraint-definitioner. Lokala filnamn och testreferenser
   använder `20261024225011` och `20261024225017`, samma versioner som stagingens
   ledger. SQL-innehållet är oförändrat; ingen migration kördes.
+
+## Sanerad stagingtelemetri för provkvalitet — 2026-10-25
+
+- [x] Read-only aggregate över senaste 14 dagarna, utan användar-ID:n, fråga-
+  eller materialtext: av 12-frågejobb var 14 `succeeded` och 6 `failed`; de
+  sex felen bestod av fyra `STAGE_RETRY_LIMIT`, ett `RETENTION_EXPIRED` och ett
+  `OPERATION_DEADLINE`. För 3-frågejobb var 3 `succeeded` och 1 `failed` med
+  `STAGE_RETRY_LIMIT`.
+- [x] `ai_usage_events`: genereringssteg hade 157 event med 11,9 s medellatens
+  och 26,0 s max; reparation hade 99 event med 13,9 s medellatens och 22,9 s
+  max. Av 158 `verify_compare`-event med booleskt utfall hade 134 minst ett
+  avslag och 24 inga avslag. Det är batchhändelser, inte antal frågor eller
+  prov; de kan inte räknas om till en verifierad frågeacceptansgrad.
+- [!] Aggregate kan inte koppla avslag till enskilda frågor, källutdrag,
+  misstagsmål eller en viss generation. Kostnadsfältet var null i dessa event.
+  Äldre enskild syntetisk körning med `sourceSectionCount=0` och avslag för
+  källstöd är en diagnostisk ledtråd, inte belägg för att alla underlag saknar
+  segmentering eller för en generell grundorsak.
+- [!] Ingen modellförfrågan, kvotändring, databasändring, push eller deploy
+  gjordes. Telemetrin stödjer att både kvalitetsavslag och återförsöks-/deadline-
+  fel bidrar; den räcker inte för att ändra kvalitetsgrindar eller påstå att en
+  viss reparationsändring löser problemet.
+
+**Nästa steg:** behåll avvisningsgrindarna och använd feltypspecifika
+reparationsspår i ett syntetiskt, versionsstyrt gold-set. Utöka aggregerad
+diagnostik endast med integritetssäkra utfallskoder; gör ny liveverifiering
+först efter färsk budget- och Previewkontroll.
+
+## Feature-Preview verifierad efter kvalitetsfixar — 2026-10-25
+
+- [x] GitHub-feature-branchen
+  `codex/exgen-generation-quality-2026-10-20` pekar på commit
+  `794ad2260c5ecd43910b21c179db231acb7d2716`
+  (`Improve ExGen exam quality and PER context`). `main` står kvar på
+  `ad60a68316a1dfaedb54a508e5b063bd1cc24bf4`.
+- [x] Vercel Preview `dpl_G5S6AVuC7EwYKcsLpjY9PuhSENjg` är READY från exakt
+  feature-branchens commit. Branch-aliasen pekar på deploymenten. En ny
+  direkt-URL visar den avsedda skolpilotens inloggningsgrind; en befintlig
+  inloggad branch-aliasflik har session, men inget AI-flöde kördes och inget
+  befintligt prov ändrades.
+- [x] Färsk, skrivskyddad stagingbudget kl. 12:24 UTC: cap `$3.379071`, spent
+  `$2.172902`, reserved `$0.263628`, kvar `$0.942541`, enabled. Ingen
+  modellförfrågan skickades; kvarvarande belopp räcker inte som verifierad
+  kostnadsram för ett meningsfullt prov-/P.E.R.-test.
+- [x] Bekräftat lokalt efter push: arbetskatalogen ren, feature-ref på
+  `794ad2260c5ecd43910b21c179db231acb7d2716`, `main` oförändrad. Inga
+  databasskrivningar, produktionsåtgärder, kontoförändringar eller
+  kvotändringar gjordes.
+
+**PILOT NOT READY.** Koden är publicerad i feature-Preview och offlinekontroller
+är godkända, men ny modellbaserad semantisk kvalitet är inte liveverifierad.
+Nästa steg är först en ny kostnadsram eller återställd budget, därefter ett
+enda avgränsat syntetiskt stagingflöde med bekräftad autentiserad session.
+
+## Verifierarens källbelägg vid felträning — 2026-10-25
+
+- [x] Bekräftad kodrotorsak: servern återskapar `sourceEvidence` från elevens
+  signerade, ägda och verifierat rättade prov. `verifyQuestions` mappade sedan
+  dessa citat till `training_focus.source_evidence`, men dess egen
+  `reviewInputWithinLimits`-allowlist avvisade fältet före granskaranropet som
+  `invalid_review_input`. Därmed kunde en källbelagd felträning stoppas innan
+  den oberoende granskaren fick bedöma om kandidaten tränade rätt misstag.
+- [x] Allowlisten accepterar nu endast detta explicita källfält och validerar
+  högst tre icke-tomma strängar om högst 500 tecken vardera. Övriga tillåtna
+  fält, totalgränser, verifierartrösklar och utfärdandegrindar är oförändrade.
+- [x] Gold-regressionen låter en strukturellt giltig och materialgrundad fråga
+  som tränar fel del av en linjär funktion nå den riktiga verifierarparsern.
+  Ett syntetiskt omdöme som saknar specifik felmatchning blockeras av befintlig
+  godkännandegrind. Separata kontrakttester verifierar payloadfältet och
+  avslag på mer än tre, tomma, feltypade eller över 500 tecken långa citat.
+- [x] Riktade offline-tester passerade: quality-gold, verifier-output-contract,
+  mistake-training-context, mistake-training-source **17/17**, riktade
+  3/6/12/misstagspipelinetester **6/6**, HTTP-pipeline **2/2** och
+  `git diff --check`.
+- [!] Detta bekräftar en verklig kodvägsdefekt i verifierarindata, inte att den
+  ensamt förklarar alla irrelevanta frågor eller alla misslyckade prov.
+  Verifierartestet använder syntetiska svar; ingen live-modellkvalitet,
+  stagingförfrågan eller faktisk elevupplevelse har verifierats efter fixen.
+  Lokala ändringar är ocommittade och finns inte i Production `ad60a683` eller
+  senaste kontrollerade Preview `590ac554`.
+
+**Nästa steg:** gör färsk stagingkopplings- och budgetkontroll före högst ett
+syntetiskt felträningsprov, först när autentiserad testdata kan verifieras utan
+att röra befintliga prov. Separera därefter utfallet från offlinebevisen.
+
+## Verifierarens exakta källmedlemskap och slutlig offlinekontroll — 2026-10-25
+
+- [x] Förstärkt preflighten för `training_focus.source_evidence`: varje begränsat
+  utdrag måste nu återfinnas i samma, avklippta `source_material` som faktiskt
+  skickas till den oberoende granskaren. Saknade eller föråldrade utdrag stoppas
+  före provideranrop; NFKC-/whitespace-normalisering tillåts och delträff inuti
+  ett större ord räknas inte som belägg. Gransknings- och utfärdandetrösklarna
+  har inte sänkts.
+- [x] Regressioner täcker saknat/stale utdrag, exakt 500-teckensgräns,
+  NFKC/whitespace, ordgräns, feltypade/tomma utdrag och UTF-16-gränser med
+  emoji. Existerande fixtures korrigerades där de påstod källbelägg som inte
+  fanns i testmaterialet.
+- [x] Offlineverifiering denna session: verifier-output-contract, quality-gold,
+  exam-generation-pipeline-http **2/2**, exam-generation-pipeline **28/28**,
+  per-exam-review-handler **76/76**, per-page-targets **87/87**,
+  per-manifest **31/31**, mistake-training-source **17/17**,
+  mistake-training-context, per-context-pack och per-sales-data-minimization
+  **4/4** passerade. `git diff --check` passerade vid kontrollen.
+- [x] HTTP/PGlite-testet innehåller nu en syntetisk end-to-end-felträningsväg:
+  signerad ägarbunden provkälla + verifierat underkänt svar → serverresolver →
+  persistent pipelinejobb → riktig intern generator med syntetiska provider-
+  svar över återupptagna batchar → oberoende verifierarkontrakt → verifierad
+  checkpoint → exakt 12/12 utfärdade frågor och en kvotförbrukning. Testet
+  observerar minst ett mellanliggande `202` före slutförandet.
+- [x] Negativ kontrast i samma harness: den syntetiska oberoende granskaren
+  nekar fokusmatchningen tills jobbet når terminalt fel. Inget prov utfärdas,
+  inga kandidater når accepterad checkpoint, reservationen återbetalas och
+  elevens kvot återgår till baslinjen.
+- [!] Detta är test med syntetiska modeller/svar, inte en live-kontroll av
+  modellernas semantiska relevans, staging, pilotanvändning eller
+  produktionsupplevelse. Testets syntetiska granskare lämnar förutbestämda
+  positiva omdömen; testet bevisar käll-/kontextflöde och oförsvagade
+  godkännandekontrakt, inte att en verklig modell tränar rätt misstag.
+  Aktuell Preview-branchkoppling och budget har nu verifierats read-only,
+  men inga live-AI-anrop, pushar eller deployer gjordes.
+- [x] Färsk fjärrkontroll: GitHub `main` och Vercels READY Production pekar på
+  `ad60a683` (`dpl_5jhXXmoq94bp3gqyPwtJvLgEycd1`). Den befintliga
+  feature-branchen och dess READY Preview pekar på `590ac554`
+  (`dpl_4XzKHLY7Wb5k8JAkUWPt6Jwi3QSr`). De 15 lokalt ändrade filerna i denna
+  arbetsgren finns inte i någon av dessa deployer.
+- [x] Vercel Preview-miljövariabler kontrollerades utan att läsa hemliga
+  värden. De tio förväntade stagingvariablerna är branch-scope:ade till
+  `codex/exgen-generation-quality-2026-10-20`. Supabase staging
+  `yhcinqejsocpmmetazpz` rapporterade `ACTIVE_HEALTHY`.
+- [x] Stagingens read-only-budgetkontroll: tak `$3.379071`, spenderat
+  `$2.172902`, reserverat `$0.263628`, återstående `$0.942541`. Inga AI-anrop
+  gjordes; denna restbudget är inte tillräcklig grund för ett större liveprov.
+- [x] Ett oavsiktligt tomt Vercel-projekt, `provia-ai-live-ad60`, skapades under
+  CLI-inspektion. Det saknade deployment och miljövariabler och togs bort efter
+  användarens uttryckliga godkännande; därefter verifierades att projektet inte
+  längre fanns. Inga andra Vercel-projekt ändrades.
+
+**Nästa steg:** granska den lokala diffen och efter separat uttryckligt
+godkännande publicera en avgränsad feature-Preview. Gör inte liveprov förrän
+stagingbudgeten räcker och kan verifieras på nytt. Behåll produktion, `main`
+och produktionsdatabas orörda tills separat releasebeslut.
+
+### Uppföljning 2026-10-25
+
+- [x] Färsk riktad omkörning på arbetsgrenen: 115 Node-tester passerade, 0
+  misslyckades. Den omfattade provpipeline, HTTP/PGlite, P.E.R API, verifierar,
+  offline kvalitets-eval, frontend-kontext, sidmål och dataminimering.
+- [x] Oberoende provkvalitetsgranskning bekräftade täckning för 3/6/12,
+  reparation, retry, timeout, ofullständiga resultat och verifierad
+  felträning. Den betonade att verklig semantisk modellprecision inte bevisas
+  av mockade providers.
+- [x] Oberoende säkerhets-/P.E.R.-granskning fann ingen blockerande regression
+  i dataminimering, kvot-/leaseflöde, verifierad efterrättning eller spärr mot
+  facit under aktivt prov. Granskningen bekräftade att kvalitetsgrindarna inte
+  försvagats. Ingen livebeteendeverifiering gjordes.
+- [!] De fyra P.E.R.-sidkontexterna har tester i API-/frontend-sviterna, men
+  aktuell modellkvalitet och svarstid är ännu inte mätta mot verkliga
+  modellutdata. Detta kräver en avgränsad staging-Preview som innehåller de
+  lokala ändringarna och ett budgetgodkänt syntetiskt test.
+- [x] Aktuell Git-kontroll: lokal `HEAD` och GitHub `main` är `ad60a683`;
+  feature-branchen är `590ac554`. De 15 ändrade arbetsfilerna är lokala och
+  ocommittade. Vercel Production följer `main`; feature-Preview följer den
+  gamla feature-commiten. Ingen releaseåtgärd utfördes.
+- [x] Ytterligare aktuell validering: `npm run a11y-audit` rapporterade 0
+  tillgänglighetsöverträdelser och 0 konsolfel på granskade sidor, inklusive
+  app, startsida och förbättringssida. `npm run xeliov:context:test` passerade
+  4/4 tester, inklusive sekretessredigering och urval av verifierade lärdomar.
+- [x] Read-only releasekontroll upprepad: Vercel Production READY kör fortfarande
+  `ad60a683`; feature-Preview READY kör fortfarande `590ac554`. Stagingens
+  enda budgetrad är aktiverad: tak `$3.379071`, spenderat `$2.172902`,
+  reserverat `$0.263628`, kvar `$0.942541`. Inga modellanrop gjordes.
+
+## Stagingfel för 12 naturvetenskapliga kortsvar och källankare — 2026-10-25
+
+- [x] En livekontroll på staging använde syntetiskt Biologi 1-material och
+  begärde 12 kortsvarsfrågor på A-nivå. Inget prov utfärdades: resultatet var
+  uttryckligen `0 av 12`, och appen bad om mer relevant material eller snävare
+  ämne. Kvalitetsgrinden fungerade fail-closed.
+- [x] Sanerad Preview-telemetri för körningen visar att första 7 kandidaterna
+  föll strukturellt på `source_answer_not_extractable`. En senare reparations-
+  batch producerade 8 kandidater; 5 passerade strukturen men samtliga 5
+  avvisades av den oberoende granskaren, främst för `source_support`, samt
+  vissa utfall för nivå, fakta och bedömningskvalitet. Jobbet avslutades med
+  `STAGE_RETRY_LIMIT`. Råfrågor, material, konton och elevinnehåll lästes inte.
+- [x] Kodfixen lägger nu till ett begränsat urval av ordagranna svarankare från
+  naturvetenskapligt material för kortsvar och blandade prov. Urvalet täcker
+  hela materialet, bevarar källans radbrytningar och hanterar decimaler,
+  förkortningar samt ofullständiga punktlistor. Reparation får samma
+  ämnesspecifika instruktioner. A-nivå får inte etiketteras som analys om
+  källan bara stöder återgivning.
+- [x] Ingen strukturell kontroll, oberoende verifiering, godkännandetröskel,
+  minsta leveransgräns eller kvotregel ändrades. Saknas tillräckligt källstöd
+  ska provet fortsatt avvisas i stället för att fyllas med irrelevanta frågor.
+- [x] Slutlig offlinekontroll efter ändringen: riktad prov/offline-quality
+  **2/2**, relevant API-/HTTP-/P.E.R-/frontendsvit **115/115**,
+  `node --check` för ändrade JavaScript-filer och `git diff --check` passerade.
+  Oberoende read-only-granskning fann inga blockerare efter korrigering av
+  meningssegmenteringen.
+- [x] Commit `acdb5ae576355aaf2b3689c2e9c87107cc853be8` är pushad till
+  `codex/exgen-generation-quality-2026-10-20`. Vercel Preview
+  `dpl_C34aTHApQtKQ9brFvrY2YSaDD1oy` blev READY från exakt den SHA:n och
+  branch-aliasen pekar på den. Ingen `main`, Production eller databas ändrades.
+- [!] Den nya koden är ännu inte live-modellverifierad. Senaste lästa
+  stagingbudget efter föregående test var `$0.941435` kvar under den
+  branch-scope:ade gränsen; ingen ytterligare modellförfrågan gjordes.
+  GitHub `main` står kvar på `ad60a683`, och Vercel Production READY kör
+  fortsatt exakt den SHA:n.
+- [x] Separat P.E.R-kontroll på startsidan fick ett relevant svar från
+  `gpt-6-luna` på cirka 2,8 sekunder. Detta verifierar bara den generella
+  startsidesfrågan, inte alla P.E.R-lägen.
+
+**PILOT NOT READY.** Den nya prompt-/ankarförbättringen finns i feature-Preview,
+men behöver en enda ny syntetisk körning när en färskt verifierad stagingbudget
+räcker. Den tidigare körningen ska fortsatt redovisas som misslyckad 0/12;
+offlinepass bevisar inte modellens framtida 12/12-resultat.
+
+### Ny stagingpreflight — 2026-10-25
+
+- [x] Aktuell Vercel Preview är READY från branchens dokumentationscheckpoint
+  `9adeb87`; koden är från `acdb5ae`. De 10 nödvändiga stagingvariablernas
+  namn är Preview-scope:ade till `codex/exgen-generation-quality-2026-10-20`;
+  värdena förblev krypterade och olästa.
+- [x] Skrivskyddad stagingbudgetkontroll: en budgetrad, cap `$3.379071`, spent
+  `$2.223469`, reserved `$0.263628`, kvar `$0.891974`, enabled. Detta är en
+  tidsbunden avläsning, inte ett nytt kostnadsgodkännande.
+- [!] Den återanvända inloggade Previewn visar fortsatt det syntetiska
+  genereringsförsökets `0/12`-fel och en icke-tom felbank. Eftersom historiken
+  inte kan verifieras som syntetisk lämnades den orörd och inget nytt AI- eller
+  provanrop gjordes.
+- [x] `main` står kvar på `ad60a683`; Vercel Production READY fortsätter från
+  samma SHA. Ingen staging-/produktionsdatabas, konto, kvot eller hemlighet
+  ändrades.
+
+**Nästa säkra steg:** använd en stagingidentitet vars testdata verifierats som
+syntetisk, eller invänta ett godkänt separat stagingkonto. Kör därefter högst
+ett 12-frågetest efter ny budgetkontroll. Fortsätt inte genom att återanvända
+den befintliga felbanken eller skapa upprepade ofullständiga prov.
+
+### Uppföljning: återanvändning av källankare — 2026-10-25
+
+- [x] Oberoende granskning identifierade att kravet på ett "ännu oanvänt"
+  ankare i första prompten i praktiken begränsade faktakortsvar till högst en
+  fråga per källmening. Prompten tillåter nu samma exakta mening för ett annat
+  tydligt avgränsat, uttryckligen stött svarsmål; parafraser och upprepningar
+  förbjuds fortsatt.
+- [x] Reparationsprompten fick samma avgränsade regel. Strukturell
+  källextraktion, oberoende faktagranskning, poänggranskning, dubblettgrind,
+  A-nivåns krav på underbyggt resonemang och kvotflöde är oförändrade.
+- [x] Offline-regressionerna täcker återanvändning av en exakt mening för två
+  olika svarsmål samt att en granskad dubblett fortsatt nekas.
+- [x] Slutlig riktad svit efter ändringen: 2/2 testscripts; den breda
+  provgenererings-/P.E.R.-sviten före det sista testtillägget passerade 203/203.
+  Oberoende granskare fann inga blockerande fynd i promptändringen.
+- [!] Ändringen är inte live-modellverifierad. Stagingbudgetens senaste
+  skrivskyddade avläsning är fortsatt `$0.891974` kvar. Den återanvända
+  sessionen visar en felbank och ett misslyckat 0/12-försök; eftersom dess
+  historik inte kan verifieras som helt syntetisk lämnades den orörd och inget
+  nytt modell-/provanrop gjordes.
+
+**Nästa steg:** verifiera en ren, enbart syntetisk stagingidentitet innan ett
+enda 12-frågetest. Offline- och mocktester bevisar inte live-modellens
+12/12-prestanda.
+
+### Uppföljning: svarutdrag och källbetydelse — 2026-10-25
+
+- [x] Naturvetenskapliga faktakortsvar kan nu använda sitt eget korta,
+  sammanhängande ordagranna svarutdrag när en källmening stöder flera skilda
+  mål. Svaret instrueras att behålla nödvändiga villkor, negationer, enheter
+  och orsakssamband; om kortningen tappar betydelse ska mer av meningen vara
+  kvar. Källhänvisningen ska visa hela relevanta meningssammanhanget.
+- [x] Den korta svarutdragsregeln är begränsad till naturvetenskap. Övriga
+  ämnen behåller instruktionen om hela ordagranna källmeningar och korta
+  källhänvisningar.
+- [x] Oberoende granskaren instrueras uttryckligen att avvisa en ordagrann
+  delsträng om borttagen negation, begränsning, villkor, enhet eller
+  orsakssamband ändrar innebörden. En syntetisk regression visar att en sådan
+  kandidat kan passera den rent strukturella substringkontrollen men avvisas
+  av oberoende verifiering; godkännandegrindarna är oförändrade.
+- [x] Offlinekontroller: syntax för fyra ändrade JavaScript-filer;
+  exam-pipeline offline, quality-gold, verifier-beslut,
+  verifier-output-contract och resumable-pipeline-testfiler passerade;
+  `git diff --check` passerade.
+- [!] Mockade verifierarutdata testar kodens avvisningsflöde, inte att en live
+  modell alltid upptäcker varje semantisk qualifierförlust. Ingen live-AI,
+  Supabase, databas, konto, kvot, `main` eller Production användes.
+
+### Uppföljning: reparationsprompt på svenska — 2026-10-25
+
+- [x] Slutgranskning fann att en äldre svensk reparationsinstruktion fortfarande
+  krävde kortaste möjliga svarutdrag generellt, trots den ämnesspecifika regeln.
+  Reparationsprompten använder nu samma villkorade svar- och källreferensregler
+  som första genereringen: korta naturvetenskapliga svar endast när de behåller
+  betydelsen; fullständiga källmeningar för övriga ämnen.
+- [x] Regressionen kontrollerar att vanliga ämnen behåller hela källmeningar och
+  inte får en “kortaste utdrag”-regel; naturvetenskaplig reparation behåller
+  villkor, negationer, enheter och orsakssamband. Inga kvalitetsgrindar ändrades.
+- [x] Oberoende slutgranskning: inga kvarvarande promptkonflikter eller
+  försvagade kvalitetsgrindar hittades.
+
+### Uppföljning: P.E.R felbankskontext — 2026-10-25
+
+- [x] P.E.R får nu upp till tre markerade fel med fråga, elevsvar, feedback,
+  modellsvar, ämne och poäng när eleven befinner sig i felbanken. Kontexten
+  följer urvalsordningen och aktuellt kursfilter. Startsidan, andra
+  förbättringssektioner och aktivt prov får inte denna lokala felkontext.
+- [x] Servern begränsar och sanerar fälten, tar bort identifierare och märker
+  dem uttryckligen som obetrodd, potentiellt gammal klientdata i både vanlig
+  studie- och supportprompt. Promptens svarsspärrar och provgrindar ändras inte.
+- [x] P.E.R avbryter nu ett pågående svar om någon promptrelevant del av det
+  markerade felet ändras. Felbanken filtrerar också bort obesvarade eller
+  tomma svar som annars hade presenterats som träningsbara fel.
+- [x] Oberoende read-only-granskning fann först kurs-/urvalskantfall; de
+  korrigerades och ett regressionstest bekräftar att synligt kursval inte
+  trängs undan av dolda markeringar. Slutgranskning fann inga blockerare.
+- [x] Offlineverifiering: `per-manifest` 34/34,
+  `forbattring-behaviour` 32/32, `per-page-targets` 90/90 och
+  `per-context-pack` passerade. Ändrade JavaScript-filer och de tre inline-
+  skripten i förbättringssidan passerade syntaxkontroll; `git diff --check`
+  passerade.
+- [!] Ingen live-AI-fråga eller användardata användes. Stagingfunktionalitet
+  är inte liveverifierad.
+- [x] Kodcheckpoint `66bc7c2716f98e3941fd1069f5d1cc24a66a271a` är pushad till
+  `codex/exgen-generation-quality-2026-10-20`. Vercel Preview
+  `dpl_6e4jdBBNjyFS9M8KS8Qbrm6XVsHj` är READY från exakt den committen;
+  `app.html` och `förbättring.html` svarar HTTP 200.
+- [x] Ingen ändring av `main`, Production eller databas gjordes.
+
+### P.E.R och kvalitetskontroll: uppföljning — 2026-10-25
+
+- [x] På aktuell Preview för branch `codex/exgen-generation-quality-2026-10-20`
+  (`4697a95`, dokumentationscheckpoint; applikationskod `66bc7c2`) skickades
+  exakt en syntetisk allmän fråga via P.E.R på startsidan. Svaret förklarade
+  konkret hur eleven tränar på egna biologianteckningar och hänvisade till
+  Mockprov med kurs, nivå, frågetyp, rättning och modellsvar. Inget prov skapades.
+- [!] Detta verifierar ett enda startsideanrop, inte modellens stabilitet eller
+  P.E.R:s aktiva-prov-, efterrättnings- eller förbättringsläge. Frågetexten var
+  syntetisk; ingen verifiering gjordes av en inloggad elevidentitet.
+- [x] Read-only budget före/efter: cap `$3.379071`; spent `$2.223469` →
+  `$2.225114`; reserved `$0.263628`; remaining `$0.891974` → `$0.890329`.
+  Skillnaden är `$0.001645`, men kan inte säkert attribueras enbart till detta
+  anrop. Inga kvoter eller budgetinställningar ändrades.
+- [x] Offline: provpipeline-/recovery-/quality-gold-sviten avslutades med kod
+  0. Fem P.E.R frontend-/kontextsviter avslutades med kod 0; de rapporterade
+  bland annat 96 aktiva-provkontextfall, 90 sidmålsfall och 32
+  förbättringsbeteendefall. Riktad P.E.R API-regression för fyra kontexter
+  passerade 4/4 med `--test-timeout=90000`.
+- [x] En första API-körning med en påtvingad 30-sekundersgräns avbröt ett
+  långsamt test som tar cirka 42 sekunder. Resultatsidans test fick därefter
+  en tillfällig falsk assertion när den avbrutna körningen fortfarande städade.
+  Isolerat och i den slutliga sekventiella körningen passerade det. Ingen
+  produktionsdefekt bekräftades. Oberoende granskare körde dessutom valda mock-
+  tester (API 12/12, kvot/strömning 19/19 och kontextpaket 1/1); dessa är inte
+  livebevis.
+- [!] Granskningen fann inga blockerande facit-, ägarskaps- eller
+  sidavgränsningsfel. Kvarstående risker: felbankstext är fortfarande
+  modellinput trots avgränsning som obetrodd data, och en ny klientbegäran
+  efter ett förlorat P.E.R-svar får ett nytt request-ID och kan ge ett nytt
+  modell-anrop.
+- [!] Ingen liveprovsgenerering kördes. Staging har `$0.890329` kvar enligt
+  senaste read-only-kontroll, men aktuell syntetisk inloggad testidentitet är
+  inte fastställd. Inga användardata, prov, konton, kvoter, hemligheter,
+  produktionsresurser eller databasscheman ändrades.
+
+### Kvalitetsmålet: verifiering efter Preview-push — 2026-10-25
+
+- [x] Commit `4442f085e8c2eebca9593c59d0954e9605339ef4` innehåller endast
+  denna statusdokumentation och är pushad till feature-branchen. Vercel Preview
+  `dpl_4mwaSCfbmRyqB6nbzSMEZHVHWXfD` är READY från exakt den committen;
+  applikationskoden är `66bc7c2716f98e3941fd1069f5d1cc24a66a271a`.
+- [x] Read-only Vercel-kontroll: Production är READY på `main` commit
+  `ad60a68316a1dfaedb54a508e5b063bd1cc24bf4` (merge av PR #124). Den aktuella
+  feature-Previewn och Production är alltså inte samma deployment/källrevision;
+  inga Promotion-, merge- eller produktionsåtgärder gjordes.
+- [x] Ny offline-regression på applikationskoden: pipeline 3/6/12, HTTP/retry/
+  partial delivery, verifierad felträning, quality-gold och P.E.R frontend-
+  kontext (`per-context-pack`, `per-page-targets`, `per-exam-context`) passerade.
+  Node summerade 51 tester utan fel; de egna kontextskripten rapporterade
+  96/96 provkontext- och 90/90 sidmålskontroller.
+- [x] Riktad P.E.R API-regression för aktivt prov, vanlig hjälp efter oavslutat
+  prov, verifierad coachhistorik och resultatsidans kontext passerade 4/4.
+  Syntaxkontroll för `generate-exam.js`, `_verifier.js` och
+  `_exam-generation-pipeline.cjs` passerade.
+- [!] Oberoende granskning fann inga nya blockerande käll-/fokusgrindar. Den
+  bekräftar att delprov kan levereras när deadline nås efter en uttrycklig
+  miniminivå; sådana svar är markerade och får inte kallas fullständiga. Live-
+  modellens relevans och fulla frågeantal på nuvarande revision är fortfarande
+  oprövade. P.E.R-risker som kräver separat bedömning: prompt-injektion via
+  markerat felinnehåll och nytt modellanrop vid en ny klientbegäran efter
+  förlorat svar.
+- [!] Fresh read-only stagingbudget står kvar på cap `$3.379071`, spent
+  `$2.225114`, reserved `$0.263628`, remaining `$0.890329` (`2026-10-25
+  19:35:40 UTC`). Den öppna inloggade Preview-sessionen visar befintlig
+  provhistorik; identiteten är inte verifierad som syntetisk. Inga liveprov
+  eller ytterligare betalda AI-anrop gjordes, och ingen existerande provdata
+  användes eller ändrades.
+- [!] Målet är inte klart: stagingverifiering av 3/6/12-frågegenerering,
+  verifierade misstag och P.E.R:s fyra sidlägen saknas på en bekräftat syntetisk
+  identitet. `main`, Production, Supabase och konton lämnades orörda.
+
+### Livekontroll och P.E.R-återförsök — 2026-10-25
+
+- [x] På den inloggade staging-Previewn skapades ett syntetiskt Biologi 1-prov
+  med tre frågor från syntetiskt material om fotosyntes/cellandning. Alla 3/3
+  frågor visades, besvarades och rättades; resultatet var 6/6. P.E.R gav en
+  ledtråd under aktivt prov utan att visa facit.
+- [!] Frågorna var relevanta för materialets ämne, men svaga för begärd A-nivå:
+  de var mest redogörande/förklarande trots märkningen `analysera`. Detta är en
+  konkret generator-/granskningslucka att åtgärda separat; observationen bevisar
+  inte att det visade 2/2-resultatet var fel enligt den aktuella rättningsrubriken.
+- [x] Efter rättning gav ett P.E.R-anrop tillfälligt status-/leasefel. Källspår
+  visade att en återförsökbar fråga kunde tappa sitt signerade efterrättningsbevis
+  på klientsidan. Återförsöket bevarar nu beviset, medan serverns verifiering
+  och aktiva provets facitfria grind är oförändrade. "Rensa" tar även bort det
+  återställda beviset så att en identisk ny fråga inte återanvänder gammal kontext.
+- [x] Offline-regression `tests/frontend/per-exam-context.test.mjs` passerade
+  99/99, inklusive statusfel → retry med samma signerade bevis och rensa →
+  identisk ny fråga utan gammalt bevis. Syntax- och diffkontroller passerade.
+- [!] Ingen ny betald AI-förfrågan gjordes efter denna verifiering. Liveprovet
+  visar en lyckad 3-frågekörning, inte tillförlitlig 6/12-generering eller att
+  P.E.R:s efterrättningsretry nu lyckas efter att status-/leasefelet återhämtat
+  sig. Budgeten ska läsas om innan eventuella fler AI-anrop.
+
+### A-nivågrind och P.E.R återförsök — 2026-10-25
+
+- [x] A-nivåns oberoende frågegranskning kräver nu strukturerad evidens:
+  ordagranna utdrag ur frågan och bedömningsrubriken, minst två olika
+  källcitat kopplade till både fråge- och svarsstöd, samt en stödd högre
+  resonemangsoperation och rubrik-/slutsatssignaler. Befintliga kvalitetsmått
+  och trösklar är oförändrade; övriga nivåer får inte det extra fältet.
+- [!] Citatindex och textsignaler kan inte avgöra om parafraserade citat
+  verkligen uttrycker olika fakta eller om en fråga semantiskt kräver A-nivå.
+  Den oberoende granskarens ämnesbedömning är fortfarande nödvändig. Testerna
+  använder mockade granskarutdata och är inte livebevis på modellens precision.
+- [x] P.E.R:s signerade efterrättningsbevis binds nu till samma konto, fråga,
+  sida och relevanta P.E.R-kontext samt högst 15 minuters återställningstid.
+  Minnesrensning tar bort bevis även i vanliga appen. Pilotens förväntade
+  övergång `startsida` → `app` efter återinloggning tillåts, men konto- och
+  kontextkontroller behålls. Vid kontextbyte förklarar UI:t att frågan skickas
+  som vanlig hjälp eller att resultatet behöver öppnas igen.
+- [x] Riktade offlinekontroller passerade: verifierarens output-kontrakt,
+  verifierarbeslut, provpipeline 28/28, P.E.R-kontext 102/102, pilotens
+  återinloggning 1/1, quality-gold, syntaxkontroller och `git diff --check`.
+- [!] En lyckad efterrättningsförklaring observerades tidigare på Preview
+  `e6afb73`, före dessa ändringar. Ingen live-AI-kontroll av ny A-nivågrind eller
+  denna uppdaterade återförsökskod har gjorts; det senast kända stagingvärdet
+  `$0.839398` var avläst före den föregående liveförfrågan och lästes inte om
+  efteråt. Inga ytterligare betalda anrop, databasskrivningar eller
+  produktionsändringar gjordes.
+- [x] Kodcheckpoint `bd558b7b0d54ddcafc88aa3701a6751f697bb2c0` är pushad till
+  `codex/exgen-generation-quality-2026-10-20`. Vercel Preview
+  `dpl_6jWACaLwi4T9vzyvifi9Ta3iNqSm` är `READY` från exakt SHA och har aliaset
+  `provia-ai-git-codex-exgen-gener-b3c147-eltons-projects-4adfb1a3.vercel.app`.
+- [!] Preview-hostnamnet returnerar Vercel SSO-omdirigering för anonyma
+  förfrågningar. Deployment och commit är verifierade, men ingen ny
+  autentiserad app- eller modellkontroll har gjorts.
+- [!] Nästa steg: testa syntetiska 3/6/12-frågeprov på Preview endast efter en
+  ny skrivskyddad budgetkontroll och bekräftad syntetisk testidentitet.
+
+### A-nivågrind och P.E.R-utkast — fortsatt kvalitetssäkring 2026-10-25
+
+- [x] Oberoende review av `f5e3c0f` reproducerade att A-grinden kunde godkänna
+  en återgivningsfråga när granskaren felaktigt hävdade att negaterat resonemang
+  var ett krav. `api/_verifier.js` kräver nu konkreta uppgiftsverb i stället för
+  ämnesord som "samband" eller "orsak", och kontrollerar att resonemang och
+  slutsats efterfrågas och belönas. Negationer, förbud och kontrastformer är
+  adversarialt regressionstestade; slutlig avgränsad verifierargranskning fann
+  inga blockerare. Heuristiken kan inte bevisa semantisk A-nivå på egen hand.
+- [x] `shared.js` rensar ett avbrutet P.E.R-utkast när inloggad användare eller
+  aktuell sida inte matchar utkastet, och rensar ogiltiga eller äldre än
+  15 minuter utkast. Om ingen användarsession är tillgänglig ligger utkastet
+  kvar dolt så samma elev kan återhämta det efter inloggning.
+- [x] Riktade offlinekontroller: provpipeline 28/28, HTTP-återupptagbar
+  3/6/12-pipeline 2/2, P.E.R-sidtester 90/90, P.E.R-provsammanhang 102/102,
+  verifierarbeslut, A-nivåns outputkontrakt, quality-gold, syntax och
+  `git diff --check` passerade.
+- [!] A-nivåns verifierutdata är syntetiskt mockade i dessa regressioner. De
+  visar att deterministiska grindar stoppar konkreta motsägelser, inte att
+  produktionsmodellen alltid tolkar uppgiftens semantik korrekt.
+- [!] Utan extern livekontroll kvarstår tidigare noterad lucka: provmekanik och
+  felbankens provenance är testade, men semantisk relevans hos verkligt
+  genererade frågor är inte bevisad av offline-testerna.
+- [x] `shared.js`-ändringen är oberoende granskad utan blockerande fynd. Den
+  först noterade testluckan för 15-minutersgränsen täcks i avsnittet nedan.
+- [x] Kodcheckpoint `e1a64fabd4f403dda7578a1fded0ca025ba3a440` är pushad till
+  `codex/exgen-generation-quality-2026-10-20`. Vercel Preview
+  `dpl_DwH5xFHup1XPP6yMfuWaAe68gDzr` blev `READY` från exakt SHA med URL
+  `https://provia-mno8zy0ep-eltons-projects-4adfb1a3.vercel.app`.
+- [!] Deployment is verified, but no authenticated app/session or live-model
+  check was performed. No Production, `main`, or database change was made.
+
+### Granskningsfynd efter Preview-checkpointen — 2026-10-25
+
+- [x] Oberoende adversarial granskning fann att jämförelsefrågor formulerade
+  som "vilka skillnader finns" eller "how do ... differ" inte uppfyllde
+  A-nivåns verbgrind. `api/_verifier.js` känner nu igen dessa vanliga svenska
+  och engelska jämförelseverb/-fraser. Positiva regressionstester lades till;
+  befintliga negationsfall förblir underkända.
+- [x] Oberoende P.E.R-granskning fann att `savedAt` som saknas eller inte är
+  numerisk ger åldern `NaN`, vilken kunde passera `< 0`/`> 15 min`-kontrollerna.
+  `shared.js` kräver nu en ändlig numerisk tidsstämpel. Testerna täcker exakt
+  15 minuter, strax över gränsen, framtida tid, saknad och ogiltig tidsstämpel.
+- [x] Uppdaterat riktat testresultat: A-nivåns outputkontrakt och
+  verifierarbeslut passerar; P.E.R-sidtester 95/95; provkontext 102/102.
+  Provpipeline och HTTP-flöden 30/30; felträningskälla, proveniens, kontext
+  och urvalsidentitet passerar sammantaget 55/55 i riktade testfiler.
+- [x] Kodcheckpoint `b0653206e5de5305d33a15b31055178e9acc98db` är pushad till
+  `codex/exgen-generation-quality-2026-10-20`. Vercel Preview
+  `dpl_H7BGL1HV3kS7m1vaRWm1wTsk9m8A` är `READY` från exakt SHA med URL
+  `https://provia-dokqtib67-eltons-projects-4adfb1a3.vercel.app`.
+- [!] Deployment och commit är verifierade; inget autentiserat app-/live-AI-test
+  gjordes. Previewn ovan ersätter den tidigare kodcheckpointen `e1a64fa`.
+- [!] Fortsatt kvarstår att mockade tester inte bevisar verklig modellsemantik
+  eller relevans hos AI-genererade frågor. Liveverifiering kräver först färsk
+  kontroll av rätt stagingmiljö, syntetisk identitet och budget.
+
+### A-nivåns språk- och bedömningssignaler — 2026-10-25
+
+- [x] Oberoende granskning reproducerade att vanliga giltiga uppgiftsfraser
+  ("discuss how", "what conclusion can we draw", "to what extent" och
+  "integrate") kunde underkännas trots källstöd. Verifieraren känner nu igen
+  dessa som uttryck för respektive högre resonemangsoperation.
+- [x] A-nivåns rubrikbevis måste nu uttryckligen stödja den deklarerade
+  operationen. Generiska resonemangs-/slutsatsord ersätter inte en operation
+  som rubriken säger är valfri, onödig, utesluten, utelämnad eller inte
+  poängsatt. Negerade och alternativa uppgiftsfraser fortsätter att stänga
+  grinden.
+- [x] Regressioner täcker engelska och svenska jämförelsefraser, fem vanliga
+  positiva operationer, negationer/alternativ samt optional/unnecessary,
+  shouldn't/mustn't/can't, waived/excluded/skipped och saknade poäng för
+  operationen.
+- [x] Oberoende read-only adversarial review fann inga blockerare i de senast
+  kontrollerade disclaimer-formerna. Offlinekontroller passerade:
+  verifierar-output-kontrakt, verifierarbeslut, quality-gold och
+  prov-/felträningsflöden 55/55. `per-page-targets` 95/95 och
+  `per-exam-context` 102/102 passerade tidigare i samma QA-omgång.
+- [!] `tests/per/per-brain.test.mjs` har en separat befintlig inkonsistens:
+  genererad modulgraf har 73 kanter medan källan har 75. Denna ändring berör
+  inte grafkällor eller genererad fil; felet lämnas utanför checkpointen.
+- [!] Alla granskningar och modellstubbar är offlinebevis. Ingen autentiserad
+  live-Preview eller AI-generering har verifierats i detta steg; senaste
+  Preview-sessionen visar fortfarande skolpilotens inloggningsgrind.
+- [x] Kodcheckpoint `79ec4a3936ea619e68668cdf9290f5e0db9069bc` är pushad till
+  `codex/exgen-generation-quality-2026-10-20`. Vercel Preview
+  `dpl_8JFuqVGp6WoejrLW8QBWppK85Auf` är `READY` från exakt SHA på
+  `https://provia-p9wj9ygfe-eltons-projects-4adfb1a3.vercel.app/app.html`.
+- [!] Preview-autentisering krävs fortfarande för användarflöde eller
+  live-modellverifiering. `main`, Production, databasen, hemligheter, konton
+  och kvoter har inte ändrats i detta steg.
+
+### Fokuserad källgrundning vid felträning — 2026-10-25
+
+- [x] Felträningens fokusutdrag härleds nu företrädesvis från den signerade
+  gamla frågan, verifierat facit och rättningsfeedback. Korta, källverifierade
+  citat behålls bara när de också överlappar det verifierade misstaget; hela
+  eller orelaterade citat kan inte ensamma täcka ett fokus.
+- [x] Om inget fokuserat källbevis kan beläggas stoppas begäran före
+  jobbstart med `MISTAKE_TRAINING_FOCUS_UNAVAILABLE`. Ingen fråga eller
+  kvalitetsgrind har släppts igenom lättare.
+- [x] Regressioner täcker tre korta men orelaterade citat, svag källa utan
+  härledbar koppling, giltig böjningsvariant, saknat bevis och den befintliga
+  HTTP-12-frågors felträningskedjan.
+- [x] Offline: käll-/pipeline-/quality-gold-sviten passerade **48/48**;
+  HTTP 3/6/12 och felträning passerade **2/2**; fristående
+  `mistake-training-source` passerade **19/19**. P.E.R-sidkontext passerade
+  **95/95** och prov/resultatkontext **102/102**. Ämnesroutning, first-pass,
+  syntax och `git diff --check` passerade.
+- [!] Oberoende granskaren fann först att korta orelaterade citat kunde
+  tränga undan fokus; därefter att reservvägen kunde acceptera sådana citat.
+  Båda fynden och ett efterföljande ordningsfall åtgärdades med regressioner.
+  Slutlig read-only-granskning fann inga kodblockerare.
+- [!] Inget staging-/live-AI-test gjordes: den befintliga inloggade Previewn
+  visar verklig studiehistorik, så syntetisk identitet kan inte säkerställas.
+  Offline-stubbarna bevisar inte modellens semantiska precision.
+- [x] Kodcheckpoint `284fbc2d8270650696068c33836872df01ab11fe` är pushad till
+  `codex/exgen-generation-quality-2026-10-20`. Vercel deployment
+  `dpl_4uqTnXZbXmCZ7sQs5hYEV4Vyja9o` är `READY` från exakt SHA på
+  `https://provia-k560gb8cp-eltons-projects-4adfb1a3.vercel.app/app.html`.
+- [!] Ingen inloggad syntetisk testkörning eller live-AI användes; Previewn
+  innehåller inte verifierad syntetisk konto-/historikstatus. `main`,
+  Production, Supabase, hemligheter, konton och kvoter är orörda.
+
+### Adversarial källkontroll för felträning — 2026-10-25
+
+- [x] Oberoende granskning reproducerade att en verifierare som felaktigt
+  markerar ett fokus kunde få en orelaterad fråga att passera när frågan bara
+  citerade rätt material. Pipelinen kräver nu både fokusets citerade utdrag
+  och ett begrepp från den specifika färdighets-/felkontexten, utöver ett
+  allmänt ämne. Vanliga böjningar och lutning/riktningskoefficient/k-värde
+  normaliseras. Befintliga strukturella, oberoende gransknings- och
+  provgrindar är oförändrade.
+- [x] Adversarial regression simulerar en fotosyntesmiss med en korrekt citerad
+  mitosfråga, en bred ämnesfråga och en felriktad användningsfråga trots
+  felaktigt positivt verifierarutlåtande. Dessa täcker inte fokus; relevanta
+  inputfrågor och böjnings-/synonymformer täcks av separata positiva fall.
+- [x] Efter ändringen passerade den kombinerade pipeline-/HTTP-/käll-/
+  quality-gold-sviten **50/50**, inklusive återupptagna 3/6/12-flöden,
+  HTTP-retry och tydlig partiell leverans.
+  `node --check api/_exam-generation-pipeline.cjs` och `git diff --check`
+  passerade. P.E.R-sid-/provkontext passerade tidigare i samma QA-session
+  (95/95 respektive 102/102); P.E.R-källfilerna ändrades inte.
+- [!] Textöverlappet är ett deterministiskt förfilter, inte semantisk entailment.
+  En verifierare kan fortfarande överdriva relevans när en felriktad fråga
+  delar ett specifikt färdighetsord med felbeviset; en relevant parafras utan
+  delade eller normaliserade termer kan avvisas. Modellsvarens semantik är
+  inte liveverifierad. En äldre kompatibilitetsgren för redan lagrade fokus
+  utan `sourceEvidence` finns kvar oförändrad och är svagare.
+- [!] Källavsnittens bredd är fortfarande en genereringsstyrning/rangordning,
+  inte ett krav för utfärdande. Ett adversarialt test av en generator som
+  ignorerar avsnittsmålet saknas; full avsnittstäckning är inte beslutad som
+  ett hårt produktkrav eftersom prov kan ha färre frågor än materialavsnitt.
+- [x] Oberoende slutgranskning bekräftade att den reproducerade felriktade
+  gasfrågan avvisas och att k-värde-synonymer godkänns; inga blockerare i
+  patchen. Granskaren bekräftade samtidigt att semantisk entailment och legacy-
+  jobb utan källutdrag fortfarande inte bevisas eller ändras.
+- [x] Kodcheckpoint `d94c34f056bf6ace9fffa6f6cf5e2ea36fc23b3e` är pushad till
+  `codex/exgen-generation-quality-2026-10-20`. Vercel Preview
+  `dpl_BgZN2mbFq8PUqxPTeSaSxU3gV5SL` är `READY` från exakt SHA på
+  `https://provia-jyo00fls5-eltons-projects-4adfb1a3.vercel.app/app.html`.
+- [!] Ingen staging- eller live-AI-körning gjordes: Preview-kontot och sparad
+  historik har inte verifierats som syntetiska. Ingen kostnad, databas-, konto-,
+  kvot-, `main`- eller Production-ändring gjordes.
+
+### Återupptagning av legacy-felträning med källbevis — 2026-10-25
+
+- [x] Äldre sparade jobb utan `sourceEvidence` kan nu återvinna ett litet antal
+  ordagranna utdrag från sitt redan sparade material, separat härledda från
+  ursprungsfråga, facit, färdighet och rättningsfeedback. Elevens felaktiga svar
+  används inte som positivt källbevis. Saknat material eller otillräcklig
+  kontext lämnar fokuset otäckt; explicit tomt `sourceEvidence` faller fortsatt
+  stängt.
+- [x] Ett legacy-fokus räknas bara som täckt när kandidatfrågan själv visar både
+  källanknytning och en specifik färdighetssignal. Modellsvar, lärandemål,
+  konceptetiketter eller enbart verifierarens match-ID kan inte fylla dessa
+  beviskrav. Källhänvisningen måste vara ordagrant belagd i det sparade
+  materialet och överlappa det härledda fokusutdraget.
+- [x] Regressioner täcker återupptagna legacyjobb, separata textpassager för
+  fråga/facit, saknat stöd, felaktigt svar, fel ämne med rätt citat, intilliggande
+  men annorlunda färdighet, missvisande lärandemål och facitsvar som ensamt
+  upprepar rätt källfakta.
+- [x] Offline pipeline-/HTTP-/käll-/quality-gold-svit passerade **50/50**,
+  inklusive 3/6/12 och återupptagning. Ändrade JavaScript-filer passerade
+  syntaxkontroll; `git diff --check` passerade. Oberoende granskning av de
+  reproducerade falska positiva fallen fann inga blockerare i slutdiffen.
+- [!] Matchningen är fortsatt ett lexikalt deterministiskt förfilter, inte
+  semantisk entailment. En giltig parafras utan delade termer kan lämnas otäckt;
+  modellkvalitet och verkligt staging/livebeteende verifieras inte av dessa
+  offlineprov.
+- [!] Ingen syntetisk inloggning kunde bekräftas för det aktuella stagingkontot;
+  därför gjordes ingen betald AI-körning. `main`, Production, Supabase, hemligheter,
+  konton och kvoter är orörda.
+
+### P.E.R efter resultatrecovery — 2026-10-25
+
+- [x] Prov-/P.E.R-browserregressionen följer nu lyckad rättning, omladdning,
+  återställning via verifierat resultat, klick på P.E.R och det efterföljande
+  `/api/explain`-anropet. Testet jämför återhämtade frågor i ordning och elevsvar
+  exakt mot rättningsåterspelningen och kontrollerar `examReview` samt provkvittot.
+- [x] Gränstestet för framtida signerade P.E.R-bevis använder nu 60 sekunders
+  marginal i stället för 1 millisekund för att undvika en tidsrace.
+- [x] Offline: `EXAM_FLOW_ONLY_RESULT_RECOVERY=1 node
+  tests/frontend/exam-flow.regression.mjs` passerade **133/133** och
+  `node tests/frontend/per-exam-context.test.mjs` passerade **102/102** efter
+  ändringarna. `node --check` för båda testerna och `git diff --check` passerade.
+- [!] Oberoende granskning fann inga blockerare. Browserflödet använder mockade
+  API-svar; det bevisar inte serverns kryptografiska kontroll eller live-/modellbeteende.
+- [!] Ingen staging- eller live-AI-körning gjordes. `main`, Production,
+  Supabase, hemligheter, konton och kvoter är orörda.
+
+### Blandad partiell leverans vid slutmontering — 2026-10-25
+
+- [x] Reproducerat med syntetiskt HTTP/PGlite-flöde: 8/12 godkända frågor
+  (7 flervalsfrågor + 1 kortsvarsfråga) passerade pipeline-miniminivån men
+  avvisades av slutmonteringens fullständiga 6/6-mixmål.
+- [x] Slutmontering behåller nu alla frågor i ett kvalificerat delprov med
+  faktisk skev fördelning, men fortsätter att kräva minst 60% av begärd mängd,
+  båda formaten och varje befintlig strukturell/verifieringsgrind. Fullständiga
+  blandade prov använder fortsatt den begärda balansen.
+- [x] Ny HTTP-regression omfattar 7+1 av 12 och verifierar utfärdat antal,
+  `partial=true`, engångskvot, engångsutfärdande och exakt replay. Den nya
+  regressionsgrenen passerade `tests/api/exam-generation-pipeline-http.test.mjs`
+  (2/2). Den fokuserade genererings-/kvalitetssviten passerade också 113/113.
+- [x] Browserflödet bevarar nu ursprungligt begärt antal och delprovsflagga i
+  rättningsmodellen. Ny 8/12-regression verifierar resultattext, lokal historik,
+  lokalt sparat resultat och POST-payloaden till kontosparningen.
+- [x] `tests/frontend/exam-flow.regression.mjs` passerade 202/202.
+- [!] Detta är lokal offline/PGlite-evidens, inte bevis för hosted SQL eller
+  live-modellkvalitet. Ingen migration, AI-anrop, staging- eller produktions-
+  databasändring gjordes.
+
+### Riktningsfel i misstagsträning — 2026-10-25
+
+- [x] Reproducerat ett falskt positivt där en fråga om vilka ämnen som bildas
+  vid fotosyntesen kunde täcka ett dokumenterat fokus på vilka ämnen växten
+  använder. Delat ämne och källcitat räckte trots motsatt träningsriktning.
+- [x] Matchningen avvisar nu endast tydliga input/output-riktningsmotsägelser
+  mellan fokuset och frågeformuleringen. Befintliga käll-, färdighets- och
+  verifieringsgrindar är oförändrade; motsägelser testas åt båda håll.
+- [x] Offline: pipeline, pipeline-HTTP, felträningskällor och quality-gold
+  passerade tillsammans; syntaxkontroll och `git diff --check` passerade.
+- [!] Riktningskontrollen är ett deterministiskt lexikalt skydd, inte semantisk
+  entailment. Sammansatta/indirekta formuleringar kan fortfarande kräva
+  oberoende modellgranskning. Ingen staging-/live-AI-körning gjordes.
+
+### P.E.R återförsök efter sidbyte — 2026-10-26
+
+- [x] Browserregressionen reproducerade att ett felat efterprovssvar följt av
+  sidbyte kunde lämna Skicka inaktiverad. En tidig retur efter kontextändring
+  hoppade över knappåterställningen trots att frågan låg kvar.
+- [x] Skicka återaktiveras nu i `finally` även vid avbrott eller tidig retur.
+  Efterprovets signerade bevis rensas fortsatt när sidan byts; en ny begäran
+  skickas som vanlig hjälp och utan provbevis, och det nya svaret renderas.
+- [x] Offlinebrowser: `tests/frontend/per-exam-context.test.mjs` passerade
+  **104/104**, inklusive retry efter avslutat fel och efter ett avbrutet
+  in-flight-svar. Sidbyte mellan fel och retry sker först efter att knappens
+  upplåsning bekräftats; det gamla signerade provbeviset skickas inte med.
+  P.E.R `per-page-targets` rapporterade **95/95**; kontextpaket,
+  `per-usage-stream` och `per-context-cap` avslutades utan testfel. Riktade
+  P.E.R API-fall efter kontext-/resultatväxling avslutades med kod 0.
+- [x] Riktade API-regressioner i `tests/api/per-exam-review-handler.test.mjs`
+  passerade **6/6**: allmän startsideshjälp, förbättringscoach, vanlig P.E.R
+  med kursens senaste misstag, resultatsidans verifierade svagheter, aktiv
+  provhjälp och signerad efterprovförklaring.
+- [!] En bred sammanslagen API-körning fastnade över fem minuter i
+  `per-exam-review-handler.test.mjs` utan testtidsgräns och stoppades. Hela den
+  filen är därför inte verifierad i denna körning; de avgränsade scenarierna
+  ovan passerade.
+- [!] Ändringen är endast lokal och offlineverifierad. Ingen ny commit, push,
+  Preview, staging-/live-AI-körning, `main`, Production eller databasåtgärd
+  utfördes efter den separata riktningsfixens Preview-checkpoint.
+
+### Negerad handling i misstagsträning — 2026-10-26
+
+- [x] Reproducerat att frågan "Vilka ämnen använder växten inte vid
+  fotosyntesen?" kunde matcha ett verifierat fokus på vilka ämnen växten
+  använder. Riktningsfiltret såg samma input-verb men jämförde inte negationen.
+- [x] Pipeline-matchningen jämför nu negation nära identifierade handlingsverb
+  innan en verifierarmärkt fokusmatch får räknas. Den hanterar även separerade
+  partikelverb och skiljer objektkontrast från kontrast till en annan handling.
+  Affirmativa kontrollfrågor och input/output-riktningskontrollerna behålls;
+  inga kvalitetsgrindar sänktes.
+- [x] Regressionerna täcker direkt negation, `varken ... eller`, separerat
+  `tar ... inte upp`, objektkontrasterna `inte X utan/men Y`, en kontrast till
+  en annan handling, skilda satser och ett verifieraranspråk på negerad fråga.
+- [x] Oberoende, skrivskyddad granskning utmanade uttryckligen de tre
+  kantfallen: `tar ... inte upp` avvisas, `inte, utan producerar` avvisas och
+  `inte syre utan koldioxid` accepteras. Riktad regression passerade **3/3**;
+  inga blockerare återstår i de granskade fallen.
+- [x] Offline: `check-detection.mjs` klarade alla ämnesfixtures och motexempel.
+  Pipeline, pipeline-HTTP, felträningskälla och quality-gold-sviten passerade
+  **52/52**. Syntaxkontroller för alla ändrade JS-filer och `git diff --check`
+  passerade.
+- [!] Bevisningen är lokal med syntetiska/stubbade modellresultat; den mäter
+  inte verklig semantisk modelltolkning eller staging/livebeteende. Ingen AI-
+  anropskostnad, staging-DB, `main` eller Production ändrades. Preview skapas
+  först efter den godkända feature-pushen.
+
+### Relevans i prov från tidigare misstag — 2026-10-26
+
+- [x] Utökade regressionsmaterialet från generiska platshållare till 3 realistiska
+  syntetiska fokusfall: linjära funktioner, fotosyntesens in-/utflöden och
+  oregelbundna engelska verb. Relevanta kandidater och närliggande men fel
+  träningsmål prövas separat.
+- [x] Pipeline-grinden kräver nu att varje kandidat i ett misstagsprov har
+  källstött matchning mot minst ett valt fokus; en redan täckt lista av fokus
+  räcker inte för att fylla resterande platser med orelaterade frågor.
+- [x] Slutmonteringen räknar om fokusmatchningen innan utfärdning och failar
+  stängt om en äldre sparad fråga inte längre har stöd. Kvalitets- och
+  verifieringskraven har inte sänkts.
+- [x] Tempusgrinden kräver en igenkänd målform, hanterar vanliga svenska
+  tempusnamn och avvisar den tydliga motsägelsen "Yesterday, I have ...".
+  Fotosyntesgrinden känner igen reaktant-/produktformuleringar och avvisar
+  de testade felvända kopplingarna.
+- [x] 3/6/12-fixtureflödet går nu genom pipeline-assembly och completion-kontrakt
+  i offline-test. Separat befintligt 12-frågetest utövar riktig lokal
+  finalisering, manifest och frågebevis; fixturetestets slutsteg är mockat.
+- [x] Startsides-P.E.R. ger nu ett konkret svar på vanliga jämförelsefrågor om
+  ExGen utan obekräftade påståenden om konkurrenters funktioner.
+- [x] Offline: 74 riktade API-/pipeline-regressioner passerade; gold-eval och
+  P.E.R.-guide passerade 10/10; syntaxkontroll och `git diff --check` passerade.
+- [!] Oberoende granskning bekräftade att de tidigare specifika exemplen nu
+  täcks. Lexikal handling-parning är fortfarande en avgränsad heuristik och
+  assembly-avvikelse i äldre jobb kan återköas tills retrygränsen nås; detta
+  avslutar säkert utan att utfärda en felaktig fråga men återställer inte jobbet.
+  Ingen staging-/live-AI-verifiering gjordes. `main`, Production, Supabase,
+  hemligheter, konton och kvoter förblir orörda.
+
+### Reviewer-prompt och blandreparationskant — 2026-11-16
+
+- [x] På Preview-commit `0633424` har verifierarens Structured Outputs-anrop
+  nu lyckats. Ett nytt syntetiskt Biologi 1 A/MC-prov gav **0/3** efter
+  att generator och reparation producerade kandidater som avvisades av
+  befintliga distraktor-, källstöds-, tydlighets- och nivågrindar. Inget prov
+  utfärdades. Detta bekräftar schemafixen, inte godkänd innehållskvalitet.
+- [x] Stagingens aggregerade `ai_usage_events` för försöket visar 3
+  genereringsanrop (medel 14,0 s, max 15,1 s), 4 verifieraranrop (medel
+  9,7 s, max 12,3 s), 4 blinda lösaranrop (medel 5,8 s, max 8,6 s) och ett
+  reparationsanrop (13,5 s). Detta är observerade modellsteg, inte en
+  jämförande modellbenchmark eller total tid för användaren.
+- [x] Prompten har fått tydligare instruktioner för relevanta, parallella
+  flervalsalternativ och en faktisk A-nivåslutsats från minst två källfakta.
+  Reparationsprompten skickar den skärpta vägledningen bara när den ska skapa
+  flervalsfrågor.
+- [x] Oberoende granskning fann att kortsvarsreparation i ett blandprov ändå
+  ärvde flervalsinstruktioner. Korrigeringen tar nu bort dem från både
+  system- och användarprompt när alla saknade platser är kortsvar. MC-repair
+  behåller kraven; inga kvalitetsgrindar eller kvoter ändras.
+- [x] Frågebytesgranskning fann inga blockerare. Läsverifiering av staging
+  bekräftade migrationsinnehåll via hash, RLS/service-only-behörigheter och
+  aktiv retention; den verifierade inte ett livefrågebyte.
+- [x] Offline: pipeline-scriptet passerade; verifierar-, budget-, solver-,
+  revisions- och frågebytes-HTTP-tester passerade **22/22**. Syntaxkontroll
+  och `git diff --check` passerade.
+- [!] Vid skrivtillfället var promptändringen lokal. Den publicerades sedan i
+  commit `18f993d` och dess misslyckade 0/3-liveprov redovisas nedan.
+  Budgeten som lästes före testet var cap $5.879071, spenderat $3.432670,
+  reserverat $0.282822 och tillgängligt $2.163579. `main`, Production,
+  databas, hemligheter och kvoter har inte ändrats.
+
+### Liveprov efter promptjustering — 2026-11-16
+
+- [x] Checkpoint `18f993d` nådde READY på befintlig branch-alias och samma
+  stagingflik. Ett syntetiskt Biologi 1 A/MC-prov med 3 frågor och 1 310
+  tecken gav **0/3**; inget prov utfärdades. UI markerade tydligt att provet
+  inte kunde färdigställas.
+- [x] Två stegvisa genereringsbatcher slutfördes på cirka **37,2 s** och
+  **38,9 s**. Första batchen stannade på verifierartimeout och noll godkända.
+  Reparationen gav fyra kandidater men inga godkända; diagnostiken visar
+  bland annat nivåträffar, svagt källstöd, alternativskvalitet och ett
+  `option_matches_shape`-fel i den blinda lösarens reparationssvar.
+- [x] Aggregerad AI-telemetri för jobbet: 3 generatoranrop, medel **15,3 s**;
+  4 verifieraranrop, medel **7,5 s**; 5 blinda lösaranrop, medel **5,3 s**.
+  Detta är mätvärden för modellen, inte en lyckad användarupplevelse.
+- [x] Kostnaden ökade **$0.081975**. Cap är fortfarande $5.879071; spenderat
+  $3.514645, reserverat $0.282822, tillgängligt $2.081604.
+- [x] Oberoende slutgranskning bekräftade att kortsvarsreparation i blandprov
+  inte längre får flervalsinriktad återkoppling, även vid MC-relaterade
+  granskningsfel. Detta kantfall har offline-test men kunde inte prövas av
+  just MC-liveprovet.
+- [x] För den redan godkända modelljämförelsen har `OPENAI_MODEL_EXAM` satts
+  till `gpt-6-luna` endast för Preview-branchen. Det är en icke-hemlig
+  modellinställning; Production påverkas inte. En ny deployment och ett enda
+  jämförande syntetiskt 3-frågetest återstår.
+
+### GPT-6 Luna: resonemangsläge — 2026-11-16
+
+- [x] Den första Luna-jämförelsen kördes med modellens standardläge `medium`.
+  Staging avslutade säkert med **0/3**, utan att utfärda prov. Den sanerade
+  körningsloggen visar verifierartimeout; ingen kvalitetsgrind passerades.
+- [x] Lokal ändring skickar nu `reasoning.effort: "none"` endast när det
+  konfigurerade modellnamnet exakt är `gpt-6-luna`, för generering,
+  strukturell reparation, oberoende granskning och blind lösning. Övriga
+  modellnamn behåller befintliga request body-inställningar.
+- [x] Strikta Structured Outputs-scheman och befintliga gransknings- och
+  lösargrindar är oförändrade. Riktade mocktester bekräftar request-parametern
+  för alla tre rollerna och strikt schema för generator, granskare och lösare.
+- [x] Officiell modellguide rekommenderar `none` som startläge vid GPT-4.x-
+  migrering och modellreferensen listar stödet för GPT-6 Luna. Detta är en
+  testkonfiguration, inte belägg för högre fråga- eller provkvalitet.
+- [x] Ändringen pushades till feature-branchen i commit `ed4ffa2`; Vercel
+  Preview `dpl_28nc7FdQjY6nTTzoASMbJ1p6eZiy` blev READY och den stabila
+  Preview-aliasen pekade på exakt den deploymenten. Ingen Production- eller
+  `main`-ändring gjordes.
+- [x] Ett enda syntetiskt 3-frågeprov kördes på den nya Previewn. UI och
+  pipeline slutförde säkert med **0/3**, provet utfärdades inte. Jobbet nådde
+  `STAGE_RETRY_LIMIT`; första reparationsgranskningen nådde timeout. En senare
+  granskning fungerade men avvisade samtliga tre kandidater med bland annat
+  nivå-, källstöds- och poängsättningsproblem. Den blinda lösaren avvisade en
+  fråga som inte gick att avgöra.
+- [x] Sanerad stagingtelemetri för detta jobb: 3 generatoranrop, medel **11,2 s**
+  (max 11,7 s); 5 verifieraranrop, medel **9,3 s** (max 11,4 s); 8 blinda
+  lösaranrop, medel **5,3 s** (max 9,7 s). Batcharna tog cirka **39,7–41,2 s**;
+  lägre generatorlatens gav alltså inte snabbare komplett prov eller godkända frågor.
+- [x] Stagingkostnaden ökade **$0.082805**. Cap `$5.879071`, spenderat
+  `$3.675273`, reserverat `$0.282822`, tillgängligt `$1.920976`. Budget och
+  kvotinställningar ändrades inte.
+- [!] Slutsats: reasoning `none` verkar minska enskild genereringstid men löser
+  inte provets kvalitets- eller timeoutproblem. Ingen grund finns att byta
+  modell som lösning ännu. Nästa steg är att analysera varför de A-nivåfrågorna
+  faller på nivå/källstöd/poängsättning och varför reparationsgranskningen
+  timeoutar, med lokala/offline förbättringar före ytterligare betalda test.
+
+### Reparationstid och 16k-materialets elevtext — 2026-11-16
+
+- [x] Agentgranskning jämförde sanerad Luna-telemetri med kodens timeoutar:
+  interna reparationsgranskningar hade 8 s fast tak mot 9,3 s genomsnitt och
+  11,4 s observerad max. Detta gör timeouten till en kodstödd, sannolik
+  flaskhals; telemetrin bevisar inte det exakta förloppet för varje timeout.
+- [x] Interna, återupptagbara batchar får nu upp till 13 s för reparationsgranskare
+  och parallell blind lösare. Vanliga synkrona retries behåller 8 s. Faktisk
+  timeout begränsas fortfarande av återstående budget; generering startar inte
+  om minsta genererings-, gransknings- och finaliseringsfönster inte ryms.
+  Oberoende verifiering och blind lösning krävs fortfarande för varje kandidat.
+- [x] Den aktiva provguiden och reservvyn säger nu vid material över 12 000 tecken
+  att allt sparas och att relevanta avsnitt kan väljas för vissa provsteg.
+  Hårda gränsen 16 000 tecken är oförändrad. Svensk/engelsk webbläsarkontroll
+  passerade vid 13 000, 16 000 och 16 001 tecken.
+- [x] Riktade offline-tester för pipeline/reparation, tidsbudget, materialgräns,
+  källurval, frågebyte och idempotens passerade **23/23**. Syntaxkontroll och
+  `git diff --check` passerade.
+- [!] Den breda `exam-flow.regression.mjs`-körningen avbröts efter tre minuter
+  när den väntade i ett senare provflöde; den räknas inte som passerad. Ingen
+  ny betald AI-körning eller staging-/produktionsdatabasändring gjordes.
+  Oberoende granskning fann inga blockerare; den bad även om ett engelskt
+  exakt-16 000-test, som nu finns. Checkpoint `7f21f96` är pushad till den
+  befintliga feature-branchen; Vercel Preview `dpl_41TirqsEW47GQJ39fZh4st3uFqyS`
+  blev READY och den befintliga Preview-aliasen pekar på den. Ingen `main`,
+  Production eller databas ändrades.
+
+### Syntetiskt 12-frågeprov efter reparationsbudgetfix — 2026-11-16
+
+- [x] På READY Preview för kodcheckpoint `7f21f96` (samma branch och befintliga
+  alias) kördes ett enda Biologi 1 A/blandat prov med syntetiskt material.
+  Eleven begärde 12 frågor; UI avslutade säkert med **0/12** och lämnade inte ut
+  något prov.
+- [x] Sanerad telemetri visar 3 genereringsanrop (medel **12,8 s**, max **13,9 s**),
+  3 jämförande granskningsanrop (medel **12,5 s**, max **12,7 s**) och 2 blinda
+  lösaranrop (medel **5,6 s**). Den första granskningen rapporterade
+  `missing_output_text` efter 12,5 s, inte timeout. Två senare jämförelser
+  slutfördes men avvisade kandidater på källstöd, nivå och poängsättning;
+  ytterligare språk-/lärandemålsfynd förekom. Inga kandidater passerade.
+- [!] Den utökade 13-sekundersgranskningen gav utrymme för långsammare interna
+  jämförelser, men detta test visar **inte** att fler frågor godkänns eller att
+  provet blir snabbare. Huvudproblemet i denna körning var innehålls-/nivå-
+  anpassning plus ett `missing_output_text`-fel, inte en verifierad timeout.
+- [x] Efter testet: budgettak `$5.879071`, spenderat `$3.687971`, reserverat
+  `$0.282822`, kvar **$1.908278**. Inga budget-, kvot-, konto-, databas- eller
+  produktionsändringar gjordes. Inga fler liveprov kördes.
+- [!] Nästa förbättring bör prioritera att minska verifierbara avvikelser mellan
+  valt A-läge, exakt materialstöd, fråga och poängmatris, samt klassificera
+  `missing_output_text` tydligare. Ändra inte granskningsgrindarna utan ny
+  evidens och riktade regressionsprov.
+
+### Ersättningsfråga behåller lärandemålet — 2026-11-16
+
+- [x] Frågebytesflödet härleder nu träningsmålet från den serververifierade,
+  signerade originalfrågan (`concept_tag`, `learning_objective`, `topic`,
+  `subtopic`). Webbläsarens egna fokusfält ignoreras.
+- [x] Målet förs separat genom intern batchkontext och ges till generatorn som
+  avgränsad etikettdata; kursmaterialet förblir enda faktakällan. Den oberoende
+  verifieraren måste också godkänna samma specifika mål. Revisionen avvisar
+  ersättningen om verifierad måltaggning saknas. Typ, poäng, frågegrindar,
+  solver, idempotens och ersättningsgränser är oförändrade.
+- [x] Offlinekontroller: generatorprompt, HTTP-route spoof-skydd,
+  revisionens fail-closed-fokuskrav och befintlig frågebytes-/revisionssvit
+  passerade **10/10**. Syntaxkontroller och `git diff --check` passerade.
+- [!] Detta verifierar kodvägen offline, inte semantisk kvalitet med live-modell.
+  Ingen betald modellkörning, migration, Preview eller produktionsändring gjordes.
+
+### Ersättningsfokus i den faktiska reparationsprompten — 2026-11-16
+
+- [x] Den nya interna integrationstesten hittade att `buildRepairPayload` byter
+  ut den ursprungliga användarprompten. Därför nådde ersättningsmålet inte själva
+  kvalitetsreparationsanropet trots att det fanns i den vanliga promptbyggaren.
+- [x] Reparationsprompten tar nu med samma avgränsade och serverhärledda fokus.
+  Testet kontrollerar också att målet når oberoende verifiering och återkommer
+  som verifierad match, medan ett manipulerat klientfält inte påverkar flödet.
+  Samtliga befintliga granskningsgrindar är kvar.
+- [!] Detta är lokal offline-evidens. Livekvalitet, kostnad och svarstid för en
+  verklig ersättningsfråga är fortfarande inte uppmätta.

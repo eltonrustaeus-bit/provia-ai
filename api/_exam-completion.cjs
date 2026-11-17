@@ -1,7 +1,7 @@
 const crypto = require("node:crypto");
 const gradeTasks = require("./_grade-task.js");
 const { getExamSigningSecret } = require("./_exam-signing-secret.cjs");
-const MAX_MATERIAL_CHARS = 12000;
+const { MAX_MATERIAL_CHARS } = require("./_material.cjs");
 
 function supportedMaterial(material) {
   return typeof material === "string" && !!material.trim() && Array.from(material).length <= MAX_MATERIAL_CHARS;

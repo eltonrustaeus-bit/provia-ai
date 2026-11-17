@@ -1,0 +1,153 @@
+{
+  "version": 1,
+  "description": "Synthetic source-grounding cases for verified mistake-training question selection.",
+  "cases": [
+    {
+      "id": "math-linear-function-parameters",
+      "focus": {
+        "focusId": "focus-1",
+        "concept": "Linjär funktion",
+        "skill": "Skilja lutningen från skärningen med y-axeln",
+        "sourceQuestion": "Vad visar k och m i y=kx+m?",
+        "sourceEvidence": ["I y=kx+m anger k lutningen och m skärningen med y-axeln."]
+      },
+      "relevant": [
+        {
+          "question": "Vilken parameter anger lutningen respektive skärningen med y-axeln i y=4x+2?",
+          "model_answer": "k=4 anger lutningen och m=2 anger skärningen med y-axeln.",
+          "learning_objective": "Skilja lutning från skärning med y-axeln"
+        },
+        {
+          "question": "För linjen y=-3x+8: förklara hur k visar lutningen och m skärningen med y-axeln.",
+          "model_answer": "k=-3 anger lutningen och m=8 anger skärningen med y-axeln.",
+          "learning_objective": "Skilja lutning från skärning med y-axeln"
+        },
+        {
+          "question": "I y=0,5x-4, vilket tal är lutningen och vilket tal anger skärningen med y-axeln?",
+          "model_answer": "Lutningen är 0,5 och skärningen med y-axeln är -4.",
+          "learning_objective": "Skilja lutning från skärning med y-axeln"
+        },
+        {
+          "question": "Jämför y=2x+1 och y=5x+1. Vilken linje har störst lutning, och vad är deras gemensamma skärning med y-axeln?",
+          "model_answer": "Den andra linjen har större lutning; båda skär y-axeln vid 1.",
+          "learning_objective": "Skilja lutning från skärning med y-axeln"
+        }
+      ],
+      "irrelevant": [
+        {
+          "question": "Beräkna y när x=3 i y=4x+2.",
+          "model_answer": "14",
+          "learning_objective": "Sätta in ett x-värde i en linjär funktion"
+        },
+        {
+          "question": "Bestäm funktionens nollställe.",
+          "model_answer": "x=-0,5",
+          "learning_objective": "Lösa en linjär ekvation"
+        }
+      ]
+    },
+    {
+      "id": "biology-photosynthesis-input-output",
+      "focus": {
+        "focusId": "focus-2",
+        "concept": "Fotosyntes",
+        "skill": "Skilja ämnen växten använder från ämnen som bildas",
+        "sourceQuestion": "Vilka ämnen använder växten och vilka bildas vid fotosyntesen?",
+        "sourceEvidence": ["Växten använder koldioxid och vatten i fotosyntesen. Fotosyntesen bildar druvsocker och syre."]
+      },
+      "relevant": [
+        {
+          "question": "Sortera koldioxid, vatten, druvsocker och syre efter vilka ämnen växten använder och vilka som bildas vid fotosyntesen.",
+          "model_answer": "Växten använder koldioxid och vatten; druvsocker och syre bildas.",
+          "learning_objective": "Skilja fotosyntesens ämnen som används från ämnen som bildas"
+        },
+        {
+          "question": "Vilka ämnen går in i fotosyntesen, och vilka produkter kommer ut?",
+          "model_answer": "Växten använder koldioxid och vatten; druvsocker och syre bildas.",
+          "learning_objective": "Skilja fotosyntesens ämnen som används från ämnen som bildas"
+        },
+        {
+          "question": "Vilka av koldioxid, vatten, druvsocker och syre används av växten och vilka bildas?",
+          "model_answer": "Koldioxid och vatten används; druvsocker och syre bildas.",
+          "learning_objective": "Skilja fotosyntesens ämnen som används från ämnen som bildas"
+        },
+        {
+          "question": "Sortera ämnena: växten använder ___ och ___; vid fotosyntesen bildas ___ och ___.",
+          "model_answer": "Växten använder koldioxid och vatten; fotosyntesen bildar druvsocker och syre.",
+          "learning_objective": "Skilja fotosyntesens ämnen som används från ämnen som bildas"
+        }
+      ],
+      "irrelevant": [
+        {
+          "question": "I vilken del av växtcellen sker fotosyntesen?",
+          "model_answer": "I kloroplasterna.",
+          "learning_objective": "Känna till var fotosyntesen sker"
+        },
+        {
+          "question": "Vilken roll har klorofyll när bladet tar emot ljus?",
+          "model_answer": "Klorofyll absorberar ljusenergi.",
+          "learning_objective": "Förklara klorofyllets roll"
+        }
+      ]
+    },
+    {
+      "id": "english-irregular-past-simple",
+      "focus": {
+        "focusId": "focus-3",
+        "concept": "Engelsk grammatik",
+        "skill": "Välja oregelbunden verbform i past simple",
+        "sourceQuestion": "Vilken form av go används i past simple?",
+        "sourceEvidence": ["Regular verbs add -ed in past simple, while the irregular verb go becomes went."]
+      },
+      "relevant": [
+        {
+          "question": "Complete in past simple: Yesterday, I ___ to school (go).",
+          "model_answer": "went",
+          "learning_objective": "Välja rätt oregelbunden verbform i past simple"
+        },
+        {
+          "question": "Complete with the past simple form of go: Last week, we ___ to the museum.",
+          "model_answer": "went; the irregular verb go becomes went.",
+          "learning_objective": "Välja rätt oregelbunden verbform i past simple"
+        },
+        {
+          "question": "Write a sentence using the past simple form of go and underline the verb.",
+          "model_answer": "I went home; the irregular verb go becomes went.",
+          "learning_objective": "Välja rätt oregelbunden verbform i past simple"
+        },
+        {
+          "question": "How does go change in the sentence 'They ___ home yesterday' when the instruction is past simple?",
+          "model_answer": "Went; the irregular verb go becomes went.",
+          "learning_objective": "Välja rätt oregelbunden verbform i past simple"
+        }
+      ],
+      "irrelevant": [
+        {
+          "question": "Complete in present perfect: I have ___ to school (go).",
+          "model_answer": "gone",
+          "learning_objective": "Använda past participle i present perfect"
+        },
+        {
+          "question": "Complete using the past participle: I have ___ to school (go).",
+          "model_answer": "gone",
+          "learning_objective": "Välja past participle"
+        },
+        {
+          "question": "Complete: I have ___ to school (go).",
+          "model_answer": "gone",
+          "learning_objective": "Välja rätt verbform"
+        },
+        {
+          "question": "Complete: Yesterday, I have ___ to school (go).",
+          "model_answer": "went",
+          "learning_objective": "Välja rätt verbform"
+        },
+        {
+          "question": "Skriv om verbet walk till past simple.",
+          "model_answer": "walked",
+          "learning_objective": "Böja regelbundna verb i past simple"
+        }
+      ]
+    }
+  ]
+}

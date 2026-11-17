@@ -103,6 +103,23 @@ check("fails closed unless source support was checked against literal evidence",
   assert.ok(V.buildVerifierSchema().schema.properties.results.items.required.includes("source_support"));
 });
 
+check("A-level evidence contract must pass explicitly", () => {
+  assert.equal(V.decideApproval({ ...good, difficulty_evidence_required: true }), false);
+  assert.equal(V.decideApproval({ ...good, difficulty_evidence_required: true, difficulty_evidence_contract_ok: false }), false);
+  assert.equal(V.decideApproval({ ...good, difficulty_evidence_required: true, difficulty_evidence_contract_ok: true }), true);
+});
+
+check("A-level schema requires auditable task and scoring evidence only for A", () => {
+  const aItem = V.buildVerifierSchema(1, false, false, "A").schema.properties.results.items;
+  const cItem = V.buildVerifierSchema(1, false, false, "C").schema.properties.results.items;
+  assert.ok(aItem.required.includes("difficulty_evidence"));
+  assert.deepEqual(aItem.properties.difficulty_evidence.required, [
+    "task_evidence", "scoring_evidence", "source_fact_evidence", "reasoning_operation", "distinct_source_facts",
+    "rubric_rewards_reasoning", "justified_conclusion_required",
+  ]);
+  assert.ok(!cItem.required.includes("difficulty_evidence"));
+});
+
 check("fails closed unless the duplicate verdict is explicit and valid", () => {
   assert.equal(V.decideApproval({ ...good, duplicate_of: undefined }), false);
   assert.equal(V.decideApproval({ ...good, duplicate_of: null }), false);

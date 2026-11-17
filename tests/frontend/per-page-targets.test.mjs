@@ -125,7 +125,7 @@ await assertPageTopic("/förbättring.html", "förbättring");
         await responseGate;
         await route.fulfill({ json: {
           answer: "LIVE_CARD_AFTER_RERENDER",
-          coachEvidenceSummary: { latestPercent: 45, trendDeltaPp: -17, recentResultCount: 3, focusCourse: "Biologi 1" },
+          coachEvidenceSummary: { latestPercent: 80, trendDeltaPp: 18, recentResultCount: 3, focusCourse: "Biologi 1" },
         } });
       } else await route.fulfill({ json: { ok: true } });
     },
@@ -143,13 +143,13 @@ await assertPageTopic("/förbättring.html", "förbättring");
   ok("in-flight coach response renders into the current card after navigation rerender",
     await page.locator("#coachText").textContent() === "LIVE_CARD_AFTER_RERENDER");
   ok("coach score summary comes from the verified server evidence, not local 62% history",
-    await page.locator("#lastText").textContent() === "45 % · verifierat resultat",
+    await page.locator("#lastText").textContent() === "80 % · verifierat resultat",
     await page.locator("#lastText").textContent());
   ok("coach trend explicitly describes the server-verified sample",
-    await page.locator("#trendText").textContent() === "-17 p.p. · senaste 3 verifierade",
+    await page.locator("#trendText").textContent() === "+18 p.p. · senaste 3 verifierade",
     await page.locator("#trendText").textContent());
   ok("coach focus is sourced from the server-verified course list",
-    await page.locator("#focusText").textContent() === "Biologi 1 · verifierade resultat under 70 %",
+    await page.locator("#focusText").textContent() === "Biologi 1 · fokus från sparad rättning",
     await page.locator("#focusText").textContent());
   ok("navigation rerender does not start a duplicate model request", coachCalls === 1, String(coachCalls));
   await ctx.close();
@@ -299,6 +299,39 @@ await assertPageTopic("/förbättring.html", "förbättring");
   await page.reload({ waitUntil: "networkidle" });
   ok("a pending question from another account is not restored", await page.locator("#perInput").inputValue() === "");
   ok("an account-mismatched draft is discarded", await page.evaluate(() => sessionStorage.getItem("exgen_per_pending_question")) === null);
+
+  await page.addInitScript(() => {
+    const fixedNow = Number(sessionStorage.getItem("per_pending_test_now"));
+    if (Number.isFinite(fixedNow) && fixedNow > 0) Date.now = () => fixedNow;
+  });
+  const fixedNow = await page.evaluate(() => Date.now());
+  await page.evaluate(now => {
+    sessionStorage.setItem("per_pending_test_now", String(now));
+    Date.now = () => now;
+    sessionStorage.setItem("exgen_per_pending_question", JSON.stringify({
+      question: "Draft at the retry boundary", savedAt: now - 15 * 60 * 1000,
+      accountId: "u1", page: "förbättring",
+    }));
+  }, fixedNow);
+  await page.reload({ waitUntil: "networkidle" });
+  await page.locator("#perMessages").getByText("Din fråga är återställd. Tryck Skicka när du vill fortsätta.").waitFor({ state: "attached", timeout: 5000 });
+  ok("a pending question exactly 15 minutes old remains manually retryable", await page.locator("#perInput").inputValue() === "Draft at the retry boundary");
+
+  for (const [label, savedAt, includeTimestamp] of [
+    ["older than the retry window", fixedNow - 15 * 60 * 1000 - 1, true],
+    ["from the future", fixedNow + 1, true],
+    ["with an invalid timestamp", "not-a-timestamp", true],
+    ["with no timestamp", undefined, false],
+  ]) {
+    await page.evaluate(({ savedAt, includeTimestamp }) => {
+      const draft = { question: `Draft ${String(savedAt)}`, accountId: "u1", page: "förbättring" };
+      if (includeTimestamp) draft.savedAt = savedAt;
+      sessionStorage.setItem("exgen_per_pending_question", JSON.stringify(draft));
+    }, { savedAt, includeTimestamp });
+    await page.reload({ waitUntil: "networkidle" });
+    ok(`a pending question ${label} is discarded`,
+      await page.evaluate(() => sessionStorage.getItem("exgen_per_pending_question")) === null);
+  }
   await ctx.close();
 }
 
@@ -681,12 +714,17 @@ await assertPageTopic("/förbättring.html", "förbättring");
   ok("T2c1 svaga områden hämtas inte från lokal historik", t2b.weakAreas === undefined, JSON.stringify(t2b.weakAreas));
   ok("T2d sidan är förbättring", t2b.page === "förbättring", t2b.page);
   ok("T2d1 provhistorik beskrivs inte som aktiv provstatus", t2b.examState === undefined);
+  ok("T2d2 startsidan på förbättringssidan är känd för P.E.R", t2b.activeSection === "hem",
+    String(t2b.activeSection));
 
   await page.evaluate(() => localStorage.setItem("proviaai_per_coach_cache", JSON.stringify({
     ownerId: "another-account", ts: Date.now(), text: "PRIVATE_OTHER_ACCOUNT_COACH_MARKER",
   })));
   await page.click('[data-go="coach"]');
   await page.waitForTimeout(300);
+  ok("T2d3 vald coachsektion följer P.E.R:s sidkontext",
+    await page.evaluate(() => window.__perTestCtx().activeSection) === "coach",
+    String(await page.evaluate(() => window.__perTestCtx().activeSection)));
   ok("T2d2 coachcache från ett annat konto visas inte",
     !(await page.locator("#coachText").textContent()).includes("PRIVATE_OTHER_ACCOUNT_COACH_MARKER"));
 
@@ -829,6 +867,110 @@ await assertPageTopic("/förbättring.html", "förbättring");
   await page.waitForFunction(question => document.getElementById("perInput")?.value === question, "Draft after expired login");
   ok("the same account can recover its draft after signing back in",
     await page.evaluate(() => sessionStorage.getItem("exgen_per_pending_question")) === null);
+  await ctx.close();
+}
+
+// A reply started in one section must not be painted after the student moves
+// to another section on the same page.
+{
+  let releaseResponse;
+  let requestStarted;
+  const started = new Promise(resolve => { requestStarted = resolve; });
+  const responseGate = new Promise(resolve => { releaseResponse = resolve; });
+  const { ctx, page } = await mk("/förbättring.html", {
+    explainHandler: async route => {
+      const body = route.request().method() === "POST" ? route.request().postDataJSON() : null;
+      if (body?.userQuestion === "Vad betyder det här?") {
+        requestStarted(body);
+        await responseGate;
+        await route.fulfill({ json: { answer: "STALE_SECTION_REPLY_MARKER", helpCap: 3 } });
+      } else await route.fulfill({ json: { ok: true } });
+    },
+  });
+  await page.evaluate(() => {
+    const nativeFetch = window.fetch.bind(window);
+    window.__perSectionRequestAborted = false;
+    window.fetch = (input, init = {}) => {
+      if (String(input).includes("/api/explain") && init.signal) {
+        init.signal.addEventListener("abort", () => { window.__perSectionRequestAborted = true; }, { once: true });
+      }
+      return nativeFetch(input, init);
+    };
+  });
+  await page.click("#perBubble");
+  await page.locator("#perInput").fill("Vad betyder det här?");
+  await page.locator("#perSendBtn").click();
+  const requestBody = await Promise.race([
+    started,
+    new Promise((_, reject) => setTimeout(() => reject(new Error("section-context P.E.R request did not start")), 5000)),
+  ]);
+  ok("P.E.R request carries the current improvement section",
+    requestBody.pageContext?.activeSection === "hem", JSON.stringify(requestBody.pageContext));
+  await page.click('[data-go="coach"]');
+  await page.locator("#perMessages .per-msg.teacher")
+    .filter({ hasText: "Sektionen ändrades medan P.E.R arbetade." }).waitFor({ timeout: 5000 });
+  ok("section switch aborts the in-flight P.E.R fetch", await page.evaluate(() => window.__perSectionRequestAborted));
+  releaseResponse();
+  await page.waitForTimeout(250);
+  ok("a late answer from the previous section is discarded",
+    !(await page.locator("#perMessages").textContent()).includes("STALE_SECTION_REPLY_MARKER"));
+  await ctx.close();
+}
+
+// A prompt-relevant change in a marked mistake must invalidate an in-flight
+// reply even when the question, concept, and learner answer stay unchanged.
+{
+  let releaseResponse;
+  let requestStarted;
+  const started = new Promise(resolve => { requestStarted = resolve; });
+  const responseGate = new Promise(resolve => { releaseResponse = resolve; });
+  const { ctx, page } = await mk("/förbättring.html", {
+    explainHandler: async route => {
+      const body = route.request().method() === "POST" ? route.request().postDataJSON() : null;
+      if (body?.userQuestion === "Förklara mitt markerade misstag") {
+        requestStarted(body);
+        await responseGate;
+        await route.fulfill({ json: { answer: "STALE_MISTAKE_REPLY_MARKER", helpCap: 3 } });
+      } else await route.fulfill({ json: { ok: true } });
+    },
+  });
+  await page.evaluate(() => window.setPerContext({
+    page: "förbättring",
+    activeSection: "felbank",
+    selectedMistakes: [{ question: "Fotosyntesfråga", concept: "Fotosyntes", studentAnswer: "Syre", feedback: "Gammal feedback", expectedAnswer: "Koldioxid och vatten" }],
+  }));
+  await page.evaluate(() => {
+    const nativeFetch = window.fetch.bind(window);
+    window.__perMistakeRequestAborted = false;
+    window.fetch = (input, init = {}) => {
+      if (String(input).includes("/api/explain") && init.signal) {
+        init.signal.addEventListener("abort", () => { window.__perMistakeRequestAborted = true; }, { once: true });
+      }
+      return nativeFetch(input, init);
+    };
+  });
+  await page.click("#perBubble");
+  await page.locator("#perInput").fill("Förklara mitt markerade misstag");
+  await page.locator("#perSendBtn").click();
+  const requestBody = await Promise.race([
+    started,
+    new Promise((_, reject) => setTimeout(() => reject(new Error("mistake-context P.E.R request did not start")), 5000)),
+  ]);
+  ok("P.E.R request bär markerad feedback som elevdata",
+    requestBody.pageContext?.selectedMistakes?.[0]?.feedback === "Gammal feedback", JSON.stringify(requestBody.pageContext));
+  await page.evaluate(() => window.setPerContext({
+    page: "förbättring",
+    activeSection: "felbank",
+    selectedMistakes: [{ question: "Fotosyntesfråga", concept: "Fotosyntes", studentAnswer: "Syre", feedback: "Uppdaterad feedback", expectedAnswer: "Koldioxid och vatten" }],
+  }));
+  await page.locator("#perMessages .per-msg.teacher")
+    .filter({ hasText: "Det markerade misstaget ändrades medan P.E.R arbetade." }).waitFor({ timeout: 5000 });
+  ok("ändrad feedback avbryter in-flight svar trots oförändrad fråga/svar",
+    await page.evaluate(() => window.__perMistakeRequestAborted));
+  releaseResponse();
+  await page.waitForTimeout(250);
+  ok("sent svar med gammal felbankstext kastas bort",
+    !(await page.locator("#perMessages").textContent()).includes("STALE_MISTAKE_REPLY_MARKER"));
   await ctx.close();
 }
 

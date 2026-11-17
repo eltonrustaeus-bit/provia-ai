@@ -61,6 +61,24 @@ await assert.rejects(reloaded.restoreIdempotencyKey("00000000-0000-4000-8000-000
 error => error.message === "GENERATION_RECOVERY_IDENTITY_CONFLICT",
 "a conflicting key cannot replace an existing request identity");
 
+const terminalized = await reloaded.clearTerminalGeneration(recoveredGraphKey, { storage: localStorage, now: 8000 });
+assert.deepEqual(terminalized, { terminalMarked: true, durableCleared: true },
+  "terminal cleanup records a shared tombstone and removes the durable request");
+await assert.rejects(reloaded.restoreIdempotencyKey("00000000-0000-4000-8000-000000000001", graphRecoveryPayload,
+  recoveredGraphKey, { storage: localStorage, crypto: webcrypto, now: 8100 }),
+error => error.message === "GENERATION_REQUEST_TERMINAL",
+"another tab cannot resurrect a terminal request from its session recovery copy");
+await assert.rejects(reloaded.getExistingIdempotencyKey("00000000-0000-4000-8000-000000000001", graphRecoveryPayload,
+  recoveredGraphKey, { storage: localStorage, crypto: webcrypto, now: 8100 }),
+error => error.message === "GENERATION_REQUEST_TERMINAL",
+"terminal requests cannot be resumed through the ordinary retry path");
+const freshGraphKey = await reloaded.getIdempotencyKey("00000000-0000-4000-8000-000000000001", graphRecoveryPayload,
+  { storage: localStorage, crypto: webcrypto, now: 8200 });
+assert.notEqual(freshGraphKey, recoveredGraphKey,
+  "a new attempt after a definitive terminal failure receives a fresh idempotency key");
+assert.ok(JSON.parse(values.get(requestIdentity.STORAGE_KEY)).requests.some(row => row.idempotencyKey === first),
+  "terminal cleanup preserves unrelated pending requests");
+
 const originalLocalStorage = globalThis.localStorage;
 const originalSessionStorage = globalThis.sessionStorage;
 const originalWindow = globalThis.window;
@@ -137,7 +155,7 @@ assert.equal(await requestIdentity.clear(otherUser, localStorage), false, "clear
 assert.equal(await requestIdentity.clear(first, localStorage), true);
 assert.equal(await requestIdentity.clear(changed, localStorage), true);
 assert.equal(await requestIdentity.clear(sourceBound, localStorage), true);
-assert.equal(await requestIdentity.clear(recoveredGraphKey, localStorage), true);
+assert.equal(await requestIdentity.clear(freshGraphKey, localStorage), true);
 assert.equal(await requestIdentity.clear(afterExpiry, expiryStorage), true);
 assert.equal(expiryValues.has(requestIdentity.STORAGE_KEY), false);
 assert.equal(values.has(requestIdentity.STORAGE_KEY), false);
@@ -440,6 +458,17 @@ assert.equal(requestIdentity.clearPendingGeneration(recoveryKey, recoveryStorage
   "a completed or terminal operation can clear its session recovery record");
 assert.equal(recoveryValues.has(requestIdentity.RECOVERY_KEY), false);
 
+const staleTerminalRecoveryKey = "00000000-0000-4000-8000-000000000097";
+await requestIdentity.savePendingGeneration(recoveryUser, graphRecoveryPayload, staleTerminalRecoveryKey, null, {
+  storage: recoveryStorage, crypto: webcrypto, now: 31000,
+});
+await requestIdentity.clearTerminalGeneration(staleTerminalRecoveryKey, { storage: localStorage, now: 31001 });
+assert.deepEqual(await requestIdentity.getPendingGenerations(recoveryUser, {
+  storage: recoveryStorage, durableStorage: localStorage, crypto: webcrypto, now: 31002,
+}), [], "terminal tombstones filter stale same-tab recovery entries before a learner can resume them");
+assert.equal(recoveryValues.has(requestIdentity.RECOVERY_KEY), false,
+  "filtered terminal recovery material is removed from the session store");
+
 const boundedRecoveryCases = [
   { ...data, trainingFocus: Array(21).fill({ concept: "algebra" }) },
   { ...data, priorQuestions: Array(21).fill({ question: "Vad är x?" }) },
@@ -448,7 +477,7 @@ const boundedRecoveryCases = [
   { ...data, trainingFocus: [{ concept: "algebra", privateExtra: "must not be retained" }] },
   { ...data, priorQuestions: [{ question: "Vad är x?", privateExtra: "must not be retained" }] },
   { ...data, sourceReferences: [{ submissionId: "a".repeat(32), questionIds: ["q1"], privateExtra: "must not be retained" }] },
-  { ...data, pastedText: "x".repeat(12001) },
+  { ...data, pastedText: "x".repeat(24001) },
 ];
 for (const [index, payload] of boundedRecoveryCases.entries()) {
   assert.equal(await requestIdentity.savePendingGeneration(recoveryUser, payload, webcrypto.randomUUID(), null, {
@@ -457,6 +486,14 @@ for (const [index, payload] of boundedRecoveryCases.entries()) {
 }
 assert.equal(recoveryValues.has(requestIdentity.RECOVERY_KEY), false,
   "invalid snapshots are not written to tab storage");
+
+const maximumRecoveryPayload = { ...data, pastedText: "x".repeat(24000) };
+const maximumRecoveryKey = webcrypto.randomUUID();
+assert.equal(await requestIdentity.savePendingGeneration(recoveryUser, maximumRecoveryPayload, maximumRecoveryKey, null, {
+  storage: recoveryStorage, crypto: webcrypto, now: 41000,
+}), true, "same-tab recovery accepts the full shared 24,000-character material limit");
+assert.equal(requestIdentity.clearPendingGeneration(maximumRecoveryKey, recoveryStorage), true,
+  "the exact-boundary recovery fixture is removed after verification");
 
 const longEvidencePayload = {
   ...data,

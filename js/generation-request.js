@@ -4,11 +4,13 @@
   if (root) root.ExGenGenerationRequest = api;
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
   var STORAGE_KEY = "exgen_generation_request_v1";
+  var TERMINAL_KEY = "exgen_generation_terminal_v1";
   var INPUT_STORAGE_KEY = "exgen_pending_generation_input_v1";
   var RECOVERY_KEY = "exgen_generation_recovery_v1";
   var TTL_MS = 7 * 24 * 60 * 60 * 1000;
   var RECOVERY_TTL_MS = 20 * 60 * 1000;
   var MAX_PENDING_REQUESTS = 5;
+  var MAX_TERMINAL_REQUESTS = 256;
   var MAX_RECOVERY_BYTES = 192 * 1024;
   var MAX_RECOVERY_ITEMS = 20;
   var UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -78,6 +80,41 @@
     }
   }
 
+  function readTerminalRecords(storage, now) {
+    if (!storage || typeof storage.getItem !== "function") throw new Error("Terminal request storage unavailable");
+    var value;
+    try { value = storage.getItem(TERMINAL_KEY); }
+    catch { throw new Error("Terminal request storage unavailable"); }
+    if (!value) return [];
+    try {
+      var parsed = JSON.parse(value);
+      if (parsed?.version !== 1 || !Array.isArray(parsed.requests)) throw new Error();
+      if (parsed.requests.length > MAX_TERMINAL_REQUESTS || parsed.requests.some(function (record) {
+        return !record || !UUID_RE.test(record.idempotencyKey || "") || !Number.isFinite(record.expiresAt);
+      })) throw new Error();
+      var currentTime = Number.isFinite(now) ? now : Date.now();
+      return parsed.requests.filter(function (record) {
+        return record && UUID_RE.test(record.idempotencyKey || "") &&
+          Number.isFinite(record.expiresAt) && record.expiresAt > currentTime;
+      }).map(function (record) {
+        return { idempotencyKey: record.idempotencyKey, expiresAt: record.expiresAt };
+      });
+    } catch { throw new Error("Terminal request storage unavailable"); }
+  }
+
+  function writeTerminalRecords(records, storage) {
+    if (records.length > MAX_TERMINAL_REQUESTS || !storage || typeof storage.setItem !== "function" || typeof storage.getItem !== "function") return false;
+    var value = JSON.stringify({ version: 1, requests: records });
+    try {
+      storage.setItem(TERMINAL_KEY, value);
+      return storage.getItem(TERMINAL_KEY) === value;
+    } catch { return false; }
+  }
+
+  function hasTerminalKey(records, idempotencyKey) {
+    return records.some(function (record) { return record.idempotencyKey === idempotencyKey; });
+  }
+
   function defaultStorage() {
     try {
       if (typeof window !== "undefined") {
@@ -117,7 +154,7 @@
       priorQuestions: Array.isArray(payload.priorQuestions) ? payload.priorQuestions : [],
       sourceReferences: Array.isArray(payload.sourceReferences) ? payload.sourceReferences : [],
     };
-    if (!clean.course || !clean.pastedText || Array.from(clean.pastedText).length > 12000 ||
+    if (!clean.course || !clean.pastedText || Array.from(clean.pastedText).length > 24000 ||
         !["mix", "mc", "short", "graph"].includes(clean.qType) ||
         !Number.isInteger(clean.numQuestions) ||
         (clean.qType === "graph" ? clean.numQuestions !== 1 : clean.numQuestions < 2 || clean.numQuestions > 20) ||
@@ -199,9 +236,12 @@
   async function savePendingGeneration(userId, payload, idempotencyKey, operationId, options) {
     var opts = options || {};
     var storage = opts.storage || recoveryStorage();
+    var durableStorage = opts.durableStorage || (typeof window !== "undefined" ? defaultStorage() : null);
     var cleanPayload = recoveryPayload(payload);
     if (!userId || typeof userId !== "string" || !cleanPayload || !UUID_RE.test(idempotencyKey || "") ||
         (operationId != null && !UUID_RE.test(operationId))) return false;
+    if (typeof window !== "undefined" && !durableStorage) return false;
+    if (durableStorage && hasTerminalKey(readTerminalRecords(durableStorage, opts.now), idempotencyKey)) return false;
     var cryptoApi = opts.crypto || (typeof crypto !== "undefined" ? crypto : null);
     var digest = await fingerprint(userId, cleanPayload, cryptoApi);
     var now = Number.isFinite(opts.now) ? opts.now : Date.now();
@@ -232,13 +272,17 @@
   async function getPendingGenerations(userId, options) {
     var opts = options || {};
     var storage = opts.storage || recoveryStorage();
+    var durableStorage = opts.durableStorage || (typeof window !== "undefined" ? defaultStorage() : null);
     var cryptoApi = opts.crypto || (typeof crypto !== "undefined" ? crypto : null);
     var now = Number.isFinite(opts.now) ? opts.now : Date.now();
+    if (typeof window !== "undefined" && !durableStorage) throw new Error("Terminal request storage unavailable");
+    var terminalRecords = durableStorage ? readTerminalRecords(durableStorage, now) : [];
     var source = readRecoveryRecords(storage);
     var kept = [];
     var matches = [];
     for (var i = 0; i < source.length; i++) {
       var record = source[i];
+      if (hasTerminalKey(terminalRecords, record?.idempotencyKey)) continue;
       var payload = recoveryPayload(record?.payload);
       if (!payload || !UUID_RE.test(record?.idempotencyKey || "") ||
           (record.operationId != null && !UUID_RE.test(record.operationId)) ||
@@ -342,13 +386,16 @@
     return withStorageLock(function () {
       migrateLegacySession(storage, now, digest);
       var storedRecords = readRecords(storage, digest);
-      var records = storedRecords.filter(function (record) { return record.expiresAt > now; });
+      var terminalRecords = readTerminalRecords(storage, now);
+      var records = storedRecords.filter(function (record) {
+        return record.expiresAt > now && !hasTerminalKey(terminalRecords, record.idempotencyKey);
+      });
+      if (records.length !== storedRecords.length && !writeRecords(records, storage)) {
+        throw new Error("Durable request ID storage unavailable");
+      }
       var matches = records.filter(function (record) { return record.fingerprint === digest; });
       if (matches.length > 1) throw new Error("DUPLICATE_PENDING_REQUEST");
       if (matches.length === 1) {
-        if (records.length !== storedRecords.length && !writeRecords(records, storage)) {
-          throw new Error("Durable request ID storage unavailable");
-        }
         return matches[0].idempotencyKey;
       }
       if (records.length >= MAX_PENDING_REQUESTS) throw new Error("PENDING_REQUEST_LIMIT");
@@ -371,6 +418,9 @@
     if (!UUID_RE.test(idempotencyKey || "")) throw new Error("PENDING_REQUEST_UNAVAILABLE");
     var digest = await fingerprint(userId, payload, cryptoApi);
     return withStorageLock(function () {
+      if (hasTerminalKey(readTerminalRecords(storage, now), idempotencyKey)) {
+        throw new Error("GENERATION_REQUEST_TERMINAL");
+      }
       var matches = readRecords(storage, digest).filter(function (record) {
         return record.fingerprint === digest && record.expiresAt > now;
       });
@@ -402,8 +452,17 @@
     var now = Number.isFinite(opts.now) ? opts.now : Date.now();
     var digest = await fingerprint(userId, payload, cryptoApi);
     return withStorageLock(function () {
+      if (hasTerminalKey(readTerminalRecords(storage, now), idempotencyKey)) {
+        throw new Error("GENERATION_REQUEST_TERMINAL");
+      }
       var storedRecords = readRecords(storage, digest);
-      var records = storedRecords.filter(function (record) { return record.expiresAt > now; });
+      var terminalRecords = readTerminalRecords(storage, now);
+      var records = storedRecords.filter(function (record) {
+        return record.expiresAt > now && !hasTerminalKey(terminalRecords, record.idempotencyKey);
+      });
+      if (records.length !== storedRecords.length && !writeRecords(records, storage)) {
+        throw new Error("Durable request ID storage unavailable");
+      }
       var matches = records.filter(function (record) { return record.fingerprint === digest; });
       if (matches.length > 1 || (matches.length === 1 && matches[0].idempotencyKey !== idempotencyKey)) {
         throw new Error("GENERATION_RECOVERY_IDENTITY_CONFLICT");
@@ -440,6 +499,93 @@
       if (error?.message === "Durable request ID storage unavailable" || error?.message === "CROSS_TAB_REQUEST_LOCK_UNAVAILABLE") throw error;
       throw new Error("Durable request ID cleanup unavailable");
     }
+  }
+
+  async function clearTerminalGeneration(idempotencyKey, options) {
+    var opts = options || {};
+    var target = opts.storage || defaultStorage();
+    var now = Number.isFinite(opts.now) ? opts.now : Date.now();
+    if (!UUID_RE.test(idempotencyKey || "") || !target || typeof target.getItem !== "function") {
+      throw new Error("Terminal request cleanup unavailable");
+    }
+    try {
+      return await withStorageLock(function () {
+        var terminalRecords = readTerminalRecords(target, now)
+          .filter(function (record) { return record.idempotencyKey !== idempotencyKey; });
+        terminalRecords.push({ idempotencyKey: idempotencyKey, expiresAt: now + TTL_MS });
+        if (!writeTerminalRecords(terminalRecords, target)) throw new Error("Terminal request storage unavailable");
+
+        var durableCleared = false;
+        try {
+          var records = readRecords(target);
+          var remaining = records.filter(function (record) { return record.idempotencyKey !== idempotencyKey; });
+          if (remaining.length === records.length) durableCleared = true;
+          else if (remaining.length) durableCleared = writeRecords(remaining, target);
+          else {
+            target.removeItem(STORAGE_KEY);
+            durableCleared = target.getItem(STORAGE_KEY) === null;
+          }
+        } catch { durableCleared = false; }
+        return { terminalMarked: true, durableCleared: durableCleared };
+      }, opts.locks, target);
+    } catch (error) {
+      if (["Terminal request storage unavailable", "Durable request ID storage unavailable", "CROSS_TAB_REQUEST_LOCK_UNAVAILABLE"].includes(error?.message)) throw error;
+      throw new Error("Terminal request cleanup unavailable");
+    }
+  }
+
+  function listPendingRequestKeys(options) {
+    var opts = options || {};
+    var target = opts.storage || defaultStorage();
+    if (!target) throw new Error("Durable request ID storage unavailable");
+    return readRecords(target).map(function (record) {
+      return { idempotencyKey: record.idempotencyKey, expiresAt: record.expiresAt };
+    });
+  }
+
+  async function clearVerifiedTerminalGenerations(checks, options) {
+    var opts = options || {};
+    var target = opts.storage || defaultStorage();
+    var now = Number.isFinite(opts.now) ? opts.now : Date.now();
+    if (!target || !Array.isArray(checks) || !checks.length || checks.length > MAX_PENDING_REQUESTS ||
+        checks.some(function (item) {
+          return item?.safeToClear !== true || !UUID_RE.test(item.idempotencyKey || "") || !Number.isFinite(item.expiresAt);
+        }) || new Set(checks.map(function (item) { return item.idempotencyKey; })).size !== checks.length) {
+      throw new Error("Verified generation cleanup unavailable");
+    }
+    var keys = checks.map(function (item) { return item.idempotencyKey; });
+    var durableCleared = await withStorageLock(function () {
+      var current = readRecords(target);
+      if (checks.some(function (item) {
+        return !current.some(function (record) {
+          return record.idempotencyKey === item.idempotencyKey && record.expiresAt === item.expiresAt;
+        });
+      })) throw new Error("Generation request registry changed");
+
+      var terminal = readTerminalRecords(target, now).filter(function (record) { return !keys.includes(record.idempotencyKey); });
+      keys.forEach(function (idempotencyKey) { terminal.push({ idempotencyKey: idempotencyKey, expiresAt: now + TTL_MS }); });
+      if (!writeTerminalRecords(terminal, target)) throw new Error("Terminal request storage unavailable");
+
+      var remaining = current.filter(function (record) { return !keys.includes(record.idempotencyKey); });
+      var saved = false;
+      try {
+        if (remaining.length) saved = writeRecords(remaining, target);
+        else {
+          target.removeItem(STORAGE_KEY);
+          saved = target.getItem(STORAGE_KEY) === null;
+        }
+      } catch { saved = false; }
+      return saved;
+    }, opts.locks, target);
+
+    var cleanupOk = durableCleared;
+    keys.forEach(function (idempotencyKey) {
+      try { clearPendingGeneration(idempotencyKey, opts.recoveryStorage); }
+      catch { cleanupOk = false; }
+      try { clearPendingInput(idempotencyKey, { inputStorage: opts.inputStorage }); }
+      catch { cleanupOk = false; }
+    });
+    return { cleared: keys.length, cleanupOk: cleanupOk };
   }
 
   function pendingInputStorage(options) {
@@ -479,6 +625,9 @@
     var cryptoApi = opts.crypto || (typeof crypto !== "undefined" ? crypto : null);
     var now = Number.isFinite(opts.now) ? opts.now : Date.now();
     if (!userId || !UUID_RE.test(idempotencyKey || "")) throw new Error("Pending exam input invalid");
+    if (hasTerminalKey(readTerminalRecords(keyStorage, now), idempotencyKey)) {
+      throw new Error("GENERATION_REQUEST_TERMINAL");
+    }
     var digest = await fingerprint(userId, payload, cryptoApi);
     var matchingKey = readRecords(keyStorage, digest).find(function (record) {
       return record.fingerprint === digest && record.idempotencyKey === idempotencyKey && record.expiresAt > now;
@@ -507,7 +656,10 @@
     var cryptoApi = opts.crypto || (typeof crypto !== "undefined" ? crypto : null);
     var now = Number.isFinite(opts.now) ? opts.now : Date.now();
     if (!userId) return [];
-    var keys = readRecords(keyStorage).filter(function (record) { return record.expiresAt > now; });
+    var terminalRecords = readTerminalRecords(keyStorage, now);
+    var keys = readRecords(keyStorage).filter(function (record) {
+      return record.expiresAt > now && !hasTerminalKey(terminalRecords, record.idempotencyKey);
+    });
     var records = readPendingInputRecords(storage);
     var valid = [];
     var retained = [];
@@ -556,6 +708,9 @@
     getIdempotencyKey: getIdempotencyKey,
     getExistingIdempotencyKey: getExistingIdempotencyKey,
     clear: clear,
+    clearTerminalGeneration: clearTerminalGeneration,
+    listPendingRequestKeys: listPendingRequestKeys,
+    clearVerifiedTerminalGenerations: clearVerifiedTerminalGenerations,
     savePendingInput: savePendingInput,
     getPendingInputs: getPendingInputs,
     clearPendingInput: clearPendingInput,

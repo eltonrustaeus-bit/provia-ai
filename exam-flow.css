@@ -449,6 +449,23 @@ body.xf-grading .xf-progress { display: none; }
 .xf-ask:hover { color: var(--xf-accent); }
 .xf-ask.used { color: var(--exgen-warning-text); }
 
+.xf-replace {
+  display: block;
+  margin-top: 8px;
+  padding: 8px 0;
+  border: 0;
+  background: none;
+  color: var(--xf-ink-2);
+  font-family: var(--exgen-font-mono);
+  font-size: 11px;
+  letter-spacing: var(--exgen-tracking-wide);
+  text-align: left;
+  cursor: pointer;
+}
+.xf-replace:hover:not(:disabled) { color: var(--xf-accent); }
+.xf-replace:disabled { opacity: .55; cursor: default; }
+.xf-replace-status { margin: 4px 0 0; color: var(--xf-ink-2); font-size: 12px; line-height: 1.5; }
+
 /* Navigering ligger fast längst ned — handen ska aldrig behöva leta. */
 /* --xf-kb sätts av js/exam-flow.js från visualViewport och är höjden på det som
    döljs av det virtuella tangentbordet. Utan det hamnar navigeringen bakom

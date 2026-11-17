@@ -1,0 +1,14 @@
+Syntetiskt studieunderlag – Biologi 1: celler, energi och transport.
+
+1. Cellmembranet avgränsar cellen och reglerar vilka ämnen som passerar in och ut. Cellväggen hos växtceller ger stadga och ligger utanför cellmembranet. Djurceller saknar cellvägg.
+2. Cellkärnan innehåller DNA. DNA innehåller information som används när cellen tillverkar proteiner. Ribosomerna bygger proteiner av aminosyror.
+3. Mitokondrier finns i både växtceller och djurceller. Där sker stora delar av cellandningen, som gör energi i glukos tillgänglig i form av ATP. ATP används bland annat vid aktiv transport.
+4. Kloroplaster finns i gröna växtceller. Klorofyll fångar upp ljusenergi som används i fotosyntesen.
+5. Fotosyntesen använder koldioxid och vatten samt ljusenergi. Den bildar glukos och syre. Ljusenergi omvandlas till kemiskt bunden energi i glukosen.
+6. Vid cellandning används glukos och syre. Koldioxid och vatten bildas och en del av energin i glukosen överförs till ATP. Energi försvinner inte utan omvandlas; en del avges som värme.
+7. En grön växt behöver både fotosyntes och cellandning. Fotosyntesen bygger energirikt glukos när ljus finns. Cellandning gör energin användbar för cellens arbete och kan pågå både dag och natt.
+8. Växten tar upp koldioxid genom klyvöppningar i bladen och vatten genom rötterna. Syre från fotosyntesen kan lämna växten genom klyvöppningarna.
+9. Diffusion innebär att partiklar sprids från högre till lägre koncentration. Denna nettotransport kräver ingen tillförd energi från ATP.
+10. Osmos är vattnets nettotransport genom ett membran som släpper igenom vatten men inte de aktuella lösta ämnena. Vatten rör sig mot sidan med högre koncentration av lösta ämnen.
+11. Aktiv transport kan flytta ämnen från lägre till högre koncentration med hjälp av transportproteiner och energi från ATP. Därför skiljer den sig från diffusion.
+12. Enzymer är proteiner som påskyndar kemiska reaktioner utan att själva förbrukas. Ett visst substrat passar till enzymets aktiva yta. Mycket hög temperatur kan förändra enzymets form så att funktionen försämras.

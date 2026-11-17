@@ -147,6 +147,15 @@ check("systemprompten tillåter ett kort direkt begreppssvar",
 check("systemprompten inte kräver en motfråga för varje faktasvar",
   /Undvik motfrågor som ersätter ett enkelt faktasvar/i.test(levelZeroPrompt));
 
+console.log("\n— SIDAN HJÄLPER P.E.R ATT GE RÄTT SORTS GUIDNING —");
+const improvementPagePrompt = C.buildPERSystemPrompt({
+  userQuestion: "Hur tränar jag på det här?",
+  pageContext: { page: "förbättring", selectedMistakes: [{ question: "Exempel" }] },
+});
+check("förbättringssidan kopplar synliga verifierade misstag till träningsfokus",
+  /göra synliga provresultat och markerade misstag till ett konkret träningsfokus/i.test(improvementPagePrompt)
+  && /behandla aldrig en markerad uppgift som bekräftad statistik/i.test(improvementPagePrompt));
+
 console.log("\n— KURSKONTEXT VÄGLEDER MATTEPEDAGOGIKEN —");
 const vagMattefråga = C.buildPERSystemPrompt({
   userQuestion: "Kan du hjälpa mig?",

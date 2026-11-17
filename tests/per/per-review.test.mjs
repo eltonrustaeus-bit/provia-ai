@@ -95,6 +95,7 @@ const allvarlig = R.parseReview({
   fynd: [{ typ: "räknefel", citat: "5", varför: "2+2 är 4" }],
 });
 check("allvarligt med rättelse visas", allvarlig.visas === true, JSON.stringify(allvarlig));
+check("giltigt granskningssvar är markerat", allvarlig.valid === true);
 check("rättelsen följer med", allvarlig.rättelse === "Det ska vara 4, inte 5.");
 check("fyndet följer med", allvarlig.fynd[0].typ === "räknefel");
 
@@ -104,8 +105,12 @@ check("ingen visas inte", R.parseReview({ allvar: "ingen", rättelse: null, fynd
    ställd än ingen varning alls. */
 check("allvarligt UTAN rättelse visas inte",
   R.parseReview({ allvar: "allvarlig", rättelse: null, fynd: [] }).visas === false);
+check("allvarligt utan rättelse godkänner inte ursprungssvaret",
+  R.parseReview({ allvar: "allvarlig", rättelse: null, fynd: [] }).valid === false);
 check("allvarligt med tom rättelse visas inte",
   R.parseReview({ allvar: "allvarlig", rättelse: "   ", fynd: [] }).visas === false);
+check("allvarligt med tom rättelse är ogiltigt",
+  R.parseReview({ allvar: "allvarlig", rättelse: "   ", fynd: [] }).valid === false);
 
 console.log("\n— FAIL OPEN —");
 /* Tvärtemot en säkerhetsgrind. Ett trasigt granskningssvar får inte visa en
@@ -117,13 +122,14 @@ for (const [namn, indata] of [
   ["fynd som inte är lista", { allvar: "allvarlig", rättelse: "x", fynd: "nej" }],
 ]) {
   const r = R.parseReview(indata);
-  check(`${namn} ger ingen rättelse`, r.visas === false && r.allvar === "ingen", JSON.stringify(r));
+  check(`${namn} ger ingen rättelse och är ogiltigt`, r.visas === false && r.allvar === "ingen" && r.valid === false, JSON.stringify(r));
 }
 /* Men ett giltigt svar med trasiga FYND ska fortfarande kunna visa rättelsen —
    fynden är underlag för loggen, rättelsen är det eleven behöver. */
 const halvtrasig = R.parseReview({ allvar: "allvarlig", rättelse: "Rätt svar är 4.", fynd: [null, { typ: 1 }] });
 check("giltig rättelse överlever trasiga fynd", halvtrasig.visas === true && halvtrasig.fynd.length === 0,
   JSON.stringify(halvtrasig));
+check("trasiga enskilda fynd ändrar inte ett i övrigt giltigt svar", halvtrasig.valid === true);
 
 console.log("\n— LÄNGDER KAPAS —");
 const lång = R.parseReview({

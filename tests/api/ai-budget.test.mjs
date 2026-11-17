@@ -3,9 +3,11 @@ import test from "node:test";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
+const { streamGeneration } = require("../../api/generate-exam.js");
 const {
   PILOT_USER_ID, PILOT_BUDGET_USD, isBudgetedPilot, pilotBudgetCapUsd, normalizeBudgetBody,
   estimateWorstCaseUsd, actualCostUsd, reserveAiSpend, settleAiSpend, budgetedOpenAIFetch,
+  settleRejectedAiSpend,
 } = require("../../api/_ai-usage.cjs");
 
 const stagingEnv = {
@@ -20,7 +22,9 @@ test("budget is enabled only for the named staging account and staging project",
   assert.equal(PILOT_BUDGET_USD, 5);
   assert.equal(pilotBudgetCapUsd(stagingEnv), 5);
   assert.equal(pilotBudgetCapUsd({ ...stagingEnv, EXGEN_PILOT_BUDGET_CAP_USD: "3.379071" }), 3.379071);
-  assert.equal(pilotBudgetCapUsd({ ...stagingEnv, EXGEN_PILOT_BUDGET_CAP_USD: "5.000001" }), null,
+  assert.equal(pilotBudgetCapUsd({ ...stagingEnv, EXGEN_PILOT_BUDGET_CAP_USD: "5.879071" }), 5.879071,
+    "an explicitly configured staging cap may include the approved 2 USD extension");
+  assert.equal(pilotBudgetCapUsd({ ...stagingEnv, EXGEN_PILOT_BUDGET_CAP_USD: "7.000001" }), null,
     "an override cannot raise the established hard cap");
 });
 
@@ -38,6 +42,21 @@ test("actual cost uses usage and the safety multiplier, rejects incomplete usage
   assert.equal(actualCostUsd({ input_tokens: 1_000_000, output_tokens: 1_000_000 }, "gpt-6-luna"), 1.2);
   assert.equal(actualCostUsd({ input_tokens: 10 }, "gpt-6-luna"), null);
   assert.equal(actualCostUsd({ input_tokens: 1, output_tokens: 1 }, "unknown-model"), null);
+});
+
+test("rejected provider requests settle safely without leaking budget reservations", async () => {
+  for (const [status, expected] of [[400, 0], [429, 0.000001], [500, 0.000001]]) {
+    const calls = [];
+    const fetchImpl = async (_url, init) => {
+      calls.push(JSON.parse(init.body));
+      return Response.json({ ok: true });
+    };
+    const reservation = { enforced: true, userId: "user", reservationId: "reservation", model: "gpt-6-luna", reserveUsd: 0.000001 };
+    assert.equal(await settleRejectedAiSpend({ status, aiSpendReservation: reservation }, { env: stagingEnv, fetchImpl }), true);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].p_actual_usd, expected,
+      status === 400 ? "a definitive malformed request settles at zero" : "uncertain provider outcomes retain the conservative reservation");
+  }
 });
 
 test("staging budget reservation fails closed and settlement uses the same server RPC", async () => {
@@ -74,6 +93,54 @@ test("staging budget reservation and settlement use the branch-scoped lower cap"
   assert.equal(JSON.parse(requests[0].init.body).p_cap_usd, 3.379071);
   assert.equal(await settleAiSpend(reservation, { input_tokens: 100, output_tokens: 20 }, { env, fetchImpl }), true);
   assert.equal(JSON.parse(requests[1].init.body).p_cap_usd, 3.379071);
+});
+
+test("approved staging extension uses the same cap for reserve and settlement", async () => {
+  const requests = [];
+  const env = { ...stagingEnv, EXGEN_PILOT_BUDGET_CAP_USD: "5.879071" };
+  const fetchImpl = async (url, init) => {
+    requests.push({ url, body: JSON.parse(init.body) });
+    return Response.json({ ok: true });
+  };
+  const reservation = await reserveAiSpend({
+    userId: PILOT_USER_ID, model: "gpt-6-luna",
+    body: { model: "gpt-6-luna", input: "synthetic prompt" },
+  }, { env, fetchImpl });
+  assert.equal(reservation.ok, true);
+  assert.equal(requests[0].body.p_cap_usd, 5.879071);
+  assert.equal(await settleAiSpend(reservation, { input_tokens: 100, output_tokens: 20 }, { env, fetchImpl }), true);
+  assert.equal(requests[1].body.p_cap_usd, 5.879071);
+});
+
+test("a local budget mismatch cannot masquerade as an upstream model failure", async () => {
+  const originalFetch = globalThis.fetch;
+  const originalUrl = process.env.SUPABASE_URL;
+  const originalKey = process.env.SUPABASE_SECRET_KEY;
+  const originalCap = process.env.EXGEN_PILOT_BUDGET_CAP_USD;
+  const calls = [];
+  try {
+    process.env.SUPABASE_URL = stagingEnv.SUPABASE_URL;
+    process.env.SUPABASE_SECRET_KEY = stagingEnv.SUPABASE_SECRET_KEY;
+    process.env.EXGEN_PILOT_BUDGET_CAP_USD = "5.879071";
+    globalThis.fetch = async (url) => {
+      calls.push(url);
+      return Response.json({ ok: false, reason: "budget_mismatch" });
+    };
+    const result = await streamGeneration({
+      apiKey: "synthetic-key", userId: PILOT_USER_ID,
+      payload: { model: "gpt-6-luna", input: "synthetic material" }, budgetMs: 1000,
+    });
+    assert.equal(result.ok, false);
+    assert.equal(result.status, 503);
+    assert.equal(result.budgetBlocked, true);
+    assert.deepEqual(calls, [`${stagingEnv.SUPABASE_URL}/rest/v1/rpc/reserve_ai_spend`],
+      "a failed reservation never reaches the model provider");
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalUrl === undefined) delete process.env.SUPABASE_URL; else process.env.SUPABASE_URL = originalUrl;
+    if (originalKey === undefined) delete process.env.SUPABASE_SECRET_KEY; else process.env.SUPABASE_SECRET_KEY = originalKey;
+    if (originalCap === undefined) delete process.env.EXGEN_PILOT_BUDGET_CAP_USD; else process.env.EXGEN_PILOT_BUDGET_CAP_USD = originalCap;
+  }
 });
 
 test("spend settlement retries once with the same idempotent reservation after a transient failure", async () => {

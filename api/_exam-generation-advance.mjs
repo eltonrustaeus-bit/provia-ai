@@ -88,7 +88,7 @@ export default async function handler(req, res) {
         error: "incomplete_exam",
         requested: current.requested_count,
         received: current.progress_current,
-        message: "För få frågor klarade kvalitetskontrollen för att skapa ett säkert prov. Inget prov lämnades ut.",
+        message: "Provet kunde inte färdigställas med tillräckligt många granskade frågor. Inget prov lämnades ut. Kontrollera materialet eller försök igen senare.",
       });
     }
     if (current.state === "succeeded") {
@@ -118,7 +118,7 @@ export default async function handler(req, res) {
       error: "incomplete_exam",
       requested: counts?.requested_count || null,
       received: counts?.progress_current || 0,
-      message: "För få frågor klarade kvalitetskontrollen för att skapa ett säkert prov. Inget prov lämnades ut.",
+      message: "Provet kunde inte färdigställas med tillräckligt många granskade frågor. Inget prov lämnades ut. Kontrollera materialet eller försök igen senare.",
     });
   }
   if (claimed.status !== "claimed") return respond(res, 503, { ok: false, error: "generation_worker_unavailable" });
@@ -133,7 +133,17 @@ export default async function handler(req, res) {
       error: "incomplete_exam",
       requested: counts?.requested_count || null,
       received: counts?.progress_current || 0,
-      message: "För få frågor klarade kvalitetskontrollen för att skapa ett säkert prov. Inget prov lämnades ut.",
+      message: result.error === "AI_BUDGET_EXHAUSTED"
+        ? "Stagingens AI-budget är slut. Inget prov lämnades ut. Kontakta pilotansvarig."
+        : result.error === "AI_BUDGET_UNAVAILABLE"
+          ? "Stagingens AI-budget kunde inte verifieras. Inget prov lämnades ut. Kontakta pilotansvarig."
+          : ["STAGE_RETRY_LIMIT", "OPERATION_DEADLINE"].includes(result.error)
+            ? "Provet kunde inte färdigställas. Inget prov lämnades ut. Försök igen senare."
+          : "Provet kunde inte färdigställas med tillräckligt många granskade frågor. Inget prov lämnades ut. Kontrollera materialet eller försök igen senare.",
+      ...(result.error === "AI_BUDGET_EXHAUSTED" || result.error === "AI_BUDGET_UNAVAILABLE"
+        ? { failureKind: result.error }
+        : ["STAGE_RETRY_LIMIT", "OPERATION_DEADLINE"].includes(result.error)
+          ? { failureKind: "GENERATION_TERMINAL_UNCLASSIFIED" } : {}),
     });
   }
   return respond(res, 202, {

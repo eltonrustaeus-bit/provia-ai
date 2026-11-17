@@ -826,7 +826,7 @@ function escapeHtml(s){
 
 let LANG = localStorage.getItem("proviaai_lang") || "sv";
 let selectedExamFocusTerms = [];
-const MATERIAL_CHAR_LIMIT = 12000;
+const MATERIAL_CHAR_LIMIT = 24000;
 // Nuvarande roll — laddas från Supabase vid inloggning, cachas i localStorage
 let currentRole = localStorage.getItem(LS_ROLE) || "gratis";
 
@@ -844,7 +844,7 @@ sv:{
   mImprove:"Min utveckling",mLang:"English",mLogout:"Logga ut",
   step1:"Material",step1Sub:"Klistra in texten du pluggar på — rubriker, definitioner, formler, exempel",
   pasteLabel:"Studiematerial",pastePH:"Rubriker → punktlista → definitioner/formler → exempel",
-  materialTooLong:"Materialet är för långt. Korta ner det till högst 12 000 tecken innan du fortsätter.",
+  materialTooLong:"Materialet är för långt. Korta ner det till högst 24 000 tecken innan du fortsätter.",
   ocrTitle:"Bild → OCR (valfritt)",ocrBtn:"OCR till material",
   ocrHint:"Tips: tydlig bild rakt ovanifrån, bra ljus, hög kontrast.",
   tip:"Tips: rubriker + punktlistor ger mer exakta frågor och bättre rättning.",
@@ -858,7 +858,7 @@ sv:{
   noExam:"Ingen provdata ännu.",noGrade:"Ingen rättning ännu.",
   needMat:"Klistra in material först.",
   genWorking:"Skapar mockprov…",gradeWorking:"Rättar prov…",
-  genDone:"Prov klart! Besvara frågorna nedan och tryck Rätta prov.",genPartial:"Kvalitetskontrollen godkände {received} av {requested} begärda frågor. Ett kortare, kontrollerat prov är klart.",gradeDone:"Rättning klar. Sparad till förbättring.",
+  genDone:"Prov klart! Besvara frågorna nedan och tryck Rätta prov.",genPartial:"Kunde skapa {received} av {requested} begärda frågor. Ett kortare delprov är klart.",gradeDone:"Rättning klar. Sparad till förbättring.",
   wrongCode:"Fel kod.",ocrNoFile:"Välj en bild först.",
   ocrWorking:"OCR pågår…",ocrDone:"OCR klart. Texten lades in i materialet.",
   writeAnswer:"Skriv ditt svar här…",fullScore:"Modellsvar (full poäng)",
@@ -891,7 +891,7 @@ en:{
   mImprove:"My progress",mLang:"Svenska",mLogout:"Log out",
   step1:"Material",step1Sub:"Paste the material you're studying — headings, definitions, formulas, examples",
   pasteLabel:"Study material",pastePH:"Headings → bullet points → definitions/formulas → examples",
-  materialTooLong:"The material is too long. Shorten it to 12,000 characters or fewer before continuing.",
+  materialTooLong:"The material is too long. Shorten it to 24,000 characters or fewer before continuing.",
   ocrTitle:"Image → OCR (optional)",ocrBtn:"OCR into material",
   ocrHint:"Tip: sharp photo from above, good light, high contrast.",
   tip:"Tip: headings + bullet points produce more accurate questions and grading.",
@@ -905,7 +905,7 @@ en:{
   noExam:"No exam data yet.",noGrade:"No grading yet.",
   needMat:"Paste material first.",
   genWorking:"Generating mock exam…",gradeWorking:"Grading…",
-  genDone:"Exam ready! Answer the questions below and press Grade exam.",genPartial:"Quality review approved {received} of {requested} requested questions. A shorter, checked exam is ready.",gradeDone:"Grading done. Saved to Improve page.",
+  genDone:"Exam ready! Answer the questions below and press Grade exam.",genPartial:"Could create {received} of {requested} requested questions. A shorter partial exam is ready.",gradeDone:"Grading done. Saved to Improve page.",
   wrongCode:"Wrong code.",ocrNoFile:"Choose an image first.",
   ocrWorking:"Running OCR…",ocrDone:"OCR done. Text was added to the material.",
   writeAnswer:"Write your answer here…",fullScore:"Full-score model answer",
@@ -1563,8 +1563,8 @@ function updateMaterialCounter(){
   const over=count>MATERIAL_CHAR_LIMIT;
   counter.className="stxt"+(over?" bad":"");
   counter.textContent=LANG==="sv"
-    ? `${count.toLocaleString("sv-SE")} / ${MATERIAL_CHAR_LIMIT.toLocaleString("sv-SE")} tecken · ${over?"Korta ner materialet innan du fortsätter.":"Hela texten används."}`
-    : `${count.toLocaleString("en-US")} / ${MATERIAL_CHAR_LIMIT.toLocaleString("en-US")} characters · ${over?"Shorten the material before continuing.":"All entered text is used."}`;
+    ? `${count.toLocaleString("sv-SE")} / ${MATERIAL_CHAR_LIMIT.toLocaleString("sv-SE")} tecken · ${over?"Korta ner materialet innan du fortsätter.":count>12000?"Hela texten sparas; relevanta avsnitt kan väljas för vissa provsteg.":"Hela texten används."}`
+    : `${count.toLocaleString("en-US")} / ${MATERIAL_CHAR_LIMIT.toLocaleString("en-US")} characters · ${over?"Shorten the material before continuing.":count>12000?"All text is saved; relevant sections may be selected for some exam steps.":"All entered text is used."}`;
 }
 
 function materialTooLongMessage(){return T[LANG].materialTooLong;}
@@ -1998,7 +1998,7 @@ function renderExam(exam){
   const droppedCount=rawQs.length-qs.length;
   if(qs.length===0||droppedCount>0){
     currentExam=null;
-    setStatus(LANG==="sv"?"Provet kunde inte skapas med tillräcklig kvalitet. Försök generera igen.":"The exam could not be built with sufficient quality. Please generate again.","bad");
+    setStatus(LANG==="sv"?"Provet kunde inte skapas komplett. Försök generera igen.":"The exam could not be completed. Please try generating it again.","bad");
     const g=$("gradeBtn");if(g)g.disabled=true;
     return false;
   }
@@ -2364,8 +2364,8 @@ try{
       const requested=Number.isInteger(state?.requested)?state.requested:payload.numQuestions;
       const retrying=state?.state==="retrying";
       const label=LANG==="sv"
-        ?`${retrying?"Inväntar nästa försök":"Skapar och granskar prov"}: ${approved} av ${requested} frågor godkända.`
-        :`${retrying?"Waiting for the next attempt":"Generating and reviewing exam"}: ${approved} of ${requested} questions approved.`;
+        ?`${retrying?"Inväntar nästa försök":"Skapar prov"}: ${approved} av ${requested} frågor klara.`
+        :`${retrying?"Waiting for the next attempt":"Generating exam"}: ${approved} of ${requested} questions ready.`;
       setStatus(label,"warn");
       if(typeof onProgress==="function"){
         try{onProgress({approved,requested,stage:state?.stage||"generate",state:state?.state||"queued"});}catch{}
@@ -2399,6 +2399,7 @@ try{
         continue;
       }
       if(step.status===0||step.status>=500||step.timedOut||step.networkError){
+        if(step.data?.error==="incomplete_exam"&&step.data?.failureKind)return step;
         consecutiveNetworkFailures++;
         consecutiveWorkingPolls=0;
         const current=await getWithSessionRecovery(`/api/generate-exam?pipeline=status&operationId=${encodeURIComponent(operationId)}`,{timeoutMs:10000});
@@ -2471,16 +2472,37 @@ try{
         ?await window.ExGenGenerationRequest.getExistingIdempotencyKey(authSnapshot.userId,payload,resumeRequest.idempotencyKey)
         :await window.ExGenGenerationRequest.getIdempotencyKey(authSnapshot.userId,payload);
     } catch (error) {
+      if(error?.message==="PENDING_REQUEST_LIMIT"&&!resumeRequest){
+        try{
+          const oldRequests=window.ExGenGenerationRequest?.listPendingRequestKeys?.()||[];
+          if(oldRequests.length){
+            const status=await postJson("/api/generate-exam?pipeline=cleanup-stale-attempts",{requests:oldRequests},{timeoutMs:12000,token:authSnapshot.token});
+            const checks=status?.data?.checks;
+            if(status.ok&&status.data?.ok===true&&Array.isArray(checks)&&checks.length===oldRequests.length&&checks.every(check=>check?.safeToClear===true)){
+              const cleared=await window.ExGenGenerationRequest.clearVerifiedTerminalGenerations(checks);
+              if(cleared?.cleared===oldRequests.length&&cleared.cleanupOk===true){
+                idempotencyKey=await window.ExGenGenerationRequest.getIdempotencyKey(authSnapshot.userId,payload);
+                setStatus(LANG==="sv"?"Gamla, inaktiva provförsök rensades säkert. Startar ditt nya prov.":"Old inactive exam attempts were safely cleared. Starting your new exam.","warn");
+              }
+            }
+          }
+        }catch{}
+      }
+      if(idempotencyKey){
+        // The verified cleanup freed the browser's bounded recovery registry.
+        // Continue below without re-entering the original catch path.
+      }else{
       const message=error?.message==="PENDING_REQUEST_UNAVAILABLE"
         ?(LANG==="sv"?"Den sparade provbegäran finns inte längre eller matchar inte underlaget. Inget nytt prov startades; gå tillbaka och välj ett nytt provförsök.":"The saved exam request is unavailable or no longer matches its input. No new exam was started; go back and choose a new attempt.")
         :error?.message==="DUPLICATE_PENDING_REQUEST"
         ?(LANG==="sv"?"Det finns flera väntande provbegäranden för samma material. Inget nytt jobb startades för att undvika dubbla prov eller kvotdrag. Behåll dina öppna ExGen-flikar och kontakta pilotansvarig för hjälp.":"Multiple pending exam requests exist for the same material. No new job was started to avoid duplicate exams or quota charges. Keep your open ExGen tabs and contact the pilot lead.")
         :error?.message==="PENDING_REQUEST_LIMIT"
-        ?(LANG==="sv"?"Flera provbegäranden väntar på återupptagning. Använd samma material och inställningar för att fortsätta ett väntande jobb; inga väntande jobb har tagits bort.":"Several exam requests are still available to resume. Use the same material and settings to continue a pending job; no pending job was removed.")
+        ?(LANG==="sv"?"Webbläsaren har nått gränsen för sparade provförsök. Äldre försök kunde inte rensas säkert, så inget nytt prov eller AI-anrop startades. Kontrollera att det inte finns ett aktivt prov och försök igen senare.":"This browser has reached its limit for saved exam attempts. Older attempts could not be safely cleared, so no new exam or AI request started. Check for an active exam and try again later.")
         :error?.message==="CROSS_TAB_REQUEST_LOCK_UNAVAILABLE"
           ?(LANG==="sv"?"Den här webbläsaren saknar stöd för säker samordning av provstart mellan flikar. Uppdatera till en aktuell version av Chrome, Edge eller Safari och försök igen.":"This browser cannot safely coordinate exam starts across tabs. Update to a current version of Chrome, Edge, or Safari and try again.")
           :(LANG==="sv"?"Provet kunde inte startas säkert i den här fliken. Ladda om sidan och försök igen.":"Exam creation could not start safely in this tab. Reload the page and try again.");
       setStatus(message,"bad");return {ok:false,error:message};
+      }
     }
     payload.idempotencyKey=idempotencyKey;
     let recoverySaved=false;
@@ -2513,6 +2535,16 @@ try{
       setStatus(message,"warn");
       return{ok:false,error:message,errorCode:"auth_verification_unavailable"};
     };
+    const finalizeTerminalGenerationRequest=async()=>{
+      try{
+        const result=await window.ExGenGenerationRequest?.clearTerminalGeneration?.(idempotencyKey);
+        if(result?.terminalMarked!==true)return false;
+        let cleanupOk=result.durableCleared===true;
+        try{window.ExGenGenerationRequest?.clearPendingGeneration?.(idempotencyKey);}catch{cleanupOk=false;}
+        try{window.ExGenGenerationRequest?.clearPendingInput?.(idempotencyKey);}catch{cleanupOk=false;}
+        return cleanupOk;
+      }catch{return false;}
+    };
     const res=payload.qType==="graph"
       ?await postJson("/api/generate-exam",payload,{timeoutMs:62000,token:authSnapshot.token})
       :await runResumableGeneration(payload,onProgress,authSnapshot.token,authSnapshot.userId,async operationId=>{
@@ -2533,15 +2565,17 @@ try{
       return {ok:false,error:message,timedOut:res.timedOut,networkError:res.networkError};
     }
     if(res.status===429&&res.data?.error==="Quota exceeded"){
-      try{window.ExGenGenerationRequest?.clearPendingGeneration?.(idempotencyKey);}catch{}
-      try{window.ExGenGenerationRequest?.clearPendingInput?.(idempotencyKey);}catch{}
       if(typeof res.data.count==="number")localStorage.setItem(quotaStorageKey(generationRole, authSnapshot.userId), String(res.data.count));
       const msg = quotaLimitMessage(res.data.periodUnit || ROLE_LIMITS[currentRole]?.period);
       setBusy(false);clearGenerationPlaceholder();setStatus(msg,"bad");await refreshQuotaUi();
       return {ok:false,error:msg,quota:true};
     }
     if(!res.ok||!res.data||!res.data.ok){
-      if(!(res.status===202||res.status===401||res.data?.error==="generation_in_progress"||res.status>=500)){
+      const requestError=String(res.data?.error||"");
+      const isGenerationInProgress=requestError.toLowerCase()==="generation_in_progress";
+      const isPayloadConflict=requestError==="GENERATION_REQUEST_PAYLOAD_CONFLICT";
+      const isExpiredRequest=requestError==="GENERATION_REQUEST_EXPIRED";
+      if(!(res.status===202||res.status===401||isGenerationInProgress||isPayloadConflict||isExpiredRequest||res.status>=500)){
         try{window.ExGenGenerationRequest?.clearPendingGeneration?.(idempotencyKey);}catch{}
       }
       setBusy(false);
@@ -2585,18 +2619,24 @@ try{
         const approved=Number.isInteger(res.data.approved)?res.data.approved:0;
         const requested=Number.isInteger(res.data.requested)?res.data.requested:payload.numQuestions;
         const message=LANG==="sv"
-          ?`Provet är inte färdigt ännu (${approved} av ${requested} frågor godkända). Du kan återuppta samma jobb utan ett nytt kvotdrag. Ladda om i samma flik om det behövs, men stäng inte fliken innan provet är färdigt.`
-          :`The exam is not ready yet (${approved} of ${requested} questions approved). You can resume the same job without another quota reservation. Reload this tab if needed, but keep it open until the exam is ready.`;
+          ?`Provet är inte färdigt ännu (${approved} av ${requested} frågor klara). Du kan återuppta samma jobb utan ett nytt kvotdrag. Ladda om i samma flik om det behövs, men stäng inte fliken innan provet är färdigt.`
+          :`The exam is not ready yet (${approved} of ${requested} questions ready). You can resume the same job without another quota reservation. Reload this tab if needed, but keep it open until the exam is ready.`;
         setStatus(message,"warn");hideDebug();
         return {ok:false,error:message,errorCode:"generation_in_progress",operationId:res.data.operationId||null};
       }
       if(res.status===409&&["GENERATION_REQUEST_EXPIRED","GENERATION_REQUEST_PAYLOAD_CONFLICT"].includes(res.data?.error)){
         let cleanupFailed=false;
-        try { await window.ExGenGenerationRequest.clear(idempotencyKey); } catch { cleanupFailed=true; }
-        try { window.ExGenGenerationRequest.clearPendingInput(idempotencyKey); } catch { cleanupFailed=true; }
-        const message=LANG==="sv"
-          ?"Den tidigare provbegäran kan inte återanvändas. Kontrollera materialet och starta ett nytt försök."
-          :"The earlier exam request cannot be reused. Check the material and start a new attempt.";
+        const payloadConflict=res.data?.error==="GENERATION_REQUEST_PAYLOAD_CONFLICT";
+        if(!payloadConflict){
+          cleanupFailed=!(await finalizeTerminalGenerationRequest());
+        }
+        const message=payloadConflict
+          ?(LANG==="sv"
+            ?"Den sparade provbegäran hör till ett annat material än det här försöket. Inget nytt jobb startades. Gå tillbaka till ursprungsfliken och använd samma material, eller kontakta pilotansvarig."
+            :"The saved exam request belongs to different material. No new job was started. Return to the original tab and use the same material, or contact the pilot lead.")
+          :(LANG==="sv"
+            ?"Den tidigare provbegäran har gått ut. Kontrollera materialet och starta ett nytt försök."
+            :"The earlier exam request has expired. Check the material and start a new attempt.");
         const cleanupMessage=cleanupFailed?(LANG==="sv"
           ?" Återupptagningsnyckeln kunde inte rensas säkert. Försök igen senare eller kontakta pilotansvarig; upprepa inte provstarten ännu."
           :" The resume key could not be safely cleared. Try again later or contact the pilot lead; do not restart generation yet."):"";
@@ -2632,23 +2672,59 @@ try{
         setStatus(message,"bad");hideDebug();
         return {ok:false,error:message};
       }
-      if(["quality_review_unavailable","incomplete_exam","independent_check_unavailable"].includes(res.data?.error)){
+      if(res.data?.error==="ai_budget_exhausted"||res.data?.error==="ai_budget_unavailable"){
+        const exhausted=res.data.error==="ai_budget_exhausted";
         const message=LANG==="sv"
-          ? (res.data.message||"Kvalitetskontrollen kunde inte slutföras. Inget prov lämnades ut; försök igen.")
+          ?(exhausted?"Stagingens AI-budget är slut. Inget prov lämnades ut. Kontakta pilotansvarig.":"Stagingens AI-budget kunde inte verifieras. Inget prov lämnades ut. Kontakta pilotansvarig.")
+          :(exhausted?"The staging AI budget is exhausted. No exam was issued. Please contact the pilot lead.":"The staging AI budget could not be verified. No exam was issued. Please contact the pilot lead.");
+        setStatus(message,"bad");hideDebug();
+        return {ok:false,error:message,errorCode:res.data.error,
+          failureKind:exhausted?"AI_BUDGET_EXHAUSTED":"AI_BUDGET_UNAVAILABLE"};
+      }
+      if(["quality_review_unavailable","incomplete_exam","independent_check_unavailable"].includes(res.data?.error)){
+        const budgetKind=res.data?.failureKind==="AI_BUDGET_EXHAUSTED"||res.data?.failureKind==="AI_BUDGET_UNAVAILABLE"
+          ?res.data.failureKind:null;
+        const terminalUnknown=res.data?.failureKind==="GENERATION_TERMINAL_UNCLASSIFIED";
+        const message=LANG==="sv"
+          ? (budgetKind==="AI_BUDGET_EXHAUSTED"?"Stagingens AI-budget är slut. Inget prov lämnades ut. Kontakta pilotansvarig."
+            :budgetKind==="AI_BUDGET_UNAVAILABLE"?"Stagingens AI-budget kunde inte verifieras. Inget prov lämnades ut. Kontakta pilotansvarig."
+            :terminalUnknown?"Provet kunde inte färdigställas. Inget prov lämnades ut. Försök igen senare."
+            :res.data.message||"Provskapandet kunde inte slutföras. Inget prov lämnades ut; försök igen.")
           : (res.data?.error==="incomplete_exam"
-            ? "ExGen could not create a complete exam that passed review. No exam was issued; try again with more relevant material or fewer questions."
-            : "ExGen could not complete the required quality checks. No exam was issued; please try again.");
-        if(res.data.error==="incomplete_exam")try{window.ExGenGenerationRequest?.clearPendingGeneration?.(idempotencyKey);}catch{}
+            ? (budgetKind==="AI_BUDGET_EXHAUSTED"?"The staging AI budget is exhausted. No exam was issued. Please contact the pilot lead."
+              :budgetKind==="AI_BUDGET_UNAVAILABLE"?"The staging AI budget could not be verified. No exam was issued. Please contact the pilot lead."
+              :terminalUnknown?"The exam could not be completed. No exam was issued. Please try again later."
+              :"ExGen could not create enough valid questions. No incomplete exam was marked complete; try again with relevant material or fewer questions.")
+            : "ExGen kunde inte skapa tillräckligt många giltiga frågor. Inget ofullständigt prov markerades som komplett; försök igen med mer material.");
+        let terminalCleanupFailed=false;
+        const definitiveTerminalFailure=res.status===502&&res.ok===false&&res.data?.ok===false
+          &&res.data?.error==="incomplete_exam"&&!res.data?.failureKind
+          &&!res.data?.exam&&!res.data?.exam_manifest&&!res.data?.questions;
+        if(definitiveTerminalFailure){
+          try{
+            const terminalResult=await window.ExGenGenerationRequest?.clearTerminalGeneration?.(idempotencyKey);
+            if(terminalResult?.terminalMarked!==true)terminalCleanupFailed=true;
+            else{
+              if(terminalResult.durableCleared!==true)terminalCleanupFailed=true;
+              try{window.ExGenGenerationRequest?.clearPendingGeneration?.(idempotencyKey);}catch{terminalCleanupFailed=true;}
+              try{window.ExGenGenerationRequest?.clearPendingInput?.(idempotencyKey);}catch{terminalCleanupFailed=true;}
+            }
+          }catch{terminalCleanupFailed=true;}
+        }
         const hasSafeCounts=res.data?.error==="incomplete_exam"
           && Number.isInteger(res.data.received)&&Number.isInteger(res.data.requested)
           && res.data.received>=0&&res.data.requested>0&&res.data.received<res.data.requested;
         const countNote=hasSafeCounts
-          ? (LANG==="sv"?` ${res.data.received} av ${res.data.requested} frågor klarade kontrollen.`:` ${res.data.received} of ${res.data.requested} questions passed review.`)
+          ? (LANG==="sv"?` ${res.data.received} av ${res.data.requested} frågor kunde skapas.`:` ${res.data.received} of ${res.data.requested} questions were generated.`)
           : "";
-        const fullMessage=message+countNote;
+        const cleanupNote=terminalCleanupFailed
+          ?(LANG==="sv"?" Den avslutade begäran kunde inte rensas säkert. Starta inte ett nytt prov i en annan flik; kontakta pilotansvarig.":" The completed request could not be cleared safely. Do not start another exam in a different tab; contact the pilot lead.")
+          :"";
+        const fullMessage=message+countNote+cleanupNote;
         setStatus(fullMessage,"bad");
         hideDebug();
-        return {ok:false,error:fullMessage,errorCode:res.data.error};
+        return {ok:false,error:fullMessage,errorCode:res.data.error,
+          failureKind:budgetKind||(terminalUnknown?"GENERATION_TERMINAL_UNCLASSIFIED":null)};
       }
       if(res.data?.error==="mock_quota_unavailable"||res.data?.error==="exam_generation_failed"){
         const message=res.data.error==="mock_quota_unavailable"
@@ -2725,6 +2801,10 @@ try{
     const questionCount=res.data.exam?.questions?.length||0;
     const requestedCount=payload.numQuestions;
     const partialExam=questionCount<requestedCount;
+    // Keep the original request attached to the grading model so a partial
+    // exam stays partial in the result, local history, and saved account row.
+    currentExam.requested_question_count=requestedCount;
+    currentExam.partial_delivery=partialExam;
     const completionMessage=partialExam
       ?t.genPartial.replace("{received}",String(questionCount)).replace("{requested}",String(requestedCount))
       :t.genDone;
@@ -2744,7 +2824,7 @@ try{
     if(fh){
       const qCount=questionCount;
       fh.textContent=partialExam
-        ?(LANG==="sv"?`Besvara de ${qCount} godkända frågorna och tryck Rätta.`:`Answer the ${qCount} approved questions and press Grade.`)
+        ?(LANG==="sv"?`Besvara de ${qCount} frågorna och tryck Rätta.`:`Answer the ${qCount} questions and press Grade.`)
         :(LANG==="sv"?`Besvara alla ${qCount} frågor och tryck Rätta.`:`Answer all ${qCount} questions then grade.`);
     }
     return {ok:true,exam:currentExam,meta:res.data.meta||null};
@@ -3085,6 +3165,47 @@ try{
       return record;
     },
     grade(answers) { return runGrade(answers); },
+    async canReplaceQuestion() {
+      const submissionId = submissionIdFromProof(currentExam?.exam_manifest);
+      if (!submissionId) return false;
+      const result = await getJson(`/api/generate-exam?questionReplacement=1&submissionId=${encodeURIComponent(submissionId)}`, { timeoutMs: 8000 });
+      return result.ok && result.data?.enabled === true;
+    },
+    async replaceQuestion(input) {
+      const auth = await getGenerationAuthSnapshot();
+      if (!auth?.token || !auth.userId ||
+          !currentExam?.exam_manifest ||
+          submissionIdFromProof(currentExam.exam_manifest) !== input?.submissionId) {
+        return { ok: false, error: LANG === "sv" ? "Provet kunde inte verifieras. Ladda om sidan." : "The exam could not be verified. Reload the page." };
+      }
+      const result = await postJson("/api/generate-exam?questionReplacement=1", {
+        requestId: input.requestId,
+        submissionId: input.submissionId,
+        questionId: input.questionId,
+        course: (courseEl()?.value || "").trim(),
+        pastedText: (pastedTextEl()?.value || "").trim(),
+        lang: input.lang || LANG,
+        level: input.level || levelEl()?.value || "C",
+      }, { token: auth.token, timeoutMs: 65000 });
+      if (!await isGenerationOwnerCurrent(auth.userId)) {
+        return { ok: false, error: LANG === "sv" ? "Kontot ändrades. Logga in igen." : "The account changed. Sign in again." };
+      }
+      if (result.status === 200 && result.data?.ok && result.data?.exam?.exam_manifest) {
+        return { ok: true, exam: result.data.exam, replacement: result.data.replacement };
+      }
+      if (result.status === 202) return { ok: false, pending: true };
+      return {
+        ok: false,
+        status: result.status,
+        errorCode: result.data?.error || "",
+        uncertain: result.status === 0 || result.status >= 500,
+        error: result.status === 429
+          ? (LANG === "sv" ? "Gränsen för frågebyten är nådd." : "The question replacement limit has been reached.")
+          : result.status === 409
+            ? (LANG === "sv" ? "Provet har ändrats eller är inte längre aktivt. Ladda om sidan." : "The exam changed or is no longer active. Reload the page.")
+            : (LANG === "sv" ? "Frågan kunde inte bytas just nu." : "The question could not be replaced right now."),
+      };
+    },
     async abandonExam() {
       if (!currentExam?.exam_manifest || !Array.isArray(currentExam.questions)) {
         return { ok: false, error: "Provet kan inte verifieras. Ladda om sidan och försök igen." };

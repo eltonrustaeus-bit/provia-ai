@@ -1,4 +1,4 @@
-const MAX_MATERIAL_CHARS = 12000;
+const MAX_MATERIAL_CHARS = 24000;
 
 function validateMaterial(value) {
   if (typeof value !== "string" || !value.trim()) {

@@ -177,11 +177,15 @@ export async function enrichMemoryFromExamData(supabase, userId, { throwOnError 
       mockRows.filter(r => r.percent < 70).map(r => r.course)
         .filter(Boolean).map(c => cleanMemoryText(c, 80))
     )].slice(0, 5);
-
-    return { mockRecentScores, mockWeakConcepts, felBankWeakConcepts, felBankErrorTypes, felBankCourses };
+    const mockCourseResults = mockRows.slice(0, 10).map(row => ({
+      course: cleanMemoryText(row.course, 80), percent: row.percent,
+      weakConcepts: uniqueList(row.weak_concept_tags, 4),
+      errorTypes: uniqueList(row.error_tags, 4),
+    }));
+    return { mockRecentScores, mockWeakConcepts, felBankWeakConcepts, felBankErrorTypes, felBankCourses, mockCourseResults };
   } catch {
     if (throwOnError) throw new Error("verified study evidence unavailable");
-    return { mockRecentScores: [], mockWeakConcepts: [], felBankWeakConcepts: [], felBankErrorTypes: [], felBankCourses: [] };
+    return { mockRecentScores: [], mockWeakConcepts: [], felBankWeakConcepts: [], felBankErrorTypes: [], felBankCourses: [], mockCourseResults: [] };
   }
 }
 

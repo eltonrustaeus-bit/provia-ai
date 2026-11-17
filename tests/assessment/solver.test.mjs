@@ -23,6 +23,8 @@ const check = (name, cond) => {
 const q = { id: "1", type: "mc", options: ["a", "b", "c"], correct_index: 1 };
 const verdict = (question, index, optionVerdicts, confidence = 0.9) => ({
   id: question.id, index, option_verdicts: optionVerdicts,
+  source_check: { premise_supported: true, independent_answer: question.options[index] || "No single answer",
+    basis: "derived", evidence_quotes: [], option_matches: optionVerdicts },
   option_plausibility: question.options.map(() => true), confidence, reason: "r"
 });
 const goodVerdict = verdict(q, 1, [false, true, false]);

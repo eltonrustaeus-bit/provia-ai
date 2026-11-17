@@ -41,6 +41,7 @@ const EXAM = {
 let lastGradePayload = null;
 let gradeCallCount = 0;
 let lastGeneratePayload = null;
+let generationCallCount = 0;
 let lastAbandonPayload = null;
 let activeExamCountResponse = 0;
 let examIssuanceStateResponse = "active";
@@ -79,7 +80,19 @@ async function mk(opts = {}, gradeOk = true, gradeResult = null, gradeDelayMs = 
         : { ok: true, abandoned: true } });
     }],
     ["**/api/generate-exam*", r => {
-      try { lastGeneratePayload = JSON.parse(r.request().postData() || "{}"); } catch (_) {}
+      generationCallCount++;
+      try {
+        const body = JSON.parse(r.request().postData() || "{}");
+        if (body && Object.hasOwn(body, "pastedText")) lastGeneratePayload = body;
+      } catch (_) {}
+      const pipeline = new URL(r.request().url()).searchParams.get("pipeline");
+      if (pipeline === "start") return r.fulfill({ status: 202, json: {
+        ok: true, operationId: "11111111-1111-4111-8111-111111111111", requested: 3, approved: 0,
+      } });
+      if (pipeline === "advance" || pipeline === "status") return r.fulfill({ json: {
+        ok: true, state: "succeeded", exam: JSON.parse(JSON.stringify(EXAM)),
+        meta: { quota: { enforced: false }, requested: 3, partial: false },
+      } });
       return r.fulfill({ json: { ok: true, exam: JSON.parse(JSON.stringify(EXAM)), meta: { quota: { enforced: false } } } });
     }],
     ["**/api/grade", async r => {
@@ -204,7 +217,7 @@ const signIn = async (page, uid, lang = "sv", storage = {}, role = "premium") =>
   }
 }
 
-async function toExam(page, reuseStart = false) {
+async function toExam(page, reuseStart = false, requestedCount = 3) {
   // The language scenario is already at the start screen. Reloading there can
   // abort its pending mocked Auth request and manufacture an unrelated error.
   if (!reuseStart) await page.goto(`${srv.url}/app.html`, { waitUntil: "domcontentloaded" });
@@ -212,6 +225,10 @@ async function toExam(page, reuseStart = false) {
   await page.click("#xf .xf-screen[data-screen='start'] .xf-btn.primary"); await waitForScreenEntrance(page);
   await page.fill("#xf .xf-screen[data-screen='subject'] .xf-input", "Biologi 1");
   await page.click("#xf .xf-screen[data-screen='subject'] .xf-btn.primary"); await waitForScreenEntrance(page);
+  if (requestedCount !== 3) {
+    await page.locator("#xf .xf-screen[data-screen='aim'] .xf-act .xf-btn.quiet").first().click();
+    await page.getByRole("group", { name: "Antal" }).getByRole("button", { name: String(requestedCount), exact: true }).click();
+  }
   await page.click("#xf .xf-screen[data-screen='aim'] .xf-btn.primary"); await waitForScreenEntrance(page);
   await page.fill("#xf .xf-screen[data-screen='material'] .xf-area", "Cellandning sker i mitokondrien. Glykolysen ger 2 ATP. Citronsyracykeln sker i matrix. Elektrontransportkedjan kräver syre. Jäsning ger bara 2 ATP per glukos vid syrebrist i muskeln.");
   await page.waitForTimeout(150);
@@ -275,11 +292,11 @@ async function toExam(page, reuseStart = false) {
       return route.fulfill({ json: { ok: true, exam: EXAM, meta: { requested: 3, partial: false } } });
     });
     const completed = toExam(page);
-    await page.waitForFunction(() => document.querySelector("#xf .xf-generation-progress")?.textContent.includes("2 av 3 frågor godkända"));
+    await page.waitForFunction(() => document.querySelector("#xf .xf-generation-progress")?.textContent.includes("2 av 3 frågor klara"));
     await page.waitForTimeout(850);
     const progress = page.locator("#xf .xf-generation-progress");
     ok("synliga provvyn visar varaktig godkänd progress", await progress.isVisible()
-      && (await progress.innerText()).includes("2 av 3 frågor godkända"));
+      && (await progress.innerText()).includes("2 av 3 frågor klara"));
     ok("stegvis generering lovar inte under en minut", !(await page.locator("#xf").innerText()).includes("under en minut"));
     await page.screenshot({ path: SHOT + "/generation-progress-desktop.png" });
     await page.setViewportSize({ width: 390, height: 844 });
@@ -443,7 +460,7 @@ async function toMaterial(page) {
   }
 }
 
-// Long source text must be preserved up to the shared 12,000-character cap;
+// Long source text must be preserved up to the shared 24,000-character cap;
 // the student must never proceed with a silently shortened source.
 {
   const { ctx, page, errs } = await mk();
@@ -453,16 +470,23 @@ async function toMaterial(page) {
     await page.setViewportSize({ width: 320, height: 740 });
     const area = page.locator("#xf .xf-screen[data-screen='material'] .xf-area");
     const next = page.locator("#xf .xf-screen[data-screen='material'] .xf-btn.primary");
-    await area.fill("x".repeat(12001));
+    await area.fill("x".repeat(24001));
     const overLimit = await page.locator("#xf .xf-screen[data-screen='material'] .xf-read[role='status']").textContent();
-    ok("aktivt materialflöde varnar och stoppar över 12 000 tecken",
-      /12.?000/.test(overLimit || "") && /korta ner/.test(overLimit || "") && await next.isDisabled(), overLimit || "");
+    ok("aktivt materialflöde varnar och stoppar över 24 000 tecken",
+      /24.?000/.test(overLimit || "") && /korta ner/.test(overLimit || "") && await next.isDisabled(), overLimit || "");
     ok("övergränsmaterialet bevaras redigerbart",
-      (await area.inputValue()).length === 12001);
-    await area.fill("x".repeat(12000));
+      (await area.inputValue()).length === 24001);
+    await area.fill("x".repeat(24000));
     const atLimit = await page.locator("#xf .xf-screen[data-screen='material'] .xf-read[role='status']").textContent();
-    ok("exakt 12 000 tecken tillåts och hela texten används",
-      /12.?000 \/ 12.?000/.test(atLimit || "") && /hela texten används/.test(atLimit || "") && await next.isEnabled(), atLimit || "");
+    ok("exakt 24 000 tecken tillåts och urval för vissa provsteg beskrivs korrekt",
+      /24.?000 \/ 24.?000/.test(atLimit || "") && /hela texten sparas/i.test(atLimit || "")
+        && /kan väljas/i.test(atLimit || "") && await next.isEnabled(), atLimit || "");
+    await area.fill("x".repeat(13000));
+    const selectedSections = await page.locator("#xf .xf-screen[data-screen='material'] .xf-read[role='status']").textContent();
+    ok("långt material beskriver urval som möjligt, inte garanterat",
+      /hela texten sparas/i.test(selectedSections || "")
+        && /kan väljas/i.test(selectedSections || "")
+        && !/väljs vid generering/i.test(selectedSections || ""), selectedSections || "");
     const mobileOverflow = await page.evaluate(() => ({
       documentWidth: document.documentElement.scrollWidth,
       status: document.querySelector("#xf .xf-screen[data-screen='material'] .xf-read[role='status']")?.getBoundingClientRect().toJSON(),
@@ -477,6 +501,31 @@ async function toMaterial(page) {
   } finally {
     await ctx.close();
   }
+
+  const english = await mk();
+  try {
+    await signIn(english.page, "material-limit-user-en", "en");
+    await toMaterial(english.page);
+    const area = english.page.locator("#xf .xf-screen[data-screen='material'] .xf-area");
+    await area.fill("x".repeat(13000));
+    const longNotice = await english.page.locator("#xf .xf-screen[data-screen='material'] .xf-read[role='status']").textContent();
+    ok("English long-material notice does not promise section selection",
+      /all text is saved/i.test(longNotice || "")
+        && /may be selected/i.test(longNotice || "")
+        && !/are selected during generation/i.test(longNotice || ""), longNotice || "");
+    await area.fill("x".repeat(24000));
+    const englishAtLimit = await english.page.locator("#xf .xf-screen[data-screen='material'] .xf-read[role='status']").textContent();
+    ok("English accepts exactly 24,000 characters with accurate selection wording",
+      /24,000 \/ 24,000/.test(englishAtLimit || "")
+        && /all text is saved/i.test(englishAtLimit || "")
+        && /may be selected/i.test(englishAtLimit || ""), englishAtLimit || "");
+    await area.fill("x".repeat(24001));
+    const notice = await english.page.locator("#xf .xf-screen[data-screen='material'] .xf-read[role='status']").textContent();
+    ok("English over-limit notice matches the 24,000-character cap",
+      /24,000/.test(notice || "") && /shorten/i.test(notice || ""), notice || "");
+  } catch (e) {
+    ok("English material limit message is accurate", false, e.message);
+  } finally { await english.ctx.close(); }
 }
 
 // Felbanksträning is a separate path and must not silently slice its source.
@@ -486,12 +535,12 @@ async function toMaterial(page) {
     await signIn(page, "long-training-material-user");
     await page.goto(`${srv.url}/app.html`, { waitUntil: "domcontentloaded" });
     await page.waitForFunction(() => typeof window.__xfPrefill === "function", null, { timeout: 8000 });
-    await page.evaluate(() => window.__xfPrefill("y".repeat(12001), "Biologi 1"));
+    await page.evaluate(() => window.__xfPrefill("y".repeat(24001), "Biologi 1"));
     const area = page.locator("#xf .xf-screen[data-screen='material'] .xf-area");
     const status = page.locator("#xf .xf-screen[data-screen='material'] .xf-read[role='status']");
     ok("felbanksträning visar hela överlånga källan och stoppar fortsättning",
-      (await area.inputValue()).length === 12001 && await page.locator("#xf .xf-screen[data-screen='material'] .xf-btn.primary").isDisabled()
-        && /12.?000/.test(await status.textContent() || "")
+      (await area.inputValue()).length === 24001 && await page.locator("#xf .xf-screen[data-screen='material'] .xf-btn.primary").isDisabled()
+        && /24.?000/.test(await status.textContent() || "")
         && /Träningsmaterialet är längre/.test(await page.locator("#xf .xf-screen[data-screen='material'] .xf-err").textContent() || ""));
   } catch (e) {
     ok("felbanksträning bevarar material över gränsen", false, e.message);
@@ -826,41 +875,61 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
       "Linjär funktion y = 2x + 1 beskriver sambandet mellan x och y. Lutningen är 2 och skärningen med y-axeln är 1.");
     await page.click("#xf .xf-screen[data-screen='material'] .xf-btn.primary");
     await page.waitForSelector("#xf .xf-screen[data-screen='contract'].on", { timeout: 5000 });
-    const qualityMessage = "För få frågor klarade kvalitetskontrollen för att bilda ett användbart prov. Inget prov lämnades ut. Lägg till mer relevant material eller avgränsa området och försök igen.";
+    const generationMessage = "Provskapandet kunde inte slutföras. Inget ofullständigt prov lämnades ut. Lägg till mer relevant material eller avgränsa området och försök igen.";
     const operationId = "12345678-1234-4234-8234-123456789abc";
+    let terminalIdempotencyKey = null;
     await page.route("**/api/generate-exam*", route => {
       const url = new URL(route.request().url());
       const pipeline = url.searchParams.get("pipeline");
-      if (pipeline === "start") return route.fulfill({ status: 202, json: {
-        ok: true, operationId, requested: 3, approved: 0, state: "queued",
-      } });
+      if (pipeline === "start") {
+        try { terminalIdempotencyKey = route.request().postDataJSON()?.idempotencyKey || null; } catch {}
+        return route.fulfill({ status: 202, json: {
+          ok: true, operationId, requested: 3, approved: 0, state: "queued",
+        } });
+      }
       if (pipeline === "advance") return route.fulfill({ status: 502, json: {
-        ok: false, error: "incomplete_exam", message: qualityMessage, received: 0, requested: 3,
+        ok: false, error: "incomplete_exam", message: generationMessage, received: 0, requested: 3,
       } });
       if (pipeline === "status") return route.fulfill({ status: 502, json: {
-        ok: false, error: "incomplete_exam", message: qualityMessage, received: 0, requested: 3,
+        ok: false, error: "incomplete_exam", message: generationMessage, received: 0, requested: 3,
       } });
       return route.fulfill({ status: 400, json: { ok: false, error: "unexpected_pipeline_request" } });
     });
     await page.click("#xf .xf-screen[data-screen='contract'] .xf-btn.primary");
     await page.waitForFunction(() => document.querySelector("#xf .xf-screen[data-screen='contract'] .xf-err")
-      ?.textContent?.includes("0 av 3 frågor klarade kontrollen"), null, { timeout: 5000 });
+      ?.textContent?.includes("0 av 3 frågor kunde skapas"), null, { timeout: 5000 });
     const zeroCountStillOnContract = await page.locator("#xf .xf-screen[data-screen='contract']").evaluate(node => node.classList.contains("on"));
     const zeroCountExamState = await page.locator("#examBody").evaluate(node => ({ text: node.textContent.trim(), skeleton: Boolean(node.querySelector(".skelBox")) }));
     const zeroCountControls = await page.locator("#gradeBtn").evaluate(() => ({
       gradeDisabled: document.getElementById("gradeBtn")?.disabled === true,
       floatingBarHidden: !document.getElementById("floatingGradeBar")?.classList.contains("show"),
     }));
-    ok("noll godkända frågor visas som 0 av 3 utan att öppna ett tomt prov",
+    ok("noll skapade frågor visas som 0 av 3 utan att öppna ett tomt prov",
       zeroCountStillOnContract && zeroCountExamState.text === "" && !zeroCountExamState.skeleton &&
         zeroCountControls.gradeDisabled && zeroCountControls.floatingBarHidden,
       JSON.stringify({ zeroCountStillOnContract, zeroCountExamState, zeroCountControls }));
-    ok("noll-frågefallet visar ett begripligt kvalitetsfel och inte en HTTP-kod",
+    ok("noll-frågefallet visar ett begripligt genereringsfel och inte en HTTP-kod",
       await page.locator("#xf .xf-screen[data-screen='contract'] .xf-err").textContent().then(text =>
-        text.includes(qualityMessage) && text.includes("0 av 3 frågor klarade kontrollen") && !text.includes("Error (HTTP 502)")));
-    await page.route("**/api/generate-exam*", route => route.fulfill({
-      status: 429, json: { ok: false, error: "Quota exceeded", count: 3, limit: 3, period: "2026-W43", periodUnit: "week" },
-    }));
+        text.includes(generationMessage) && text.includes("0 av 3 frågor kunde skapas") && !text.includes("Error (HTTP 502)")));
+    const failedRequestCleanup = await page.evaluate(key => {
+      const durable = JSON.parse(localStorage.getItem("exgen_generation_request_v1") || '{"requests":[]}');
+      const terminal = JSON.parse(localStorage.getItem("exgen_generation_terminal_v1") || '{"requests":[]}');
+      const recovery = JSON.parse(sessionStorage.getItem("exgen_generation_recovery_v1") || '{"requests":[]}');
+      const inputs = JSON.parse(sessionStorage.getItem("exgen_pending_generation_input_v1") || '{"requests":[]}');
+      const contains = value => JSON.stringify(value).includes(key);
+      return { durable: contains(durable), terminal: contains(terminal), recovery: contains(recovery), inputs: contains(inputs) };
+    }, terminalIdempotencyKey);
+    ok("definitivt misslyckad provbegäran rensas ur idempotens- och återupptagningslagret",
+      Boolean(terminalIdempotencyKey) && !failedRequestCleanup.durable && failedRequestCleanup.terminal
+        && !failedRequestCleanup.recovery && !failedRequestCleanup.inputs,
+      JSON.stringify(failedRequestCleanup));
+    let quotaIdempotencyKey = null;
+    await page.route("**/api/generate-exam*", route => {
+      try { quotaIdempotencyKey = route.request().postDataJSON()?.idempotencyKey || quotaIdempotencyKey; } catch {}
+      return route.fulfill({
+        status: 429, json: { ok: false, error: "Quota exceeded", count: 3, limit: 3, period: "2026-W43", periodUnit: "week" },
+      });
+    });
     await page.click("#xf .xf-screen[data-screen='contract'] .xf-btn.primary");
     await page.waitForFunction(() => document.querySelector("#xf .xf-screen[data-screen='contract'] .xf-say")
       ?.textContent === "Provkvoten är slut.", null, { timeout: 5000 });
@@ -869,7 +938,23 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
     ok("kvotstopp får ett eget besked och återställningstid i stället för ett generiskt genereringsfel",
       /veckan|måndag/i.test(quotaNotice) && !quotaNotice.includes("färre frågor") && !quotaError.trim(),
       JSON.stringify({ quotaNotice, quotaError }));
-    await page.route("**/api/generate-exam*", route => route.abort("failed"));
+    const quotaRequestCleanup = await page.evaluate(key => {
+      const durable = JSON.parse(localStorage.getItem("exgen_generation_request_v1") || '{"requests":[]}');
+      const terminal = JSON.parse(localStorage.getItem("exgen_generation_terminal_v1") || '{"requests":[]}');
+      const recovery = JSON.parse(sessionStorage.getItem("exgen_generation_recovery_v1") || '{"requests":[]}');
+      const inputs = JSON.parse(sessionStorage.getItem("exgen_pending_generation_input_v1") || '{"requests":[]}');
+      const contains = value => JSON.stringify(value).includes(key);
+      return { durable: contains(durable), terminal: contains(terminal), recovery: contains(recovery), inputs: contains(inputs) };
+    }, quotaIdempotencyKey);
+    ok("kvotavslag bevarar idempotensnyckel och flikens återupptagningsmaterial för säkert återförsök",
+      Boolean(quotaIdempotencyKey) && quotaRequestCleanup.durable && !quotaRequestCleanup.terminal
+        && quotaRequestCleanup.recovery,
+      JSON.stringify(quotaRequestCleanup));
+    let retryIdempotencyKey = null;
+    await page.route("**/api/generate-exam*", route => {
+      try { retryIdempotencyKey = route.request().postDataJSON()?.idempotencyKey || retryIdempotencyKey; } catch {}
+      return route.abort("failed");
+    });
     await page.click("#xf .xf-screen[data-screen='contract'] .xf-btn.primary");
     await page.waitForFunction(() => /Provet är inte färdigt ännu/.test(
       document.querySelector("#xf .xf-screen[data-screen='contract'] .xf-err")?.textContent || ""), null, { timeout: 7000 });
@@ -880,6 +965,25 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
     ok("återupptagbart genereringsfel bevarar elevens material",
       await page.locator("#xf .xf-screen[data-screen='material'] .xf-area").inputValue()
         .then(value => value.includes("Linjär funktion y = 2x + 1")));
+    ok("återförsök efter kvotstopp använder samma idempotensnyckel",
+      Boolean(quotaIdempotencyKey) && retryIdempotencyKey === quotaIdempotencyKey,
+      JSON.stringify({ quotaIdempotencyKey, retryIdempotencyKey }));
+    let inProgressStartCalls = 0;
+    await page.route("**/api/generate-exam*", route => {
+      inProgressStartCalls++;
+      return route.fulfill({ status: 409, json: { ok: false, error: "GENERATION_IN_PROGRESS", retryable: true } });
+    });
+    await page.click("#xf .xf-screen[data-screen='contract'] .xf-btn.primary");
+    await page.waitForFunction(() => /Provet är inte färdigt ännu/.test(
+      document.querySelector("#xf .xf-screen[data-screen='contract'] .xf-err")?.textContent || ""), null, { timeout: 7000 });
+    const inProgressRecovery = await page.evaluate(() => {
+      const durable = JSON.parse(localStorage.getItem("exgen_generation_request_v1") || '{"requests":[]}');
+      const recovery = JSON.parse(sessionStorage.getItem("exgen_generation_recovery_v1") || '{"requests":[]}');
+      return { durable: durable.requests.length, recovery: recovery.requests.length };
+    });
+    ok("versalt GENERATION_IN_PROGRESS behåller nyckeln och återupptagningskopian",
+      inProgressStartCalls === 4 && inProgressRecovery.durable > 0 && inProgressRecovery.recovery > 0,
+      JSON.stringify({ inProgressStartCalls, inProgressRecovery }));
   } catch (e) {
     const visibleState = await page.evaluate(() => ({
       error: document.querySelector("#xf .xf-screen[data-screen='contract'] .xf-err")?.textContent || "",
@@ -890,6 +994,106 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
   } finally {
     await ctx.close();
   }
+}
+
+if (process.env.EXGEN_TERMINAL_CLEANUP_ONLY === "1") {
+  await browser.close();
+  await srv.close();
+  fail.forEach(item => console.error(`FEL ${item}`));
+  console.log(`terminal cleanup UI checkpoint: ${pass.length} passed, ${fail.length} failed`);
+  process.exit(fail.length ? 1 : 0);
+}
+
+// Budget failures must not be shown as a source-quality rejection or raw HTTP
+// error. These mocked responses exercise the real guided flow and engine.
+const budgetPassStart = pass.length;
+const budgetFailStart = fail.length;
+{
+  const { ctx, page, errs } = await mk();
+  try {
+    await signIn(page, "english-budget-guidance", "en");
+    await toMaterial(page);
+    await page.fill("#xf .xf-screen[data-screen='material'] .xf-area",
+      "Photosynthesis uses carbon dioxide and water and produces glucose and oxygen.");
+    await page.click("#xf .xf-screen[data-screen='material'] .xf-btn.primary");
+    await page.waitForSelector("#xf .xf-screen[data-screen='contract'].on", { timeout: 5000 });
+    const operationId = "12345678-1234-4234-8234-123456789abc";
+    let budgetIdempotencyKey = null;
+    await page.route("**/api/generate-exam*", route => {
+      const pipeline = new URL(route.request().url()).searchParams.get("pipeline");
+      if (pipeline === "start") {
+        try { budgetIdempotencyKey = route.request().postDataJSON()?.idempotencyKey || null; } catch {}
+        return route.fulfill({ status: 202, json: {
+          ok: true, operationId, requested: 3, approved: 0, state: "queued",
+        } });
+      }
+      return route.fulfill({ status: 502, json: {
+        ok: false, error: "incomplete_exam", failureKind: "AI_BUDGET_EXHAUSTED",
+        message: "Stagingens AI-budget är slut.", received: 0, requested: 3,
+      } });
+    });
+    await page.click("#xf .xf-screen[data-screen='contract'] .xf-btn.primary");
+    await page.waitForFunction(() => document.querySelector("#xf .xf-screen[data-screen='contract'] .xf-err")
+      ?.textContent?.includes("The staging AI budget is exhausted"), null, { timeout: 5000 });
+    await page.waitForFunction(() => document.querySelector("#xf .xf-screen[data-screen='contract'] .xf-sub")
+      ?.textContent?.includes("Contact the pilot lead"), null, { timeout: 5000 });
+    const error = await page.locator("#xf .xf-screen[data-screen='contract'] .xf-err").textContent();
+    const hint = await page.locator("#xf .xf-screen[data-screen='contract'] .xf-sub").textContent();
+    const budgetRecoveryPreserved = await page.evaluate(key => {
+      const inStore = (storeKey, storage) => JSON.stringify(JSON.parse(storage.getItem(storeKey) || '{"requests":[]}')).includes(key);
+      return {
+        durable: inStore("exgen_generation_request_v1", localStorage),
+        recovery: inStore("exgen_generation_recovery_v1", sessionStorage),
+        terminal: inStore("exgen_generation_terminal_v1", localStorage),
+      };
+    }, budgetIdempotencyKey);
+    ok("English budget stop remains localized and does not blame the source",
+      error.includes("The staging AI budget is exhausted") && !error.includes("Stagingens")
+        && !error.includes("relevant material") && hint.includes("Contact the pilot lead")
+        && !hint.includes("fewer questions") && errs.length === 0
+        && budgetRecoveryPreserved.durable && budgetRecoveryPreserved.recovery && !budgetRecoveryPreserved.terminal,
+      JSON.stringify({ error, hint, errs, budgetRecoveryPreserved }));
+  } catch (e) {
+    ok("English budget stop remains localized and does not blame the source", false, e.message);
+  } finally {
+    await ctx.close();
+  }
+}
+
+{
+  const { ctx, page, errs } = await mk();
+  try {
+    await signIn(page, "graph-budget-guidance", "sv");
+    await page.goto(`${srv.url}/app.html`, { waitUntil: "domcontentloaded" });
+    await page.waitForFunction(() => window.ExGenEngine?.ready === true);
+    await page.route("**/api/generate-exam*", route => route.fulfill({ status: 502, json: {
+      ok: false, error: "ai_budget_unavailable", message: "Stagingens AI-budget kunde inte verifieras.",
+    } }));
+    const result = await page.evaluate(async () => {
+      window.ExGenEngine.setInputs({ course: "Matematik 1b", level: "E", qType: "graph", num: 1,
+        material: "I tabellen är x 1, 2, 3 och y 2, 4, 6. Rita en graf över sambandet." });
+      return window.ExGenEngine.generate();
+    });
+    const status = await page.locator("#status").textContent();
+    ok("graph budget stop returns its cause without raw HTTP diagnostics",
+      result.failureKind === "AI_BUDGET_UNAVAILABLE" && status.includes("AI-budget kunde inte verifieras")
+        && !status.includes("HTTP 502") && errs.length === 0,
+      JSON.stringify({ result, status, errs }));
+  } catch (e) {
+    ok("graph budget stop returns its cause without raw HTTP diagnostics", false, e.message);
+  } finally {
+    await ctx.close();
+  }
+}
+
+if (process.env.EXGEN_BUDGET_ERRORS_ONLY === "1") {
+  await browser.close();
+  await srv.close();
+  const budgetPass = pass.length - budgetPassStart;
+  const budgetFail = fail.slice(budgetFailStart);
+  console.log(`budget UI checkpoint: ${budgetPass} passed, ${budgetFail.length} failed`);
+  budgetFail.forEach(item => console.error(`FEL ${item}`));
+  process.exit(budgetFail.length ? 1 : 0);
 }
 
 // ── T1f: a fresh local save cannot revive an expired server issuance ──────
@@ -909,13 +1113,28 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
     }, oldStart);
     await page.reload({ waitUntil: "domcontentloaded" });
     await page.waitForSelector("#xf .xf-screen[data-screen='start'].on", { timeout: 8000 });
+    ok("T1f ett sparat signerat prov blockerar start av nytt prov",
+      await page.getByRole("button", { name: "Skapa prov", exact: true }).isDisabled());
     await page.getByRole("button", { name: "Fortsätt provet du började" }).click();
     await page.getByText(/har avslutats eller gått ut/).waitFor({ timeout: 5000 });
     ok("T1f utgånget prov öppnas inte trots ett färskt utkast", !(await page.locator(".xf-exam.on").isVisible()));
-    ok("T1f gammalt provutkast tas bort", await page.evaluate(() => !Object.keys(localStorage).some((name) => name.startsWith("exgen_flow_draft_"))));
+    ok("T1f utgånget provutkast bevaras tills eleven väljer att ta bort det",
+      await page.evaluate(() => Object.keys(localStorage).some((name) => name.startsWith("exgen_flow_draft_")))
+      && await page.getByRole("button", { name: "Skapa prov", exact: true }).isDisabled());
+    page.once("dialog", dialog => dialog.dismiss());
+    await page.getByRole("button", { name: "Skapa nytt prov av materialet" }).click();
+    ok("T1f avböjd borttagning behåller det utgångna utkastet",
+      await page.evaluate(() => Object.keys(localStorage).some((name) => name.startsWith("exgen_flow_draft_"))));
+    page.once("dialog", dialog => dialog.accept());
     await page.getByRole("button", { name: "Skapa nytt prov av materialet" }).click();
     await page.waitForSelector("#xf .xf-screen[data-screen='material'].on", { timeout: 5000 });
+    ok("T1f godkänd borttagning rensar det utgångna utkastet",
+      await page.evaluate(() => !Object.keys(localStorage).some((name) => name.startsWith("exgen_flow_draft_"))));
     ok("T1f elevens material följer med till ett nytt prov", (await page.locator("#xf .xf-screen[data-screen='material'] .xf-area").inputValue()).includes("Cellandning sker i mitokondrien"));
+    await page.click("#xf .xf-screen[data-screen='material'] .xf-btn.primary");
+    await page.waitForSelector("#xf .xf-screen[data-screen='contract'].on", { timeout: 5000 });
+    ok("T1f kursen följer med till den nya provöversikten",
+      (await page.locator("#xf .xf-screen[data-screen='contract'].on").innerText()).includes("Biologi 1"));
   } finally {
     examIssuanceStateResponse = "active";
     await ctx.close();
@@ -994,8 +1213,8 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
     const perBoundary = await page.evaluate(() => {
       const selector = 'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
       const visible = node => node.getClientRects().length > 0 && !node.closest('[inert]');
-      const firstPerStop = [...document.querySelectorAll("#perWidget " + selector)].find(visible);
-      const examStops = [...document.querySelectorAll(".xf-exam " + selector)].filter(visible);
+      const firstPerStop = [...document.getElementById("perWidget").querySelectorAll(selector)].find(visible);
+      const examStops = [...document.querySelector(".xf-exam").querySelectorAll(selector)].filter(node => visible(node) && !document.getElementById("perWidget").contains(node));
       window.__perFirstTabStop = firstPerStop || null;
       window.__examLastTabStop = examStops[examStops.length - 1] || null;
       return !!firstPerStop && examStops.length > 0;
@@ -1021,7 +1240,7 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
     const inlineStops = await page.evaluate(() => {
       const selector = 'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
       const visible = node => node.getClientRects().length > 0 && !node.closest('[inert]');
-      const stops = [...document.querySelectorAll(".xf-exam " + selector)].filter(visible);
+      const stops = [...document.querySelector(".xf-exam").querySelectorAll(selector)].filter(visible);
       const per = document.getElementById("perWidget");
       const firstPer = stops.find(node => per.contains(node));
       const previous = firstPer && stops[stops.indexOf(firstPer) - 1];
@@ -1192,12 +1411,84 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
   await ctx.close();
 }
 
+// A type-skewed partial remains labelled 8/12 after grading and in history.
+{
+  const { ctx, page } = await mk();
+  const partialQuestions = Array.from({ length: 8 }, (_, index) => {
+    const short = index === 7;
+    const source = short ? EXAM.questions[1] : EXAM.questions[0];
+    return {
+      ...source,
+      id: `partial-${index + 1}`,
+      question: `Syntetisk delprov fråga ${index + 1}`,
+      ...(short ? { type: "short", options: [], correct_index: -1 } : {}),
+    };
+  });
+  try {
+    const persistedExamRows = [];
+    await page.route("**/rest/v1/user_exams**", route => {
+      if (route.request().method() === "POST") {
+        try {
+          const body = JSON.parse(route.request().postData() || "[]");
+          persistedExamRows.push(...(Array.isArray(body) ? body : [body]));
+        } catch {}
+      }
+      return route.fallback();
+    });
+    await page.route("**/api/generate-exam*", route => route.fulfill({ json: {
+      ok: true,
+      exam: { ...EXAM, questions: partialQuestions },
+      meta: { requested: 12, partial: true },
+    } }));
+    await signIn(page, "partial-history-user");
+    await toExam(page, false, 12);
+    ok("8 skapade frågor visas som delprov av 12",
+      (await page.locator("#status").innerText()).includes("8 av 12")
+        && (await page.locator("#xf .xf-exam").count()) === 1);
+    for (let index = 0; index < partialQuestions.length; index++) {
+      if (index === 7) await page.fill(".xf-answer", "syntetiskt kortsvar");
+      else await page.locator(".xf-mc-opt").first().click();
+      await page.locator(".xf-exam-nav .xf-btn.primary").click();
+      if (index < partialQuestions.length - 1) await page.waitForTimeout(150);
+    }
+    await page.waitForSelector("#xf .xf-screen[data-screen='result'].on", { timeout: 15000 });
+    const partialState = await page.evaluate(() => ({
+      history: JSON.parse(localStorage.getItem("proviaai_history") || "[]").at(-1),
+      saved: JSON.parse(localStorage.getItem("proviaai_last_result") || "null"),
+    }));
+    const partialQualityNotes = await page.locator("#xf .xf-screen[data-screen='result'] .xf-question-quality-note").allInnerTexts();
+    ok("rättad delprovsskärm visar fortfarande 8 av 12",
+      partialQualityNotes.some(note => note.includes("12 frågor") && note.includes("8 giltiga frågor")),
+      partialQualityNotes.join(" | "));
+    ok("lokal provhistorik bevarar begärt antal och delprovsflagga",
+      partialState.history?.numQuestions === 12 && partialState.history?.partialDelivery === true,
+      JSON.stringify(partialState.history));
+    ok("sparat resultat bevarar delprovets ursprungliga omfattning",
+      partialState.saved?.exam?.requested_question_count === 12
+        && partialState.saved?.exam?.partial_delivery === true,
+      JSON.stringify({ requested: partialState.saved?.exam?.requested_question_count,
+        partial: partialState.saved?.exam?.partial_delivery }));
+    const savedExam = persistedExamRows.at(-1)?.exam;
+    ok("kontots sparbegäran bevarar begärt antal och delprovsflagga",
+      savedExam?.requested_question_count === 12 && savedExam?.partial_delivery === true,
+      JSON.stringify({ requested: savedExam?.requested_question_count,
+        partial: savedExam?.partial_delivery }));
+  } finally {
+    await ctx.close();
+  }
+}
+
 // A successful grade survives a reload and is recovered only through the
 // server's verified/idempotent replay path, preserving P.E.R review proof.
 {
   const { ctx, page } = await mk();
   const originalGradeTasks = EXAM.questions.map(q => q.grade_task);
+  let recoveredReviewPayload = null;
   try {
+    await page.route("**/api/explain", async route => {
+      recoveredReviewPayload = JSON.parse(route.request().postData() || "{}");
+      return route.fulfill({ json: { ok: true, answer: "Svar efter verifierad rättning." } });
+    });
     EXAM.questions.forEach((q, index) => { q.grade_task = { task_id: `recovery-${index}`, rubric: "synthetic" }; });
     await signIn(page, "result-recovery-user");
     await toExam(page);
@@ -1222,6 +1513,22 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
     await page.waitForSelector("#xf .xf-screen[data-screen='start'].on", { timeout: 8000 });
     const restore = page.getByRole("button", { name: "Återställ resultatet" });
     ok("T1r resultatutkast får en tydlig återställningsåtgärd", await restore.count() === 1);
+    const draftBefore = await page.evaluate(() => localStorage.getItem("exgen_flow_draft_result-recovery-user"));
+    ok("T1r ett återställningsbart resultat blockerar start av nytt prov",
+      await page.getByRole("button", { name: "Skapa prov", exact: true }).isDisabled());
+    page.once("dialog", dialog => dialog.dismiss());
+    await page.getByRole("button", { name: "Ta bort lokal återställning" }).click();
+    ok("T1r avböjd borttagning bevarar återställningskopian",
+      await page.evaluate(() => localStorage.getItem("exgen_flow_draft_result-recovery-user")) === draftBefore);
+    const callsBeforeBypass = generationCallCount;
+    await page.evaluate(() => window.__xfPrefill("Syntetiskt material för en ny provbegäran.", "Biologi 1", 3));
+    await page.getByRole("button", { name: "Skapa provet", exact: true }).click();
+    ok("T1r även förifylld provstart stoppas före generering",
+      generationCallCount === callsBeforeBypass && await page.getByText(/Ett sparat prov eller resultat behöver hanteras först/).isVisible());
+    ok("T1r återställningsutkastet och svaren är oförändrade",
+      await page.evaluate(() => localStorage.getItem("exgen_flow_draft_result-recovery-user")) === draftBefore);
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.waitForSelector("#xf .xf-screen[data-screen='start'].on", { timeout: 8000 });
     await restore.click();
     await page.waitForSelector("#xf .xf-screen[data-screen='result'].on", { timeout: 15000 });
     ok("T1r verifierat resultat återställs efter omladdning", await page.locator(".xf-item-own").count() === 3);
@@ -1230,9 +1537,524 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
     ok("T1r återhämtning använder exakt en idempotent rättningsåterspelning",
       gradeCallCount === callsAfterFirstGrade + 1, `replay calls=${gradeCallCount - callsAfterFirstGrade}`);
     ok("T1r P.E.R:s facitgranskning finns efter återhämtning", await page.locator(".xf-review-action").count() > 0);
+    await page.locator("#langBtnDesktop").click();
+    ok("T1r språkbyte behåller det återställda resultatet",
+      await page.locator("#xf .xf-screen[data-screen='result'].on").isVisible());
+    await page.locator("#langBtnDesktop").click();
+    await page.locator(".xf-review-action").first().click();
+    await page.waitForFunction(() => Array.from(document.querySelectorAll("#perMessages .per-msg.teacher"))
+      .some(message => message.textContent.includes("Svar efter verifierad rättning.")), null, { timeout: 8000 });
+    ok("T1r återställt resultat öppnar P.E.R-förklaring", !!recoveredReviewPayload);
+    ok("T1r P.E.R-anropet använder återhämtat signerat provbevis",
+      recoveredReviewPayload?.examProof?.receipt === `v2.${"f".repeat(32)}.syntheticRegressionProof`
+      && recoveredReviewPayload?.examProof?.selectedQuestionId === lastGradePayload?.questions?.[0]?.id,
+      JSON.stringify({ hasProof: !!recoveredReviewPayload?.examProof,
+        selectedQuestionId: recoveredReviewPayload?.examProof?.selectedQuestionId }));
+    ok("T1r efterrättningsanropet skickar rättade frågor i samma ordning",
+      JSON.stringify(recoveredReviewPayload?.examProof?.questions?.map(q => q.id))
+        === JSON.stringify(lastGradePayload?.questions?.map(q => q.id)));
+    ok("T1r efterrättningsanropet skickar exakt de rättade elevsvaren",
+      JSON.stringify(recoveredReviewPayload?.examProof?.answers)
+        === JSON.stringify(lastGradePayload?.answers));
+    ok("T1r efterrättningsanropet är uttryckligen markerat som provgranskning",
+      recoveredReviewPayload?.examReview === true);
+    if (await page.locator("#perPanel").isVisible()) await page.locator("#perCloseBtn").click();
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.waitForSelector("#xf .xf-screen[data-screen='start'].on", { timeout: 8000 });
+    await page.getByRole("button", { name: "Återställ resultatet" }).click();
+    await page.waitForSelector("#xf .xf-screen[data-screen='result'].on", { timeout: 15000 });
+    const beforeRedoConflict = await page.evaluate(() => {
+      const key = "exgen_flow_draft_result-recovery-user";
+      const raw = localStorage.getItem(key);
+      const changed = JSON.parse(raw);
+      changed.answers = { dup: "Ett nyare syntetiskt svar" };
+      localStorage.setItem(key, JSON.stringify(changed));
+      return raw;
+    });
+    const beforeRedoCalls = generationCallCount;
+    await page.getByRole("button", { name: "Gör om — nya frågor, samma nivå" }).click();
+    ok("T1r gör om startar inte när en nyare version av samma prov har sparats",
+      generationCallCount === beforeRedoCalls
+      && await page.getByText(/Den sparade provversionen har ändrats/).isVisible());
+    await page.evaluate(raw => localStorage.setItem("exgen_flow_draft_result-recovery-user", raw), beforeRedoConflict);
+    const savedResultDraft = await page.evaluate(() => {
+      const key = "exgen_flow_draft_result-recovery-user";
+      const raw = localStorage.getItem(key);
+      const legacy = JSON.parse(raw);
+      delete legacy.exam.exam_manifest;
+      localStorage.setItem(key, JSON.stringify(legacy));
+      return raw;
+    });
+    const callsBeforeLegacyRedo = generationCallCount;
+    await page.getByRole("button", { name: "Gör om — nya frågor, samma nivå" }).click();
+    ok("T1r gör om skriver inte över ett nyare äldre utkast utan signatur",
+      generationCallCount === callsBeforeLegacyRedo
+      && await page.getByText(/Den sparade provversionen har ändrats/).isVisible());
+    await page.getByRole("link", { name: "Träna sparade misstag" }).press("Enter");
+    ok("T1r annan eller äldre sparad provkopia ger synligt fel på resultatsidan",
+      await page.getByText(/Ett annat sparat prov har ändrats eller kunde inte tas bort/).isVisible());
+    await page.evaluate(raw => localStorage.setItem("exgen_flow_draft_result-recovery-user", raw), savedResultDraft);
+    page.once("dialog", dialog => dialog.dismiss());
+    await page.getByRole("link", { name: "Träna sparade misstag" }).press("Enter");
+    ok("T1r avböjd felträning bevarar återställningskopian",
+      !!await page.evaluate(() => localStorage.getItem("exgen_flow_draft_result-recovery-user")));
+    page.once("dialog", dialog => dialog.accept());
+    await page.getByRole("link", { name: "Träna sparade misstag" }).press("Enter");
+    await page.waitForURL(/#train$/);
+    ok("T1r godkänd felträning kan fortsätta och tar bort endast den lokala återställningskopian",
+      !await page.evaluate(() => localStorage.getItem("exgen_flow_draft_result-recovery-user")));
   } finally {
     EXAM.questions.forEach((q, index) => { q.grade_task = originalGradeTasks[index]; });
     examIssuanceStateResponse = "active";
+    await ctx.close();
+  }
+}
+
+// A different draft created while generation is in flight must not be overwritten.
+{
+  const { ctx, page } = await mk();
+  let releaseGeneration;
+  let requestStarted;
+  const started = new Promise(resolve => { requestStarted = resolve; });
+  try {
+    await page.route("**/api/generate-exam*", async route => {
+      requestStarted();
+      await new Promise(resolve => { releaseGeneration = resolve; });
+      await route.fulfill({ json: { ok: true, exam: JSON.parse(JSON.stringify(EXAM)), meta: { quota: { enforced: false } } } });
+    });
+    await signIn(page, "draft-race-user");
+    await page.goto(`${srv.url}/app.html`, { waitUntil: "domcontentloaded" });
+    await page.waitForFunction(() => typeof window.__xfPrefill === "function");
+    await page.evaluate(() => window.__xfPrefill("Syntetiskt material för ett nytt prov.", "Biologi 1", 3));
+    await page.getByRole("button", { name: "Skapa provet", exact: true }).click();
+    await Promise.race([started, new Promise((_, reject) => setTimeout(() => reject(new Error("generation request did not start")), 10000))]);
+    const otherDraft = await page.evaluate(exam => {
+      const other = { uid: "draft-race-user", ts: Date.now(), phase: "active", material: "Annat syntetiskt material",
+        exam: { ...exam, exam_manifest: `v2.${"e".repeat(32)}.syntheticRegressionProof` }, answers: { dup: "A" }, helped: {}, idx: 0 };
+      const raw = JSON.stringify(other);
+      localStorage.setItem("exgen_flow_draft_draft-race-user", raw);
+      return raw;
+    }, EXAM);
+    releaseGeneration();
+    await page.waitForSelector(".xf-exam.on", { timeout: 15000 });
+    ok("T1r ett annat prov som sparas under generering skrivs inte över",
+      await page.evaluate(() => localStorage.getItem("exgen_flow_draft_draft-race-user")) === otherDraft);
+    ok("T1r eleven varnas när det nya provet inte kan sparas lokalt",
+      await page.getByText(/detta prov sparas inte på enheten/i).isVisible());
+    page.once("dialog", dialog => dialog.accept());
+    await page.getByRole("button", { name: "Avbryt prov" }).click();
+    await page.waitForSelector("#xf .xf-screen[data-screen='start'].on", { timeout: 8000 });
+    ok("T1r avbrott av det nya provet raderar inte det andra utkastet",
+      await page.evaluate(() => localStorage.getItem("exgen_flow_draft_draft-race-user")) === otherDraft);
+    await page.getByRole("button", { name: "Fortsätt provet du började" }).click();
+    await page.waitForSelector(".xf-exam.on", { timeout: 8000 });
+    ok("T1r varningen följer inte med till det bevarade sparade provet",
+      await page.getByText(/detta prov sparas inte på enheten/i).count() === 0);
+  } finally {
+    if (releaseGeneration) releaseGeneration();
+    await ctx.close();
+  }
+}
+
+// A stale tab must not replace a newer recovery snapshot of the same signed exam.
+{
+  const { ctx, page } = await mk();
+  try {
+    await signIn(page, "same-exam-race");
+    await toExam(page);
+    const newer = await page.evaluate(() => {
+      const key = "exgen_flow_draft_same-exam-race";
+      const saved = JSON.parse(localStorage.getItem(key));
+      saved.phase = "result-recovery";
+      saved.answers = { dup: "NYARE SVAR" };
+      const raw = JSON.stringify(saved);
+      localStorage.setItem(key, raw);
+      return raw;
+    });
+    await page.click(".xf-mc-opt >> nth=0");
+    await page.click(".xf-exam-nav .xf-btn.primary");
+    ok("T1r äldre flik skriver inte över nyare återställning för samma prov",
+      await page.evaluate(() => localStorage.getItem("exgen_flow_draft_same-exam-race")) === newer);
+    ok("T1r eleven varnas när senare svar inte kan sparas lokalt",
+      await page.getByText(/detta prov sparas inte på enheten/i).isVisible());
+    page.once("dialog", dialog => dialog.accept());
+    await page.getByRole("button", { name: "Avbryt prov" }).click();
+    await page.waitForSelector("#xf .xf-screen[data-screen='start'].on", { timeout: 8000 });
+    ok("T1r äldre flik raderar inte den nyare återställningen vid avbrott",
+      await page.evaluate(() => localStorage.getItem("exgen_flow_draft_same-exam-race")) === newer);
+  } finally {
+    await ctx.close();
+  }
+}
+
+// Legacy records with equal timestamps retain their fallback progress.
+{
+  const { ctx, page } = await mk();
+  try {
+    const userId = "legacy-tie-progress";
+    const now = Date.now();
+    await signIn(page, userId, "sv", {
+      [`exgen_flow_draft_${userId}`]: { uid: userId, ts: now, phase: "active", material: "Syntetiskt material",
+        exam: EXAM, answers: { dup: "A" }, helped: {}, idx: 0 },
+      [`exgen_flow_progress_${userId}`]: { uid: userId, ts: now, examManifest: EXAM.exam_manifest,
+        answers: { dup: "B" }, helped: {}, idx: 0 },
+    });
+    await page.goto(`${srv.url}/app.html`, { waitUntil: "domcontentloaded" });
+    await page.waitForSelector("#xf .xf-screen[data-screen='start'].on", { timeout: 8000 });
+    await page.getByRole("button", { name: "Fortsätt provet du började" }).click();
+    await page.waitForSelector(".xf-exam.on", { timeout: 8000 });
+    ok("T1r äldre reservsvar med samma tidsstämpel bevaras",
+      /^B(?:\.|\s)/.test(await page.locator(".xf-mc-opt.sel").innerText()));
+  } finally {
+    await ctx.close();
+  }
+}
+
+// A complete save supersedes an old fallback even if cleanup fails and the
+// fallback's timestamp is later. Exercise migration from legacy records too.
+for (const versioned of [false, true]) {
+  const { ctx, page } = await mk();
+  try {
+    const userId = versioned ? "stale-versioned-progress" : "stale-legacy-progress";
+    const key = `exgen_flow_draft_${userId}`;
+    const progressKey = `exgen_flow_progress_${userId}`;
+    const now = Date.now();
+    const initialStorage = {
+      [key]: { uid: userId, ts: now, revision: versioned ? "prior-revision" : undefined,
+        phase: "active", material: "Syntetiskt material", exam: EXAM,
+        answers: { dup: "A" }, helped: {}, idx: 0 },
+      [progressKey]: { uid: userId, ts: now + 60000, baseRevision: versioned ? "prior-revision" : undefined,
+        examManifest: EXAM.exam_manifest, answers: { dup: "B" }, helped: {}, idx: 0 },
+    };
+    // Seed these records once. The auth helper's storage option would overwrite
+    // the newer answers again on reload and invalidate this persistence test.
+    await signIn(page, userId);
+    await page.goto(`${srv.url}/app.html`, { waitUntil: "domcontentloaded" });
+    await page.waitForSelector("#xf .xf-screen[data-screen='start'].on", { timeout: 8000 });
+    await page.evaluate(storage => {
+      for (const [key, value] of Object.entries(storage)) localStorage.setItem(key, JSON.stringify(value));
+      window.dispatchEvent(new Event("exgen:history-updated"));
+    }, initialStorage);
+    await page.getByRole("button", { name: "Fortsätt provet du började" }).click();
+    await page.waitForSelector(".xf-exam.on", { timeout: 8000 });
+    ok(`T1r matchande reservsvar kan återställas (${userId})`,
+      /^B(?:\.|\s)/.test(await page.locator(".xf-mc-opt.sel").innerText()));
+    await page.evaluate(progressKey => {
+      const original = Storage.prototype.removeItem;
+      window.__restoreProgressCleanup = () => { Storage.prototype.removeItem = original; };
+      Storage.prototype.removeItem = function (key) {
+        if (key === progressKey) throw new DOMException("Cleanup blocked", "SecurityError");
+        return original.call(this, key);
+      };
+    }, progressKey);
+    await page.locator(".xf-mc-opt").nth(2).click();
+    const saved = await page.evaluate(({key, progressKey}) => ({
+      base: JSON.parse(localStorage.getItem(key)), progress: JSON.parse(localStorage.getItem(progressKey)),
+    }), {key, progressKey});
+    ok(`T1r fullständig sparning skapar ny version trots misslyckad rensning (${userId})`,
+      saved.base?.answers?.dup === "C" && /^[a-f0-9]{32}$/.test(saved.base.revision)
+      && saved.progress?.answers?.dup === "B" && saved.progress.ts > saved.base.ts);
+    if (versioned) {
+      await page.waitForSelector(".xf-answer", { timeout: 8000 });
+      await page.fill(".xf-answer", "Syntetiskt svar om jäsning.");
+      await page.locator(".xf-exam-nav .xf-btn.primary").click();
+      await page.locator(".xf-mc-opt").nth(2).click();
+      await page.locator(".xf-exam-nav .xf-btn.primary").click();
+      await page.waitForSelector("#xf .xf-screen[data-screen='result'].on", { timeout: 15000 });
+      await page.evaluate(() => window.__restoreProgressCleanup());
+      page.once("dialog", dialog => dialog.accept());
+      await page.getByRole("link", { name: "Träna sparade misstag" }).press("Enter");
+      await page.waitForURL(/#train$/);
+      ok("T1r återställd rensning ger ingen falsk konflikt vid felträning i samma flik",
+        await page.evaluate(key => localStorage.getItem(key), key) === null);
+      continue;
+    }
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.getByRole("button", { name: "Fortsätt provet du började" }).click();
+    await page.waitForSelector(".xf-exam.on", { timeout: 8000 });
+    await page.locator(".xf-dot").first().click();
+    ok(`T1r gammalt reservsvar döljer inte det nyare svaret (${userId})`,
+      /^C(?:\.|\s)/.test(await page.locator(".xf-mc-opt.sel").innerText()));
+  } finally {
+    await ctx.close();
+  }
+}
+
+// Old local drafts and their fallback records remain until the student decides.
+{
+  const { ctx, page } = await mk();
+  try {
+    const userId = "aged-local-draft";
+    const key = `exgen_flow_draft_${userId}`;
+    const progressKey = `exgen_flow_progress_${userId}`;
+    const old = Date.now() - 8 * 24 * 60 * 60 * 1000;
+    await signIn(page, userId, "sv", {
+      [key]: { uid: userId, ts: old, phase: "active", material: "Syntetiskt material",
+        exam: EXAM, answers: { dup: "A" }, helped: {}, idx: 0 },
+      [progressKey]: { uid: userId, ts: old, examManifest: EXAM.exam_manifest,
+        answers: { dup: "B" }, helped: {}, idx: 0 },
+    });
+    await page.goto(`${srv.url}/app.html`, { waitUntil: "domcontentloaded" });
+    await page.waitForSelector("#xf .xf-screen[data-screen='start'].on", { timeout: 8000 });
+    ok("T1r gammal lokal provkopia och reservsvar tas inte bort automatiskt",
+      !!await page.evaluate(key => localStorage.getItem(key), key)
+      && !!await page.evaluate(key => localStorage.getItem(key), progressKey)
+      && await page.getByRole("button", { name: "Fortsätt provet du började" }).isVisible());
+    await page.getByRole("button", { name: "Fortsätt provet du började" }).click();
+    await page.waitForSelector(".xf-exam.on", { timeout: 8000 });
+    ok("T1r gamla giltiga reservsvar används när servern tillåter återupptagning",
+      /^B(?:\.|\s)/.test(await page.locator(".xf-mc-opt.sel").innerText()));
+  } finally {
+    await ctx.close();
+  }
+}
+
+// Explicit removal must fail closed on storage errors, then work after recovery.
+{
+  const { ctx, page } = await mk();
+  try {
+    const userId = "discard-recovery-user";
+    const key = `exgen_flow_draft_${userId}`;
+    const progressKey = `exgen_flow_progress_${userId}`;
+    const baseTime = Date.now();
+    await signIn(page, userId, "sv", {
+      [key]: { uid: userId, ts: baseTime, phase: "result-recovery", material: "Syntetiskt material",
+        exam: EXAM, answers: { dup: "A" }, helped: {}, idx: 0 },
+      [progressKey]: { uid: userId, ts: baseTime + 1, examManifest: EXAM.exam_manifest,
+        answers: { dup: "B" }, helped: {}, idx: 0 },
+    });
+    await page.goto(`${srv.url}/app.html`, { waitUntil: "domcontentloaded" });
+    await page.waitForSelector("#xf .xf-screen[data-screen='start'].on", { timeout: 8000 });
+    await page.evaluate(key => {
+      window.__originalRemoveItem = Storage.prototype.removeItem;
+      Storage.prototype.removeItem = function (itemKey) {
+        if (itemKey === key) throw new DOMException("Storage blocked", "SecurityError");
+        return window.__originalRemoveItem.call(this, itemKey);
+      };
+    }, key);
+    page.once("dialog", dialog => dialog.accept());
+    await page.getByRole("button", { name: "Ta bort lokal återställning" }).click();
+    ok("T1r lagringsfel lämnar återställningskopian kvar och ny start spärrad",
+      !!await page.evaluate(key => localStorage.getItem(key), key)
+      && !!await page.evaluate(key => localStorage.getItem(key), progressKey)
+      && await page.getByRole("button", { name: "Skapa prov", exact: true }).isDisabled());
+    await page.evaluate(() => { Storage.prototype.removeItem = window.__originalRemoveItem; });
+    page.once("dialog", dialog => dialog.accept());
+    await page.getByRole("button", { name: "Ta bort lokal återställning" }).click();
+    ok("T1r eleven kan uttryckligen ta bort återställningskopian när lagring fungerar",
+      !await page.evaluate(key => localStorage.getItem(key), key)
+      && await page.getByRole("button", { name: "Skapa prov", exact: true }).isEnabled());
+  } finally {
+    await ctx.close();
+  }
+}
+
+// A delayed recovery cannot reopen an old result after the student changes view.
+{
+  const { ctx, page } = await mk();
+  let releaseGrade;
+  let gradeStarted;
+  const started = new Promise(resolve => { gradeStarted = resolve; });
+  examIssuanceStateResponse = "completed";
+  try {
+    const userId = "delayed-recovery-user";
+    await page.route("**/api/grade", async route => {
+      gradeStarted();
+      await new Promise(resolve => { releaseGrade = resolve; });
+      const payload = JSON.parse(route.request().postData() || "{}");
+      await route.fulfill({ json: { ok: true, exam_proof: `v2.${"f".repeat(32)}.syntheticRegressionProof`,
+        persistence: { mock_result_saved: true }, result: { total_points: 1, max_points: 8,
+          per_question: payload.questions.map(q => ({ id: String(q.id), points: 0, max_points: q.points, feedback: "syntetisk feedback" })) } } });
+    });
+    await signIn(page, userId, "sv", {
+      [`exgen_flow_draft_${userId}`]: { uid: userId, ts: Date.now(), phase: "result-recovery", material: "Syntetiskt material",
+        exam: EXAM, answers: { dup: "A" }, helped: {}, idx: 0 },
+    });
+    await page.goto(`${srv.url}/app.html`, { waitUntil: "domcontentloaded" });
+    await page.waitForSelector("#xf .xf-screen[data-screen='start'].on", { timeout: 8000 });
+    await page.getByRole("button", { name: "Återställ resultatet" }).click();
+    await Promise.race([started, new Promise((_, reject) => setTimeout(() => reject(new Error("recovery request did not start")), 10000))]);
+    ok("T1r lokal återställning kan inte tas bort medan återhämtning pågår",
+      await page.getByRole("button", { name: "Ta bort lokal återställning" }).isDisabled());
+    await page.evaluate(() => window.__xfPrefill("Syntetiskt material för en annan vy.", "Biologi 1", 3));
+    releaseGrade();
+    await page.waitForTimeout(2000);
+    ok("T1r fördröjd återställning öppnar inte ett gammalt resultat efter vybyte",
+      await page.locator("#xf .xf-screen[data-screen='contract'].on").isVisible()
+      && !await page.locator("#xf .xf-screen[data-screen='result'].on").isVisible());
+  } finally {
+    if (releaseGrade) releaseGrade();
+    examIssuanceStateResponse = "active";
+    await ctx.close();
+  }
+}
+
+// A deferred redraw must not transfer one exam's expired state onto another draft.
+{
+  const { ctx, page } = await mk();
+  let releaseState;
+  let stateStarted;
+  const started = new Promise(resolve => { stateStarted = resolve; });
+  try {
+    const userId = "expired-redraw-race";
+    const key = `exgen_flow_draft_${userId}`;
+    await page.route("**/api/abandon-exam*", async route => {
+      const url = new URL(route.request().url());
+      if (!url.searchParams.has("submission_id")) return route.fulfill({ json: { ok: true, active_count: 0 } });
+      stateStarted();
+      await new Promise(resolve => { releaseState = resolve; });
+      return route.fulfill({ json: { ok: true, exam_state: "expired" } });
+    });
+    await signIn(page, userId, "sv", {
+      [key]: { uid: userId, ts: Date.now(), phase: "active", material: "Första syntetiska materialet",
+        exam: EXAM, answers: { dup: "A" }, helped: {}, idx: 0 },
+    });
+    await page.goto(`${srv.url}/app.html`, { waitUntil: "domcontentloaded" });
+    await page.waitForSelector("#xf .xf-screen[data-screen='start'].on", { timeout: 8000 });
+    await page.getByRole("button", { name: "Fortsätt provet du började" }).click();
+    await Promise.race([started, new Promise((_, reject) => setTimeout(() => reject(new Error("exam state request did not start")), 10000))]);
+    await page.evaluate(() => window.dispatchEvent(new Event("exgen:history-updated")));
+    const newer = await page.evaluate(key => {
+      const saved = JSON.parse(localStorage.getItem(key));
+      saved.exam.exam_manifest = `v2.${"e".repeat(32)}.syntheticRegressionProof`;
+      saved.material = "Andra syntetiska materialet";
+      const raw = JSON.stringify(saved);
+      localStorage.setItem(key, raw);
+      return raw;
+    }, key);
+    releaseState();
+    await page.waitForTimeout(300);
+    ok("T1r utgångsstatus förs inte över till en annan sparad provkopia",
+      await page.evaluate(key => localStorage.getItem(key), key) === newer
+      && await page.getByRole("button", { name: "Fortsätt provet du började" }).isVisible()
+      && await page.getByRole("button", { name: "Skapa nytt prov av materialet" }).count() === 0);
+  } finally {
+    if (releaseState) releaseState();
+    await ctx.close();
+  }
+}
+
+// Same-view update events must not interrupt an in-flight recovery.
+{
+  const { ctx, page } = await mk();
+  let releaseState;
+  let stateStarted;
+  const started = new Promise(resolve => { stateStarted = resolve; });
+  try {
+    const userId = "rerender-recovery-user";
+    await page.route("**/api/abandon-exam*", async route => {
+      const url = new URL(route.request().url());
+      if (!url.searchParams.has("submission_id")) return route.fulfill({ json: { ok: true, active_count: 0 } });
+      stateStarted();
+      await new Promise(resolve => { releaseState = resolve; });
+      return route.fulfill({ json: { ok: true, exam_state: "completed" } });
+    });
+    await signIn(page, userId, "sv", {
+      [`exgen_flow_draft_${userId}`]: { uid: userId, ts: Date.now(), phase: "result-recovery", material: "Syntetiskt material",
+        exam: EXAM, answers: { dup: "A" }, helped: {}, idx: 0 },
+    });
+    await page.goto(`${srv.url}/app.html`, { waitUntil: "domcontentloaded" });
+    await page.waitForSelector("#xf .xf-screen[data-screen='start'].on", { timeout: 8000 });
+    const priorGradeCalls = gradeCallCount;
+    await page.getByRole("button", { name: "Återställ resultatet" }).click();
+    await Promise.race([started, new Promise((_, reject) => setTimeout(() => reject(new Error("exam state request did not start")), 10000))]);
+    await page.evaluate(() => {
+      window.dispatchEvent(new Event("exgen:history-updated"));
+      window.dispatchEvent(new Event("exgen:languagechange"));
+    });
+    ok("T1r språk- och historikuppdatering låser inte upp borttagning under återställning",
+      await page.getByRole("button", { name: "Ta bort lokal återställning" }).isDisabled());
+    releaseState();
+    await page.waitForSelector("#xf .xf-screen[data-screen='result'].on", { timeout: 15000 });
+    ok("T1r återställningen fortsätter efter omritningshändelser med ett enda rättningsanrop",
+      gradeCallCount === priorGradeCalls + 1);
+  } finally {
+    if (releaseState) releaseState();
+    await ctx.close();
+  }
+}
+
+// A server-completed exam saved as active still gets an explicit exit after a failed replay.
+{
+  const { ctx, page } = await mk();
+  let releaseFailure;
+  let failureStarted;
+  const started = new Promise(resolve => { failureStarted = resolve; });
+  examIssuanceStateResponse = "completed";
+  try {
+    const userId = "failed-recovery-user";
+    const key = `exgen_flow_draft_${userId}`;
+    await page.route("**/api/grade", async route => {
+      failureStarted();
+      await new Promise(resolve => { releaseFailure = resolve; });
+      return route.fulfill({ status: 503, json: { ok: false, error: "EXAM_STATE_UNAVAILABLE" } });
+    });
+    await signIn(page, userId, "sv", {
+      [key]: { uid: userId, ts: Date.now(), phase: "active", material: "Syntetiskt material",
+        exam: EXAM, answers: { dup: "A" }, helped: {}, idx: 0 },
+    });
+    await page.goto(`${srv.url}/app.html`, { waitUntil: "domcontentloaded" });
+    await page.waitForSelector("#xf .xf-screen[data-screen='start'].on", { timeout: 8000 });
+    await page.getByRole("button", { name: "Fortsätt provet du började" }).click();
+    await Promise.race([started, new Promise((_, reject) => setTimeout(() => reject(new Error("failed recovery request did not start")), 10000))]);
+    await page.locator("#langBtnDesktop").click();
+    await page.evaluate(() => window.dispatchEvent(new Event("exgen:history-updated")));
+    releaseFailure();
+    const discard = page.getByRole("button", { name: "Remove local recovery copy" });
+    await discard.waitFor({ state: "visible", timeout: 10000 });
+    ok("T1r misslyckad återställning av avslutat prov ger ett tydligt val att gå vidare", await discard.isEnabled());
+    ok("T1r uppskjuten språkändring visas efter misslyckad återställning",
+      await page.getByRole("button", { name: "Create an exam", exact: true }).isDisabled());
+    page.once("dialog", dialog => dialog.accept());
+    await discard.click();
+    ok("T1r godkänt bortval efter misslyckad återställning låser upp ny provstart",
+      !await page.evaluate(key => localStorage.getItem(key), key)
+      && await page.getByRole("button", { name: "Create an exam", exact: true }).isEnabled());
+  } finally {
+    if (releaseFailure) releaseFailure();
+    examIssuanceStateResponse = "active";
+    await ctx.close();
+  }
+}
+
+// A save retry's result survives a language change, including a change while
+// the save is pending. The persistence service is stubbed: this checks UI state.
+{
+  const { ctx, page } = await mk();
+  try {
+    await signIn(page, "save-language-user");
+    await toExam(page);
+    await page.evaluate(() => {
+      const originalGrade = window.ExGenEngine.grade;
+      window.ExGenEngine.grade = async (...args) => {
+        const result = await originalGrade(...args);
+        return { ...result, persistence: { accountSaveFailed: true, localId: "synthetic-local-result" } };
+      };
+      window.__saveRetryCalls = 0;
+      window.ExGenEngine.retryAccountSave = () => {
+        window.__saveRetryCalls++;
+        return new Promise(resolve => { window.__finishSaveRetry = () => resolve({ ok: true }); });
+      };
+    });
+    await page.locator(".xf-dot").last().click();
+    page.once("dialog", dialog => dialog.accept());
+    await page.locator(".xf-exam-nav .xf-btn.primary").click();
+    await page.waitForSelector("#xf .xf-screen[data-screen='result'].on", { timeout: 15000 });
+    await page.getByRole("button", { name: "Försök spara till kontot igen" }).click();
+    await page.locator("#langBtnDesktop").click();
+    ok("T1r språkbyte startar inte en parallell kontosparning",
+      await page.evaluate(() => window.__saveRetryCalls) === 1
+      && await page.locator(".xf-screen[data-screen='result'] .xf-save-warning button").isDisabled());
+    await page.evaluate(() => window.__finishSaveRetry());
+    await page.waitForFunction(() => !document.querySelector(".xf-screen[data-screen='result'] .xf-save-warning"));
+    ok("T1r lyckad kontosparning behålls när väntande språkbyte slutförs",
+      await page.locator("#xf .xf-screen[data-screen='result'].on").isVisible()
+      && await page.getByRole("button", { name: "New topic" }).isVisible());
+    await page.locator("#langBtnDesktop").click();
+    ok("T1r senare språkbyte återinför inte felmeddelande eller ny spara-knapp",
+      await page.locator(".xf-screen[data-screen='result'] .xf-save-warning").count() === 0
+      && await page.evaluate(() => window.__saveRetryCalls) === 1);
+  } finally {
     await ctx.close();
   }
 }
@@ -1344,12 +2166,12 @@ if (process.env.EXAM_FLOW_ONLY_RESULT_RECOVERY) {
     exam: document.querySelector(".xf-exam").classList.contains("on"),
     machine: document.querySelector(".xf-machine").classList.contains("on"),
     overflow: document.body.style.overflow,
-    nudge: document.querySelector(".xf-nudge").classList.contains("on"),
+    error: document.querySelector(".xf-sheet [role='alert']")?.textContent,
     answerKept: !!document.querySelector(".xf-mc-opt.sel") || !!document.querySelector(".xf-answer")?.value
   }));
   ok("T4a tillbaka i provet", st.exam === true);
   ok("T4b maskinytan stängd", st.machine === false);
-  ok("T4c eleven fick besked", st.nudge === true);
+  ok("T4c eleven fick bestående besked", /rättningen|Rättningen|server/i.test(st.error || ""));
   ok("T4d svaren kvar", st.answerKept === true);
   await page.screenshot({ path: SHOT + "/t4-grade-fail.png" });
   await ctx.close();
@@ -1741,6 +2563,7 @@ if (process.env.EXAM_FLOW_ONLY_RESULT_RECOVERY) {
     "signerat basutkast bevarat");
   ok("T13b reservposten innehåller bara svar kopplade till exakt manifest",
     stored.progress?.examManifest === baseBefore.exam.exam_manifest
+      && stored.progress?.baseRevision === stored.base?.revision
       && Object.values(stored.progress?.answers || {}).includes("B")
       && Object.values(stored.progress?.answers || {}).includes("mitt svar ska överleva omladdning")
       && !("exam" in (stored.progress || {})) && !("material" in (stored.progress || {})),
@@ -1773,12 +2596,13 @@ if (process.env.EXAM_FLOW_ONLY_RESULT_RECOVERY) {
   })));
   await page.reload({ waitUntil: "domcontentloaded" });
   await page.waitForSelector("#xf .xf-screen[data-screen='start'].on", { timeout: 8000 });
+  ok("T13f startvyn läser avvikande reservdata utan att radera den",
+    await page.evaluate(() => localStorage.getItem("exgen_flow_progress_mismatch-user") !== null));
   await page.getByRole("button", { name: "Fortsätt provet du började" }).click();
   await page.waitForSelector(".xf-exam.on", { timeout: 8000 });
   await page.click(".xf-dot >> nth=0");
-  ok("T13f svar från avvikande manifest ignoreras och tas bort",
-    await page.locator(".xf-mc-opt.sel").count() === 0
-      && await page.evaluate(() => localStorage.getItem("exgen_flow_progress_mismatch-user") === null));
+  ok("T13f svar från avvikande manifest används inte i det återställda provet",
+    await page.locator(".xf-mc-opt.sel").count() === 0);
   await ctx.close();
 }
 

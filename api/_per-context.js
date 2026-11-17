@@ -1,4 +1,15 @@
 const BLOCKED_CONTEXT_REGEX = /\b(ignore previous|ignore all|system prompt|developer message|api key|secret|token|supabase_service_role|stripe_secret|openai_api_key|env(?:ironment)? variables?)\b/i;
+const IMPROVEMENT_SECTIONS = Object.freeze({
+  hem: "översikt",
+  felbank: "felbank",
+  prov: "provhistorik",
+  coach: "studiecoach",
+  rapport: "övningsrapport",
+});
+
+export function safeImprovementSectionId(value) {
+  return typeof value === "string" && Object.hasOwn(IMPROVEMENT_SECTIONS, value) ? value : "";
+}
 
 function cleanText(value, maxLen = 120) {
   if (value === null || value === undefined) return "";
@@ -55,6 +66,25 @@ function cleanMistakes(values) {
       feedback: cleanText(item?.feedback || "", 160),
     }))
     .filter(item => item.question || item.category || item.concept || item.feedback);
+}
+
+function cleanSelectedMistakes(values) {
+  if (!Array.isArray(values)) return [];
+  return values.slice(0, 3).map(item => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) return null;
+    const mistake = {
+      question: cleanText(item.question, 240),
+      concept: cleanText(item.concept, 100),
+      studentAnswer: cleanText(item.studentAnswer, 240),
+      feedback: cleanText(item.feedback, 240),
+      expectedAnswer: cleanText(item.expectedAnswer, 240),
+      course: cleanText(item.course, 100),
+      points: cleanNumber(item.points, 0, 999),
+      maxPoints: cleanNumber(item.maxPoints, 0, 999),
+    };
+    return mistake.question || mistake.concept || mistake.studentAnswer || mistake.feedback || mistake.expectedAnswer
+      ? mistake : null;
+  }).filter(Boolean);
 }
 
 /* Mål som sidan erbjuder P.E.R att skicka eleven till. Bara id, etikett och
@@ -119,6 +149,24 @@ export function buildPERContextPack({
   if (course) pageContext.course = course;
   if (level) pageContext.level = level;
   if (mode) pageContext.mode = mode;
+
+  // The client sends only a screen id; map it to a fixed label before it can
+  // reach the prompt. Ignore section claims from every other page.
+  if (page === "förbättring" && typeof raw.activeSection === "string") {
+    const sectionId = safeImprovementSectionId(raw.activeSection);
+    const activeSection = sectionId ? IMPROVEMENT_SECTIONS[sectionId] : "";
+    if (activeSection) {
+      pageContext.activeSection = activeSection;
+      summaryLines.push(`Aktiv del av förbättringssidan: ${activeSection}`);
+    }
+  }
+
+  // Markerade fel är lokal klientkontext, inte verifierad serverhistorik.
+  // Skicka dem bara från felbanken och låt prompten behandla dem som osäkra data.
+  if (page === "förbättring" && raw.activeSection === "felbank") {
+    const selectedMistakes = cleanSelectedMistakes(raw.selectedMistakes);
+    if (selectedMistakes.length) pageContext.selectedMistakes = selectedMistakes;
+  }
 
   const currentQuestion = cleanQuestion(raw.currentQuestion, { maxText: 360, includeType: true });
   const resultStudyContext = !currentQuestion && (

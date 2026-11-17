@@ -369,6 +369,8 @@ try {
   await page.evaluate(() => {
     document.querySelector(".xf-next-actions a")?.addEventListener("click", (event) => event.preventDefault(), { capture: true, once: true });
   });
+  page.removeAllListeners("dialog");
+  page.once("dialog", dialog => dialog.accept());
   await page.getByRole("link", { name: "Träna misstagen" }).click();
   const trainingPick = await page.evaluate(() => ({
     pick: JSON.parse(localStorage.getItem("proviaai_train_pick") || "null"),

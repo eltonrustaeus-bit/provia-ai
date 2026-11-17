@@ -10,6 +10,7 @@ const ERROR_CLASSES = new Set(["AbortError", "Error", "TimeoutError", "TypeError
 const PILOT_STAGING_REF = "yhcinqejsocpmmetazpz";
 const PILOT_USER_ID = "c54b2a2a-c11a-4f55-aadd-f5935e7995e7";
 const PILOT_BUDGET_USD = 5;
+const MAX_APPROVED_PILOT_BUDGET_USD = 7; // default 5 USD plus at most 2 USD of explicitly approved staging headroom
 const SAFETY_FACTOR = 2;
 const DEFAULT_MAX_OUTPUT_TOKENS = 12000;
 const RATES_PER_MILLION = Object.freeze({
@@ -28,7 +29,7 @@ function isBudgetedPilot(userId, env = process.env) {
 function pilotBudgetCapUsd(env = process.env) {
   if (!Object.hasOwn(env, "EXGEN_PILOT_BUDGET_CAP_USD")) return PILOT_BUDGET_USD;
   const capUsd = Number(env.EXGEN_PILOT_BUDGET_CAP_USD);
-  return Number.isFinite(capUsd) && capUsd > 0 && capUsd <= PILOT_BUDGET_USD
+  return Number.isFinite(capUsd) && capUsd > 0 && capUsd <= MAX_APPROVED_PILOT_BUDGET_USD
     ? Math.round(capUsd * 1_000_000) / 1_000_000
     : null;
 }
@@ -135,6 +136,19 @@ async function settleAiSpend(reservation, usage, options = {}) {
   // Settlement is idempotent by reservation ID, including a lost success response.
   if (!result.ok) result = await callBudgetRpc("settle_ai_spend", args, options);
   return result.ok === true;
+}
+
+async function settleRejectedAiSpend(response, options = {}) {
+  const reservation = response?.aiSpendReservation;
+  if (!reservation?.enforced) return true;
+  const status = Number(response.status);
+  // Only a definitive malformed-request response is settled at zero. For
+  // every other status (including 401/429), keep the conservative reservation
+  // because this wrapper cannot prove whether provider-side work was billed.
+  if (status === 400) {
+    return settleAiSpend(reservation, { input_tokens: 0, output_tokens: 0 }, options);
+  }
+  return settleAiSpend(reservation, null, { ...options, conservativeFallback: true });
 }
 
 function budgetFailureStatus(reason) { return reason === "budget_exhausted" ? 429 : 503; }
@@ -266,5 +280,5 @@ module.exports = {
   measuredTokens, measuredEmbeddingTokens, qualityGatePassed, usageEvent, logAiUsage, logMockExamUsage, safeFailureDetails,
   PILOT_STAGING_REF, PILOT_USER_ID, PILOT_BUDGET_USD, RATES_PER_MILLION,
   isBudgetedPilot, pilotBudgetCapUsd, normalizeBudgetBody, estimateWorstCaseUsd, actualCostUsd,
-  reserveAiSpend, settleAiSpend, budgetedOpenAIFetch, budgetFailureStatus,
+  reserveAiSpend, settleAiSpend, settleRejectedAiSpend, budgetedOpenAIFetch, budgetFailureStatus,
 };
