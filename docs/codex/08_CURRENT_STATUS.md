@@ -1,5 +1,29 @@
 # 08 Current Status
 
+## Production class/profile access restrictions — 2026-11-17
+
+- With separate explicit approval, the existing migrations
+  `20261012103949_restrict_direct_class_joins.sql`,
+  `20261117220908_restrict_direct_class_writes.sql`, and
+  `20261012222700_restrict_profiles_client_insert.sql` were applied in that
+  order to production. The Supabase connector recorded hosted versions
+  `20261117224851`, `20261117224945`, and `20261117224953` under the matching
+  migration names. Local filenames and hosted versions differ; reconcile
+  migration history before any future CLI push rather than replaying SQL.
+- Production catalog readback: `anon` and `authenticated` lack
+  INSERT/UPDATE/DELETE on `classes` and `class_members`; `service_role`
+  retains those writes. Browser roles lack profile INSERT. The direct join
+  and profile insert policies are absent. Auth's `on_auth_user_created`
+  trigger is enabled and still invokes SECURITY DEFINER `handle_new_user`.
+  `https://exgen.se/app.html` returned HTTP 200 after application.
+- These checks confirm the database permission boundary and page availability,
+  not a hosted authenticated signup or teacher create/student join/leave.
+  The pilot Preview intentionally blocks class routes; use a safe normal-mode
+  staging path with disposable accounts before claiming the full flow works.
+  PR #128 remains draft; no `main` merge or Production code deploy occurred.
+- The detailed evidence and other open security findings are in
+  `docs/security/pilot-security-status-2026-11-17.md`.
+
 ## Main release — 2026-11-17
 
 - PR #125 was merged to `main` as merge commit `f82c28c0643bc9e5e6d4581cedf744871f4cd28d`.

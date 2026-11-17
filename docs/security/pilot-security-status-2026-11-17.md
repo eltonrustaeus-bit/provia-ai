@@ -1,9 +1,9 @@
 # ExGen school-pilot security work — 2026-11-17
 
 This is a working, evidence-scoped record, not a security certification. The
-repository review used feature-branch commit `c5753c4` plus the current local
-diff. Production observations came from read-only Supabase catalog/advisors and
-an HTTPS header check; no authenticated cross-account attack test was run.
+initial repository review used feature-branch commit `c5753c4`; subsequent
+changes and hosted checks are recorded below. No authenticated cross-account
+attack test was run against production.
 
 ## Personal-data map
 
@@ -36,21 +36,20 @@ JavaScript access to those tokens.
    security advisor lists four anon-executable definer functions, down from
    six; these are the separately reviewed trigger/event-trigger cases. Its
    mutable-search-path count is now two, down from four.
-2. Production `class_members` permits a user to insert their own membership
-   for any known class ID, bypassing the server's join-code check. The local
-   `20261012103949_restrict_direct_class_joins.sql` removes direct browser
-   insertion; it is absent from production history.
-3. Production `classes` grants direct browser writes and its owner policy does
-   not require a teacher role. The API checks teacher/admin role, but callers
-   can bypass that route. The prepared local
-   `20261117220908_restrict_direct_class_writes.sql` revokes browser writes to
-   `classes` and `class_members` while preserving service-role writes. A PGlite
-   test verifies the intended ACL boundary; staging ACL readback now matches,
-   while live API behavior remains untested.
-4. The local `20261012222700_restrict_profiles_client_insert.sql` addresses a
-   conditional role-insert risk if an Auth profile row is missing. It has not
-   been applied to production. Confirm signup and recovery behavior first.
-5. `api/admin.js` allows role changes and approval using an admin bearer
+2. After separate approval, production received the reviewed class-join,
+   class-write and profile-insert restrictions in that order. The connector
+   recorded them as `20261117224851`, `20261117224945` and `20261117224953`
+   respectively, under names `restrict_direct_class_joins`,
+   `restrict_direct_class_writes` and `restrict_profiles_client_insert`.
+   Readback found both old direct-insert policies absent. `anon` and
+   `authenticated` now lack INSERT/UPDATE/DELETE on `classes` and
+   `class_members`, while `service_role` retains those writes. Both browser
+   roles lack profile INSERT; the Auth `on_auth_user_created` trigger remains
+   enabled and points to the SECURITY DEFINER `handle_new_user` function.
+   `https://exgen.se/app.html` returned HTTP 200 after the changes. These
+   checks establish database ACLs and page availability, not a successful
+   hosted signup or authenticated class create/join/leave journey.
+3. `api/admin.js` allows role changes and approval using an admin bearer
    session without a fresh passkey step-up. The existing passkey flow is
    owner-scoped; design a compatible admin UI/auth change before enforcing it.
    Independent review found that extending the current owner gate directly
@@ -77,8 +76,8 @@ effective in the reviewed production catalog.
   request-level regression confirms a synthetic email name is absent from
   the sent model payload. This is live only in the feature Preview.
 - `20261117220908_restrict_direct_class_writes.sql` and its PGlite test:
-  closes direct class mutation paths. The migration is applied only in staging;
-  it is not deployed to production.
+  closes direct class mutation paths. The SQL is now applied in staging and
+  production; the feature-branch app code remains Preview-only.
 
 ## Read-only environment checks
 
@@ -89,12 +88,11 @@ effective in the reviewed production catalog.
   insert class memberships but could update/delete memberships and write
   classes. The later readback below confirms those remaining class writes are
   now denied in staging.
-- The pre-change production catalog showed anon and authenticated could execute
-  both exam-count RPCs; the new post-change check above supersedes that finding.
-  Authenticated can still insert/update/delete `classes`,
-  `class_members` and `profiles`. These are permissions, not proof that every
-  attempted write succeeds; the class-creation/known-class join bypasses
-  additionally follow from the current policies reviewed above.
+- The pre-change production catalog showed browser-role writes to `classes`
+  and `class_members`, and profile INSERT. The production readback above
+  supersedes those findings. Profile UPDATE/DELETE table privileges still
+  exist for browser roles and remain governed by their own RLS policies;
+  this approved change addressed profile INSERT only.
 - A fresh unauthenticated HTTPS HEAD check of `https://exgen.se/app.html`
   returned HTTP 200 and HSTS, but none of the five prepared response headers.
   This confirms the local `vercel.json` change has not reached Production.
@@ -168,9 +166,10 @@ effective in the reviewed production catalog.
   account, so no authenticated class mutation or cross-account API test was
   run through it.
 - The Supabase connector assigned hosted ledger versions different from the
-  repository filenames for both the staging class fix and production count
-  fix. Reconcile migration history deliberately before any future CLI push;
-  do not replay either SQL blindly or edit the ledger without review.
+  repository filenames for the staging class fix, production count fix and
+  the three newly applied production restrictions. Reconcile migration history
+  deliberately before any future CLI push; do not replay SQL blindly or edit
+  the ledger without review.
 - The open staging Preview is logged in as the existing ExGen staging account,
   but `konto.html` deliberately hides the class card and skips
   `student_classes` in pilot mode. `api/check-role.js` also rejects these class
@@ -223,21 +222,20 @@ effective in the reviewed production catalog.
   Verify server class creation/join/leave,
   account deletion including storage, and normal exam/P.E.R. journeys; the
   database transaction could not exercise JWT validation or those routes.
-- Production: separate approval is required for migrations, Auth settings,
-  secrets, push, merge or deployment. After each approved release, verify live
-  ACL/policy metadata and denied calls; check login, class join, exam and P.E.R.
+- Production: the count-RPC and three class/profile migrations described above
+  were separately approved and applied. Further migrations, Auth settings,
+  secrets, merge or deployment require their own approval. After each release,
+  verify live ACL/policy metadata and denied calls; check login, class join, exam and P.E.R.
   with existing legitimate accounts without exposing student content.
 
 ## Execution order before a school pilot
 
-1. **Close remaining class and profile access paths.** The count RPCs are now
-   restricted in production. Complete hosted authenticated API verification
-   of the applied staging class-write fix, then package the staging-tested
-   direct-join and profile-insert restrictions with the new class-write
-   migration. Production application requires a separate, exact approval and
-   a check for active class operations. Success means browser roles cannot
-   write class membership/classes directly, while teacher creation, coded
-   student join/leave and own-class reporting still work through the API.
+1. **Verify the closed class and profile paths end to end.** The count RPCs,
+   direct class writes and profile INSERT are now restricted in production.
+   Database ACLs and page availability passed. A safe normal-mode staging
+   deployment with disposable accounts is still needed to prove teacher
+   creation, coded student join/leave, own-class reporting, and signup through
+   hosted authenticated APIs before claiming the whole journey works.
 2. **Harden privileged accounts.** Require a fresh passkey step-up for
    role/approval changes and protect the admin UI accordingly; test bootstrap,
    lost-device recovery, another admin, expired proof and a stolen bearer.
