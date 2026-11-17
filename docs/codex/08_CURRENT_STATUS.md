@@ -29,11 +29,19 @@
   syntax checks and `git diff --check` passed. The older offline test file
   still contains assertions for the removed AI-review/repair behavior and is
   not passing as a whole; those stale expectations are not counted as a pass.
-- All evidence above is local/mocked. No hosted AI request has yet verified
-  the behavior of this change. The next step is one feature-branch checkpoint,
-  verify its Vercel Preview on the existing tab, then run one bounded synthetic
-  staging journey only if the already approved budget and session still allow
-  it. `main`, Production and databases remain unchanged.
+- Commit `9e9b109` was pushed to the existing feature branch. Vercel deployment
+  `dpl_5WNKCkjopnSkqGeZ5BM68znqbvVq` reached READY for that exact SHA and the
+  existing feature Preview alias. The same signed-in tab was reused; no new
+  tabs were opened.
+- One synthetic 3-question staging attempt was started in that Preview, but
+  the browser stopped it locally at the saved-attempt limit before an AI call.
+  The visible app message confirms no exam and no AI request started. Fresh
+  staging budget read before the attempt: cap `$5.879071`, spent `$3.687971`,
+  reserved `$0.282822`, available `$1.908278`; no budget write occurred. Thus
+  this is not a live generation pass and the deployed generation behavior is
+  not yet verified end to end. Do not bypass or clear the saved-attempt guard;
+  continue only from the original tab/request or after the app's recovery state
+  is safely resolved. `main`, Production and databases remain unchanged.
 
 ## Source-target grounding and safe retry after quota denial — 2026-11-17
 
