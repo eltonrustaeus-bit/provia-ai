@@ -88,9 +88,13 @@ export default async function handler(req, res) {
       (typeof req.url === "string" ? new URL(req.url, "https://exgen.invalid").searchParams.get("submissionId") : "");
     if (!SUBMISSION.test(submissionId || "")) return res.status(400).json({ ok: false, enabled: false });
     const canonical = await cachedExam(user.id, submissionId);
+    const questions = canonical?.exam?.questions;
+    const sourceBound = Array.isArray(questions) && questions.every((question) =>
+      question?.type === "graph" || (Array.isArray(question?.source_references) &&
+        question.source_references.some((reference) => typeof reference === "string" && reference.trim())));
     const eligible = Boolean(canonical?.meta && ["sv", "en"].includes(canonical.meta.lang) &&
       ["E", "C", "A"].includes(canonical.meta.level) &&
-      canonical.exam?.exam_manifest?.split(".")[1] === submissionId);
+      canonical.exam?.exam_manifest?.split(".")[1] === submissionId && sourceBound);
     return res.status(200).json({ ok: true, enabled: eligible });
   }
   const body = await readBody(req);
@@ -130,6 +134,10 @@ export default async function handler(req, res) {
     )) return res.status(409).json({ ok: false, error: "EXAM_REPLACEMENT_UNAVAILABLE" });
     if (original.type === "graph") {
       return res.status(409).json({ ok: false, error: "GRAPH_REPLACEMENT_UNAVAILABLE" });
+    }
+    if (!Array.isArray(original.source_references) || !original.source_references.some((reference) =>
+      typeof reference === "string" && reference.trim() && material.includes(reference))) {
+      return res.status(409).json({ ok: false, error: "EXAM_SOURCE_ANCHOR_UNAVAILABLE" });
     }
   } else {
     // Successful revisions move the generation cache to the child. Only their
@@ -186,20 +194,19 @@ export default async function handler(req, res) {
       },
     });
     const approved = batch.status === 200 && batch.body?.ok &&
-      Array.isArray(batch.body.questions) && batch.body.quality?.verifierApproved >= batch.body.questions.length &&
-      (original.type !== "mc" || batch.body.quality?.solverApprovedMc >= batch.body.questions.length)
+      Array.isArray(batch.body.questions)
       ? batch.body.questions : [];
     let revised = null;
     for (const candidate of approved) {
       revised = revision.reviseIssuedExam({
         userId: user.id, course, material, exam: canonical.exam, submissionId: parentSubmissionId,
-        questionId, candidate, lang, level, requiredTrainingFocusId: "focus-1",
+        questionId, candidate, lang, level,
       });
       if (revised) break;
     }
     if (!revised) {
       await failClaim();
-      return res.status(502).json({ ok: false, error: "REPLACEMENT_QUALITY_UNAVAILABLE" });
+      return res.status(502).json({ ok: false, error: "REPLACEMENT_GENERATION_UNAVAILABLE" });
     }
     const response = {
       ...canonical,

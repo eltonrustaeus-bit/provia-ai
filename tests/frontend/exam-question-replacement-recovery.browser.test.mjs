@@ -88,7 +88,7 @@ try {
       return original.call(this, key, value);
     };
   });
-  await secondPage.getByRole("button", { name: /Fel fråga\? Generera ny/ }).click();
+  await secondPage.getByRole("button", { name: /Gör om frågan/ }).click();
   assert.equal(calls, 1, "no POST starts when the recovery request cannot be saved");
   const stillSaved = await secondPage.evaluate(() => JSON.parse(localStorage.getItem("exgen_flow_draft_u1")));
   assert.equal(stillSaved.replacementPending, null);
@@ -123,7 +123,7 @@ try {
       return describe(context);
     };
   });
-  await thirdPage.getByRole("button", { name: /Fel fråga\? Generera ny/ }).click();
+  await thirdPage.getByRole("button", { name: /Gör om frågan/ }).click();
   assert.equal(await thirdPage.locator(".xf-dot").nth(1).isDisabled(), true,
     "question dots cannot change the target during a replacement");
   releaseResponse();
@@ -152,7 +152,7 @@ try {
   const fourthPage = fourth.page;
   await fourthPage.getByRole("button", { name: /Fortsätt provet du började/ }).click();
   await fourthPage.waitForSelector(".xf-exam.on .xf-replace");
-  await fourthPage.getByRole("button", { name: /Fel fråga\? Generera ny/ }).click();
+  await fourthPage.getByRole("button", { name: /Gör om frågan/ }).click();
   await fourthPage.waitForFunction(() => {
     const draft = JSON.parse(localStorage.getItem("exgen_flow_draft_u1") || "null");
     return draft && draft.replacementPending === null &&
@@ -198,7 +198,7 @@ try {
   fifthPage.on("dialog", dialog => dialog.accept());
   await fifthPage.getByRole("button", { name: /Fortsätt provet du började/ }).click();
   await fifthPage.waitForSelector(".xf-exam.on .xf-replace");
-  await fifthPage.getByRole("button", { name: /Fel fråga\? Generera ny/ }).click();
+  await fifthPage.getByRole("button", { name: /Gör om frågan/ }).click();
   await fifthPage.getByText(/kunde inte sparas här|could not save it on this device/i).waitFor();
   await fifthPage.getByRole("button", { name: /Kontrollera frågebytet|Check question replacement/i }).waitFor();
   const pendingAfterCommitFailure = await fifthPage.evaluate(() => {
@@ -257,8 +257,8 @@ try {
   const seventhPage = seventh.page;
   await seventhPage.getByRole("button", { name: /Fortsätt provet du började/ }).click();
   await seventhPage.waitForSelector(".xf-exam.on .xf-replace");
-  await seventhPage.getByRole("button", { name: /Fel fråga\? Generera ny/ }).click();
-  await seventhPage.getByRole("button", { name: /Fel fråga\? Generera ny/ }).waitFor();
+  await seventhPage.getByRole("button", { name: /Gör om frågan/ }).click();
+  await seventhPage.getByRole("button", { name: /Gör om frågan/ }).waitFor();
   const staleProofState = await seventhPage.evaluate(() => JSON.parse(localStorage.getItem("exgen_flow_draft_u1")));
   assert.equal(staleProofState.exam.exam_manifest, oldExam.exam_manifest,
     "a child response with an unchanged old question proof is rejected");

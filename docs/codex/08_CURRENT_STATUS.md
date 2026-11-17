@@ -1,5 +1,40 @@
 # 08 Current Status
 
+## Generation-only issuance and in-place question replacement — 2026-11-17
+
+- The blocking semantic AI review/solver/repair stages have been removed from
+  the normal exam-issuance path. Questions still pass deterministic structure,
+  answer-shape, duplicate-stem and material-reference checks; they are marked
+  `generation_only`, and the UI no longer labels them as AI-reviewed. This is
+  the requested tradeoff to let a usable exam issue without waiting for a
+  second AI gate. It does not guarantee semantic correctness: ambiguous or
+  incorrect model answers can now pass the deterministic checks.
+- Generation prompts were strengthened for concise, unambiguous questions,
+  single defensible answers, plausible multiple-choice options, source use and
+  the exact requested count. The material allowance is now 24,000 characters.
+- The existing per-question replacement flow is labeled “Gör om frågan”. It
+  replaces one question in place, keeps the rest of the exam and answers, and
+  retains ownership/proof, format, point-value and original source-anchor
+  checks. Replacement still uses the generation-only question path rather
+  than a semantic quality gate.
+- Independent review found and the writer fixed a mixed-question selection
+  target bug and a replacement source-scope issue. Reviewers reported no
+  remaining security/signing blocker; they called out semantic ambiguity as a
+  known product risk of removing the requested gate.
+- Local evidence on this working tree: pipeline HTTP tests **3/3** (including
+  mocked 3/6/12 requests and zero reviewer/solver calls), pipeline unit tests
+  **34/34**, PostgreSQL contract tests **29/29**, replacement/revision tests
+  **10/10**, replacement browser recovery **6 scenarios**, material boundary
+  and selection tests passed, broad exam-flow browser regression **256/256**,
+  syntax checks and `git diff --check` passed. The older offline test file
+  still contains assertions for the removed AI-review/repair behavior and is
+  not passing as a whole; those stale expectations are not counted as a pass.
+- All evidence above is local/mocked. No hosted AI request has yet verified
+  the behavior of this change. The next step is one feature-branch checkpoint,
+  verify its Vercel Preview on the existing tab, then run one bounded synthetic
+  staging journey only if the already approved budget and session still allow
+  it. `main`, Production and databases remain unchanged.
+
 ## Source-target grounding and safe retry after quota denial — 2026-11-17
 
 - The under-covered-section prompt now directs a question to the selected

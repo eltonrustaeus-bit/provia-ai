@@ -85,6 +85,14 @@ async function mk(opts = {}, gradeOk = true, gradeResult = null, gradeDelayMs = 
         const body = JSON.parse(r.request().postData() || "{}");
         if (body && Object.hasOwn(body, "pastedText")) lastGeneratePayload = body;
       } catch (_) {}
+      const pipeline = new URL(r.request().url()).searchParams.get("pipeline");
+      if (pipeline === "start") return r.fulfill({ status: 202, json: {
+        ok: true, operationId: "11111111-1111-4111-8111-111111111111", requested: 3, approved: 0,
+      } });
+      if (pipeline === "advance" || pipeline === "status") return r.fulfill({ json: {
+        ok: true, state: "succeeded", exam: JSON.parse(JSON.stringify(EXAM)),
+        meta: { quota: { enforced: false }, requested: 3, partial: false },
+      } });
       return r.fulfill({ json: { ok: true, exam: JSON.parse(JSON.stringify(EXAM)), meta: { quota: { enforced: false } } } });
     }],
     ["**/api/grade", async r => {
@@ -284,11 +292,11 @@ async function toExam(page, reuseStart = false, requestedCount = 3) {
       return route.fulfill({ json: { ok: true, exam: EXAM, meta: { requested: 3, partial: false } } });
     });
     const completed = toExam(page);
-    await page.waitForFunction(() => document.querySelector("#xf .xf-generation-progress")?.textContent.includes("2 av 3 frågor godkända"));
+    await page.waitForFunction(() => document.querySelector("#xf .xf-generation-progress")?.textContent.includes("2 av 3 frågor klara"));
     await page.waitForTimeout(850);
     const progress = page.locator("#xf .xf-generation-progress");
     ok("synliga provvyn visar varaktig godkänd progress", await progress.isVisible()
-      && (await progress.innerText()).includes("2 av 3 frågor godkända"));
+      && (await progress.innerText()).includes("2 av 3 frågor klara"));
     ok("stegvis generering lovar inte under en minut", !(await page.locator("#xf").innerText()).includes("under en minut"));
     await page.screenshot({ path: SHOT + "/generation-progress-desktop.png" });
     await page.setViewportSize({ width: 390, height: 844 });
@@ -452,7 +460,7 @@ async function toMaterial(page) {
   }
 }
 
-// Long source text must be preserved up to the shared 16,000-character cap;
+// Long source text must be preserved up to the shared 24,000-character cap;
 // the student must never proceed with a silently shortened source.
 {
   const { ctx, page, errs } = await mk();
@@ -462,16 +470,16 @@ async function toMaterial(page) {
     await page.setViewportSize({ width: 320, height: 740 });
     const area = page.locator("#xf .xf-screen[data-screen='material'] .xf-area");
     const next = page.locator("#xf .xf-screen[data-screen='material'] .xf-btn.primary");
-    await area.fill("x".repeat(16001));
+    await area.fill("x".repeat(24001));
     const overLimit = await page.locator("#xf .xf-screen[data-screen='material'] .xf-read[role='status']").textContent();
-    ok("aktivt materialflöde varnar och stoppar över 16 000 tecken",
-      /16.?000/.test(overLimit || "") && /korta ner/.test(overLimit || "") && await next.isDisabled(), overLimit || "");
+    ok("aktivt materialflöde varnar och stoppar över 24 000 tecken",
+      /24.?000/.test(overLimit || "") && /korta ner/.test(overLimit || "") && await next.isDisabled(), overLimit || "");
     ok("övergränsmaterialet bevaras redigerbart",
-      (await area.inputValue()).length === 16001);
-    await area.fill("x".repeat(16000));
+      (await area.inputValue()).length === 24001);
+    await area.fill("x".repeat(24000));
     const atLimit = await page.locator("#xf .xf-screen[data-screen='material'] .xf-read[role='status']").textContent();
-    ok("exakt 16 000 tecken tillåts och urval för vissa provsteg beskrivs korrekt",
-      /16.?000 \/ 16.?000/.test(atLimit || "") && /hela texten sparas/i.test(atLimit || "")
+    ok("exakt 24 000 tecken tillåts och urval för vissa provsteg beskrivs korrekt",
+      /24.?000 \/ 24.?000/.test(atLimit || "") && /hela texten sparas/i.test(atLimit || "")
         && /kan väljas/i.test(atLimit || "") && await next.isEnabled(), atLimit || "");
     await area.fill("x".repeat(13000));
     const selectedSections = await page.locator("#xf .xf-screen[data-screen='material'] .xf-read[role='status']").textContent();
@@ -505,16 +513,16 @@ async function toMaterial(page) {
       /all text is saved/i.test(longNotice || "")
         && /may be selected/i.test(longNotice || "")
         && !/are selected during generation/i.test(longNotice || ""), longNotice || "");
-    await area.fill("x".repeat(16000));
+    await area.fill("x".repeat(24000));
     const englishAtLimit = await english.page.locator("#xf .xf-screen[data-screen='material'] .xf-read[role='status']").textContent();
-    ok("English accepts exactly 16,000 characters with accurate selection wording",
-      /16,000 \/ 16,000/.test(englishAtLimit || "")
+    ok("English accepts exactly 24,000 characters with accurate selection wording",
+      /24,000 \/ 24,000/.test(englishAtLimit || "")
         && /all text is saved/i.test(englishAtLimit || "")
         && /may be selected/i.test(englishAtLimit || ""), englishAtLimit || "");
-    await area.fill("x".repeat(16001));
+    await area.fill("x".repeat(24001));
     const notice = await english.page.locator("#xf .xf-screen[data-screen='material'] .xf-read[role='status']").textContent();
-    ok("English over-limit notice matches the 16,000-character cap",
-      /16,000/.test(notice || "") && /shorten/i.test(notice || ""), notice || "");
+    ok("English over-limit notice matches the 24,000-character cap",
+      /24,000/.test(notice || "") && /shorten/i.test(notice || ""), notice || "");
   } catch (e) {
     ok("English material limit message is accurate", false, e.message);
   } finally { await english.ctx.close(); }
@@ -527,12 +535,12 @@ async function toMaterial(page) {
     await signIn(page, "long-training-material-user");
     await page.goto(`${srv.url}/app.html`, { waitUntil: "domcontentloaded" });
     await page.waitForFunction(() => typeof window.__xfPrefill === "function", null, { timeout: 8000 });
-    await page.evaluate(() => window.__xfPrefill("y".repeat(16001), "Biologi 1"));
+    await page.evaluate(() => window.__xfPrefill("y".repeat(24001), "Biologi 1"));
     const area = page.locator("#xf .xf-screen[data-screen='material'] .xf-area");
     const status = page.locator("#xf .xf-screen[data-screen='material'] .xf-read[role='status']");
     ok("felbanksträning visar hela överlånga källan och stoppar fortsättning",
-      (await area.inputValue()).length === 16001 && await page.locator("#xf .xf-screen[data-screen='material'] .xf-btn.primary").isDisabled()
-        && /16.?000/.test(await status.textContent() || "")
+      (await area.inputValue()).length === 24001 && await page.locator("#xf .xf-screen[data-screen='material'] .xf-btn.primary").isDisabled()
+        && /24.?000/.test(await status.textContent() || "")
         && /Träningsmaterialet är längre/.test(await page.locator("#xf .xf-screen[data-screen='material'] .xf-err").textContent() || ""));
   } catch (e) {
     ok("felbanksträning bevarar material över gränsen", false, e.message);
@@ -867,7 +875,7 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
       "Linjär funktion y = 2x + 1 beskriver sambandet mellan x och y. Lutningen är 2 och skärningen med y-axeln är 1.");
     await page.click("#xf .xf-screen[data-screen='material'] .xf-btn.primary");
     await page.waitForSelector("#xf .xf-screen[data-screen='contract'].on", { timeout: 5000 });
-    const qualityMessage = "För få frågor klarade kvalitetskontrollen för att bilda ett användbart prov. Inget prov lämnades ut. Lägg till mer relevant material eller avgränsa området och försök igen.";
+    const generationMessage = "Provskapandet kunde inte slutföras. Inget ofullständigt prov lämnades ut. Lägg till mer relevant material eller avgränsa området och försök igen.";
     const operationId = "12345678-1234-4234-8234-123456789abc";
     let terminalIdempotencyKey = null;
     await page.route("**/api/generate-exam*", route => {
@@ -880,29 +888,29 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
         } });
       }
       if (pipeline === "advance") return route.fulfill({ status: 502, json: {
-        ok: false, error: "incomplete_exam", message: qualityMessage, received: 0, requested: 3,
+        ok: false, error: "incomplete_exam", message: generationMessage, received: 0, requested: 3,
       } });
       if (pipeline === "status") return route.fulfill({ status: 502, json: {
-        ok: false, error: "incomplete_exam", message: qualityMessage, received: 0, requested: 3,
+        ok: false, error: "incomplete_exam", message: generationMessage, received: 0, requested: 3,
       } });
       return route.fulfill({ status: 400, json: { ok: false, error: "unexpected_pipeline_request" } });
     });
     await page.click("#xf .xf-screen[data-screen='contract'] .xf-btn.primary");
     await page.waitForFunction(() => document.querySelector("#xf .xf-screen[data-screen='contract'] .xf-err")
-      ?.textContent?.includes("0 av 3 frågor klarade kontrollen"), null, { timeout: 5000 });
+      ?.textContent?.includes("0 av 3 frågor kunde skapas"), null, { timeout: 5000 });
     const zeroCountStillOnContract = await page.locator("#xf .xf-screen[data-screen='contract']").evaluate(node => node.classList.contains("on"));
     const zeroCountExamState = await page.locator("#examBody").evaluate(node => ({ text: node.textContent.trim(), skeleton: Boolean(node.querySelector(".skelBox")) }));
     const zeroCountControls = await page.locator("#gradeBtn").evaluate(() => ({
       gradeDisabled: document.getElementById("gradeBtn")?.disabled === true,
       floatingBarHidden: !document.getElementById("floatingGradeBar")?.classList.contains("show"),
     }));
-    ok("noll godkända frågor visas som 0 av 3 utan att öppna ett tomt prov",
+    ok("noll skapade frågor visas som 0 av 3 utan att öppna ett tomt prov",
       zeroCountStillOnContract && zeroCountExamState.text === "" && !zeroCountExamState.skeleton &&
         zeroCountControls.gradeDisabled && zeroCountControls.floatingBarHidden,
       JSON.stringify({ zeroCountStillOnContract, zeroCountExamState, zeroCountControls }));
-    ok("noll-frågefallet visar ett begripligt kvalitetsfel och inte en HTTP-kod",
+    ok("noll-frågefallet visar ett begripligt genereringsfel och inte en HTTP-kod",
       await page.locator("#xf .xf-screen[data-screen='contract'] .xf-err").textContent().then(text =>
-        text.includes(qualityMessage) && text.includes("0 av 3 frågor klarade kontrollen") && !text.includes("Error (HTTP 502)")));
+        text.includes(generationMessage) && text.includes("0 av 3 frågor kunde skapas") && !text.includes("Error (HTTP 502)")));
     const failedRequestCleanup = await page.evaluate(key => {
       const durable = JSON.parse(localStorage.getItem("exgen_generation_request_v1") || '{"requests":[]}');
       const terminal = JSON.parse(localStorage.getItem("exgen_generation_terminal_v1") || '{"requests":[]}');
@@ -1434,7 +1442,7 @@ if (process.env.EXGEN_BUDGET_ERRORS_ONLY === "1") {
     } }));
     await signIn(page, "partial-history-user");
     await toExam(page, false, 12);
-    ok("8 godkända frågor visas som delprov av 12",
+    ok("8 skapade frågor visas som delprov av 12",
       (await page.locator("#status").innerText()).includes("8 av 12")
         && (await page.locator("#xf .xf-exam").count()) === 1);
     for (let index = 0; index < partialQuestions.length; index++) {
@@ -1450,7 +1458,7 @@ if (process.env.EXGEN_BUDGET_ERRORS_ONLY === "1") {
     }));
     const partialQualityNotes = await page.locator("#xf .xf-screen[data-screen='result'] .xf-question-quality-note").allInnerTexts();
     ok("rättad delprovsskärm visar fortfarande 8 av 12",
-      partialQualityNotes.some(note => note.includes("12 frågor") && note.includes("8 frågor klarade")),
+      partialQualityNotes.some(note => note.includes("12 frågor") && note.includes("8 giltiga frågor")),
       partialQualityNotes.join(" | "));
     ok("lokal provhistorik bevarar begärt antal och delprovsflagga",
       partialState.history?.numQuestions === 12 && partialState.history?.partialDelivery === true,

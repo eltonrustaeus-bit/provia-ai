@@ -155,7 +155,13 @@ function uncoveredTrainingFocusIds(job, questions) {
 function supportedTrainingFocusMatches(question, matches, trainingFocus, sourceMaterial = "") {
   const references = Array.isArray(question?.source_references) ? question.source_references : [];
   const focuses = Array.isArray(trainingFocus) ? trainingFocus : [];
-  return (Array.isArray(matches) ? matches : []).filter((focusId) => {
+  // In generation-only mode there is no verifier to attach focus IDs. Treat
+  // them as candidates, then apply the same deterministic source/evidence
+  // checks below before preserving mistake-targeting behavior.
+  const candidateMatches = Array.isArray(matches) && matches.length
+    ? matches
+    : focuses.map((focus, index) => /^focus-[1-9][0-9]{0,1}$/.test(focus?.focusId || "") ? focus.focusId : `focus-${index + 1}`);
+  return candidateMatches.filter((focusId) => {
     const focus = focuses.find((item, index) =>
       (item?.focusId || `focus-${index + 1}`) === focusId);
     if (!focus) return false;
@@ -496,10 +502,9 @@ async function advance(job, { deadlineAt = null } = {}) {
   const sourceCounts = sourceTarget?.counts || [];
   const rankedQuestions = generated.body.questions.map((question, index) => ({ question, index,
     sourceIndices: coverage.questionSectionIndices(question, sections) }));
-  const eligibleCount = rankedQuestions.filter(({ question }) => question.validation_status === "verified" &&
-    (!targets || question.type === batchType) && noSemanticDuplicate(existing, question, {
-      profile: assessment.detectSubjectProfile(job.payload.course, job.payload.pastedText), sourceMaterial: job.payload.pastedText,
-    })).length;
+  const eligibleCount = rankedQuestions.filter(({ question }) =>
+    ["verified", "gate_only"].includes(question.validation_status) &&
+    (!targets || question.type === batchType)).length;
   if (eligibleCount > slots) {
     const representedBreadth = new Set(existing.map(questionBreadthKey).filter(Boolean));
     const breadthCounts = new Map();
@@ -520,7 +525,7 @@ async function advance(job, { deadlineAt = null } = {}) {
       newSections(right) - newSections(left) || lowestCount(left) - lowestCount(right) || left.index - right.index);
   }
   for (const { question } of rankedQuestions) {
-    if (question.validation_status !== "verified") { unverifiedCandidates++; continue; }
+    if (!["verified", "gate_only"].includes(question.validation_status)) { unverifiedCandidates++; continue; }
     const candidateFocusMatches = supportedTrainingFocusMatches(
       question, question.training_focus_matches, job.payload.trainingFocus, job.payload.pastedText,
     );
@@ -544,9 +549,10 @@ async function advance(job, { deadlineAt = null } = {}) {
     if (accepted.some((prior) => prior.id === candidate.id)) {
       batchIdCollisions++; duplicateCandidates++; continue;
     }
-    if (!noSemanticDuplicate([...accepted, ...priorQuestions], candidate, {
-      profile: assessment.detectSubjectProfile(job.payload.course, job.payload.pastedText), sourceMaterial: job.payload.pastedText,
-    })) {
+    const candidateText = String(candidate.question || "").normalize("NFKC").trim().toLocaleLowerCase("sv-SE");
+    const repeatedText = [...accepted, ...priorQuestions].some((prior) =>
+      String(prior.question || "").normalize("NFKC").trim().toLocaleLowerCase("sv-SE") === candidateText);
+    if (repeatedText) {
       semanticDuplicateCandidates++; duplicateCandidates++; continue;
     }
     accepted.push(candidate);

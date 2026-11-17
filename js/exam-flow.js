@@ -44,7 +44,7 @@
   /* Serverns tak på pastedText i api/generate-exam.js. Speglas här så att
      eleven ser gränsen medan hen klistrar in i stället för att upptäcka den
      genom att halva materialet tyst försvann. */
-  var MATERIAL_MAX = 16000;
+  var MATERIAL_MAX = 24000;
 
   // ── Små hjälpare ─────────────────────────────────────────────────────────
 
@@ -197,8 +197,8 @@
 
   function questionCountNote(got, requested) {
     if (!Number.isFinite(got) || !Number.isFinite(requested) || got >= requested) return "";
-    return tx("Du bad om " + requested + " frågor. " + got + " " + (got === 1 ? "fråga klarade" : "frågor klarade") + " kvalitetskontrollen och ingår i provet.",
-      "You requested " + requested + " questions. " + got + " " + (got === 1 ? "question passed quality review and is included" : "questions passed quality review and are included") + " in this exam.");
+    return tx("Du bad om " + requested + " frågor. " + got + " " + (got === 1 ? "giltig fråga ingår" : "giltiga frågor ingår") + " i delprovet.",
+      "You requested " + requested + " questions. " + got + " " + (got === 1 ? "valid question is included" : "valid questions are included") + " in this exam.");
   }
 
   function questionProgressLabel(index, delivered) {
@@ -2020,8 +2020,8 @@
     busy(true);
     err.textContent = "";
     generationProgress.hidden = false;
-    generationProgress.textContent = tx("Skapar och granskar frågor…", "Creating and checking questions…");
-    say(tx("Bygger ditt prov.", "Building your exam."), tx("Frågorna skapas och granskas i omgångar. Större prov kan ta några minuter.", "Questions are created and checked in batches. Larger exams can take a few minutes."));
+    generationProgress.textContent = tx("Skapar frågor…", "Creating questions…");
+    say(tx("Bygger ditt prov.", "Building your exam."), tx("Frågorna skapas i omgångar. Större prov kan ta några minuter.", "Questions are created in batches. Larger exams can take a few minutes."));
 
     function done() {
       S.generating = false;
@@ -2044,12 +2044,12 @@
       var requested = Number.isInteger(progress.requested) ? progress.requested : S.num;
       var approved = Math.max(0, Math.min(requested, Number.isInteger(progress.approved) ? progress.approved : 0));
       generationProgress.textContent = approved + tx(" av ", " of ") + requested +
-        tx(" frågor godkända. ", " questions approved. ") +
+        tx(" frågor klara. ", " questions ready. ") +
         (progress.stage === "assemble"
           ? tx("Färdigställer provet.", "Preparing your exam.")
           : progress.state === "retrying"
           ? tx("Jag inväntar nästa försök.", "Waiting for the next attempt.")
-          : tx("Jag skapar och granskar resten.", "Creating and checking the remaining questions."));
+          : tx("Jag skapar resten.", "Creating the remaining questions."));
     } }).then(function (r) {
       done();
       if (uid() !== requestOwnerId) {
@@ -2735,7 +2735,7 @@
     if (S.replacementAvailable && q.type !== "graph") {
       var replace = el("button", "xf-replace", S.replacementPending
         ? tx("Kontrollera frågebytet", "Check question replacement")
-        : tx("Fel fråga? Generera ny", "Bad question? Generate a new one"));
+        : tx("Gör om frågan", "Regenerate this question"));
       replace.type = "button";
       replace.disabled = S.replacing || S.submitting ||
         Boolean(S.replacementPending && (S.replacementPending.submissionId !==
@@ -2744,7 +2744,7 @@
       sheet.appendChild(replace);
       if (S.replacementPending) {
         var replaceStatus = el("p", "xf-replace-status", S.replacing
-          ? tx("Skapar och granskar en ny fråga…", "Creating and reviewing a new question…")
+          ? tx("Skapar en ny fråga…", "Generating a new question…")
           : tx("Bytet behöver kontrolleras innan provet kan lämnas in. Använd samma knapp igen.",
             "The replacement must be checked before you submit. Use the same button again."));
         replaceStatus.setAttribute("role", "status");

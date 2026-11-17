@@ -11,7 +11,7 @@ test("long material selects complete later sections for generation and review", 
     `${index + 1}. Avsnitt ${index + 1} beskriver ett eget biologiskt samband. ${"Cellens funktion och energiflöde förklaras här. ".repeat(23)}`);
   const full = blocks.join("\n");
   assert.ok(Array.from(full).length > GENERATION_CONTEXT_CHARS);
-  assert.ok(Array.from(full).length <= 16000);
+  assert.ok(Array.from(full).length <= 24000);
   const sections = sourceSections(full);
   assert.equal(sections.length, 13);
   const target = { excerpt: sections[12].body.slice(0, 200) };
@@ -26,7 +26,7 @@ test("focus terms select their complete source block and Unicode length is bound
   const selected = selectGenerationMaterial(full, null, ["Fotosyntes"]);
   assert.ok(selected.includes("Fotosyntes använder ljus och vatten."));
   assert.ok(Array.from(selected).length <= GENERATION_CONTEXT_CHARS);
-  assert.equal(selectGenerationMaterial("😀".repeat(16000)), "😀".repeat(16000),
+  assert.equal(selectGenerationMaterial("😀".repeat(24000)), "😀".repeat(24000),
     "an indivisible source is passed whole rather than cut mid-fact");
 });
 

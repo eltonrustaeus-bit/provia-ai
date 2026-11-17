@@ -95,7 +95,9 @@ test("idempotent replay returns the saved revision without a second model call",
 });
 
 test("availability is limited to the selected exam with saved language and level", async () => {
-  let cached = { ok: true, exam: { exam_manifest: `v2.${parent}.synthetic` }, meta: {} };
+  let cached = { ok: true, exam: { exam_manifest: `v2.${parent}.synthetic`, questions: [
+    { id: "q1", type: "mc", source_references: ["Källförankrad fråga"] },
+  ] }, meta: {} };
   globalThis.fetch = async (url) => {
     const path = String(url);
     if (path.endsWith("/auth/v1/user")) return Response.json({ id: userId, aud: "authenticated", role: "authenticated" });

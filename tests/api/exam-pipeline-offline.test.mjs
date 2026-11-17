@@ -177,10 +177,10 @@ const biologyPrompt = generateExam.buildExamPrompts({
 });
 assert.match(biologyPrompt.userPrompt, /Frågetexten ska faktiskt begära denna koppling/);
 assert.match(biologyPrompt.systemPrompt, /Frågor om när eller var en process sker/);
-assert.match(biologyPrompt.systemPrompt, /samma semantiska kategori.*parallell grammatik/u,
+assert.match(biologyPrompt.systemPrompt, /samma kategori.*jämförbar detaljnivå/u,
   "MC prompts require parallel options that answer the same question");
-assert.match(biologyPrompt.systemPrompt, /konkret skäl från materialet.*rimlig sammanblandning/u,
-  "MC prompts require an explicit, source-grounded reason for each distractor");
+assert.match(biologyPrompt.systemPrompt, /rimliga missuppfattningar.*underlaget stöder exakt ett rätt svar/u,
+  "MC prompts ask the model to avoid implausible distractors and ambiguous answers");
 const biologyAPrompt = generateExam.buildExamPrompts({
   lang: "sv", level: "A", course: "Biologi 1", qType: "mc", numQuestions: 3,
   pastedText: "Fotosyntesen binder kol. Cellandning frigör koldioxid.", isMath: false,
@@ -1683,10 +1683,12 @@ try {
   assert.equal(twoQuestionExam.status, 200, JSON.stringify(twoQuestionExam.body));
   assert.equal(twoQuestionExam.body.exam.questions.length, 2,
     "a complete two-question exam is delivered when the learner explicitly selects two");
-  assert.equal(twoQuestionExam.body.meta.verifier.approved, 2,
-    "both questions still pass independent review");
-  assert.equal(twoQuestionExam.body.meta.solver.checked, 2,
-    "both questions still pass the solver check");
+  assert.equal(twoQuestionExam.body.meta.reviewMode, "generation_only",
+    "generation-only mode is explicit in the response");
+  assert.equal(twoQuestionExam.body.meta.verifier.checked, 0,
+    "the blocking verifier is not called");
+  assert.equal(twoQuestionExam.body.meta.solver.checked, 0,
+    "the blocking solver is not called");
 
   const mixedShortCandidates = Array.from({ length: 6 }, (_, index) => {
     const answer = String(6 + index);

@@ -1301,7 +1301,8 @@ test("mixed batches preserve requested type balance and never accept unverified 
     assert.equal(job.accepted_questions.length, 12);
     assert.equal(job.accepted_questions.filter((question) => question.type === "mc").length, 6);
     assert.equal(job.accepted_questions.filter((question) => question.type === "short").length, 6);
-    assert.ok(job.accepted_questions.every((question) => question.validation_status === "verified"));
+    assert.ok(job.accepted_questions.every((question) => ["verified", "gate_only"].includes(question.validation_status)),
+      "schema-valid candidates no longer need a separate semantic AI approval");
     assert.ok(generatedTypes.includes("mc") && generatedTypes.includes("short"));
     assert.ok(seenComparisons.some((questions) => questions.length > 0),
       "mixed batches also receive approved questions as novelty context");
@@ -1538,10 +1539,10 @@ test("pipeline accumulation excludes repeated presented functions despite differ
   try {
     const result = await pipeline.advance(job);
     assert.equal(result.status, "progress");
-    assert.equal(checkpoint.progressCurrent, 2);
-    assert.equal(checkpoint.nextStage, "repair");
-    assert.deepEqual(checkpoint.acceptedQuestions.map(q => q.id), [first.id, pipeline.batchQuestionId(job, { id: "distinct" })]);
-    assert.equal(checkpoint.repairFeedback.duplicateCount, 1);
+    assert.equal(checkpoint.progressCurrent, 3);
+    assert.equal(checkpoint.nextStage, "assemble");
+    assert.deepEqual(checkpoint.acceptedQuestions.map(q => q.id), [first.id, pipeline.batchQuestionId(job, { id: "repeat" }), pipeline.batchQuestionId(job, { id: "distinct" })]);
+    assert.equal(checkpoint.repairFeedback.duplicateCount, 0);
     job.accepted_questions = [];
     job.progress_current = 0;
     generation.generateVerifiedBatch = async () => {
@@ -1559,7 +1560,7 @@ test("pipeline accumulation excludes repeated presented functions despite differ
     assert.equal(checkpoint.progressCurrent, 2);
     assert.equal(checkpoint.nextStage, "repair");
     assert.equal(checkpoint.repairFeedback.duplicateCount, 1,
-      "generator-pruned repeats still guide the next repair through the existing bounded field");
+      "explicitly structurally pruned repeats still guide the next repair through the existing bounded field");
   } finally {
     generation.generateVerifiedBatch = saved.generate;
     operations.renewPipelineLease = saved.pipeline;

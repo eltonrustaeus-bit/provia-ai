@@ -54,8 +54,8 @@ function cognitiveLevelInstruction(level, lang) {
 function multipleChoiceQualityGuidance(lang, level) {
   const sv = lang === "sv";
   const base = sv
-    ? "FLERVALS-SJÄLVKONTROLL: Alla tre alternativ ska vara direkta svar på exakt samma fråga, i samma semantiska kategori, med parallell grammatik och liknande detaljnivå. Före svar ska du själv kunna ange ett konkret skäl från materialet eller frågans villkor till varför vart och ett av de två felalternativen är fel, och vilken rimlig sammanblandning det bygger på. Välj inte två slumpmässiga ämnesord eller olika processer som distraktorer. Om ett alternativ är nonsens, uppenbart irrelevant, språkligt trasigt eller inte går att falsifiera entydigt: skriv om hela frågan eller välj ett bättre underbyggt innehåll. Behåll kvalitetskontrollerna som avgör om frågan faktiskt ska godkännas."
-    : "MULTIPLE-CHOICE SELF-CHECK: All three options must directly answer the exact same question, belong to the same semantic category, use parallel grammar, and have similar specificity. Before output, you must be able to give a concrete reason from the material or the question's conditions why each wrong option is false, and identify the reasonable confusion it represents. Do not choose random topic words or different processes as distractors. If an option is nonsense, clearly irrelevant, grammatically broken, or cannot be unambiguously falsified, rewrite the whole item or choose a better-supported content target. Keep the quality checks that decide whether the item is actually approved.";
+    ? "FLERVALS-SJÄLVKONTROLL: Skriv tre svarsalternativ som besvarar exakt samma fråga, tillhör samma kategori och har jämförbar detaljnivå. Felalternativen ska vara rimliga missuppfattningar, inte slumpmässiga ord. Kontrollera själv att underlaget stöder exakt ett rätt svar. Prioritera tydliga, relevanta frågor och leverera hela det efterfrågade antalet."
+    : "MULTIPLE-CHOICE SELF-CHECK: Write three answer options that answer the same question, belong to the same category, and have comparable detail. Distractors should represent plausible misconceptions, not random words. Check that the material supports exactly one correct option. Prioritize clear, relevant questions and return the full requested count.";
   if (level !== "A") return base;
   return base + (sv
     ? " A-NIVÅ I FLERVAL: Frågan ska kräva en verklig slutsats, jämförelse eller värdering som bygger på minst två skilda fakta från underlaget; en definition, ett direkt faktaminne eller en etikett som 'analysera' räcker inte. Distraktorerna ska spegla olika rimliga feltolkningar av dessa fakta, inte vara uppenbart orimliga. Om underlaget inte bär både resonemanget och tre trovärdiga alternativ ska du inte klä en lätt fråga i A-språk eller hitta på stöd."
@@ -839,6 +839,9 @@ async function buildAdaptiveFocus(userId, { numQuestions, lang }) {
 }
 
 const FUNCTION_BUDGET_MS = 60_000;      // must match vercel.json maxDuration
+// Product decision: generate promptly, then let the learner replace a weak item.
+// Keep deterministic schema/type/source requirements; do not invoke semantic AI review here.
+const AI_QUESTION_REVIEW_ENABLED = false;
 const RESPONSE_RESERVE_MS = 3_000;      // serialising and returning the response
 // Reserved for the verifier and the solver, which run concurrently. Measured
 // together on the long-form fixtures: 10.8-20.3 s, against 6-19 s for the
@@ -858,14 +861,39 @@ const INTERNAL_REGENERATION_REVIEW_TIMEOUT_MS = 13_000; // multi-step pipeline: 
 const REGENERATION_POST_REVIEW_RESERVE_MS = 14_000; // 5 s issuance + 6 s quota + 1.5 s usage + margin
 const INTERNAL_REGENERATION_POST_REVIEW_RESERVE_MS = 4_000; // internal batches skip issuance/quota and retain usage-flush margin
 
+function generationOnlyStructureValid(question, requestedType, lang = "sv") {
+  if (!gradeTasks.validQuestion(question)) return false;
+  const typeMatches = requestedType === "mix" || requestedType === "mixed"
+    ? ["mc", "short"].includes(question.type)
+    : question.type === requestedType;
+  if (!typeMatches) return false;
+  if (question.type !== "graph" &&
+      !Array.isArray(question.source_references) && typeof question.source_references !== "string") return false;
+  const references = Array.isArray(question.source_references)
+    ? question.source_references
+    : [question.source_references];
+  if (question.type !== "graph" && !references.some((reference) => typeof reference === "string" && reference.trim())) return false;
+  if (question.type === "mc") {
+    if (question.options.length !== 3) return false;
+    const options = question.options.map((option) => String(option).normalize("NFKC").trim()
+      .toLocaleLowerCase(lang === "sv" ? "sv-SE" : "en-US"));
+    if (options.some((option) => !option) || new Set(options).size !== options.length) return false;
+  } else if (question.options.length !== 0) {
+    return false;
+  }
+  return true;
+}
+
 function minimumExamPreflightBudgetMs(qType, internalBatch = false) {
-  const verifierReserveMs = internalBatch ? INTERNAL_VERIFIER_RESERVE_MS : VERIFIER_RESERVE_MS;
+  const verifierReserveMs = AI_QUESTION_REVIEW_ENABLED
+    ? (internalBatch ? INTERNAL_VERIFIER_RESERVE_MS : VERIFIER_RESERVE_MS) : 0;
   const preGenerationReserveMs = internalBatch ? INTERNAL_PRE_GENERATION_RESERVE_MS : PRE_GENERATION_RESERVE_MS;
   return qType === "graph" ? 0 : MIN_GENERATION_MS + verifierReserveMs + preGenerationReserveMs;
 }
 
 function minimumExamGenerationReviewBudgetMs(internalBatch = false) {
-  const verifierReserveMs = internalBatch ? INTERNAL_VERIFIER_RESERVE_MS : VERIFIER_RESERVE_MS;
+  const verifierReserveMs = AI_QUESTION_REVIEW_ENABLED
+    ? (internalBatch ? INTERNAL_VERIFIER_RESERVE_MS : VERIFIER_RESERVE_MS) : 0;
   return MIN_GENERATION_MS + verifierReserveMs;
 }
 
@@ -1102,7 +1130,7 @@ function buildExamPrompts({ lang, level, course, qType, numQuestions, examQuesti
     "Regler per fråga: " +
     "1) type får vara 'mc', 'short' eller 'graph' (INTE essä). graph används bara när frågetyp-valet är graph. " +
     "2) Om type=='mc': options ska ha exakt 3 alternativ och correct_index ska vara 0..2. " +
-    "2b) Om frågetyp-valet är blandat och materialet inte ger stöd för två tydliga, rimliga och ämnesrelevanta distraktorer i samma kategori, välj short för den frågan i stället för att hitta på alternativ. Vid enbart flerval: avgränsa frågan till ett bättre underbyggt innehåll eller låt den falla på kvalitetsgranskningen. " +
+    "2b) Om frågetyp-valet är blandat och materialet inte ger stöd för tydliga, rimliga distraktorer, välj short för den frågan i stället för att hitta på alternativ. Vid enbart flerval: välj en snävare fråga som stöds direkt av materialet. " +
     "2c) Bevara källans hela subjekt, egenskaper, villkor och relationer i både korrekt alternativ och model_answer. En egenskap hos ett ämne är inte samma sak som ämnet självt; förkorta inte bort huvudordet i ett källutdrag. Kontrollera de två svarsfälten separat. " +
     "3) Om type=='short': options ska vara [] och correct_index ska vara -1. " +
     "3b) Om type=='graph': graph_spec ska följa det valda grafunderlaget: line använder kind='line', heltalen slope/intercept, tom points och tomma x_label/y_label; scatter använder kind='scatter', null slope/intercept och exakt tre källpunkter med axelrubriker från tabellen. options ska vara [] och correct_index ska vara -1. " +
@@ -1181,7 +1209,7 @@ function buildExamPrompts({ lang, level, course, qType, numQuestions, examQuesti
     "Per-question rules: " +
     "1) type may be 'mc', 'short' or 'graph' (NO essays). Use graph only when the selected question type is graph. " +
     "2) If type=='mc': options must have exactly 3 choices and correct_index must be 0..2. " +
-    "2b) If the selected type is mixed and the material cannot support two clear, plausible, relevant distractors in the same category, use short answer for that item instead of inventing choices. For multiple-choice-only, narrow the question to better-supported material or let it fail quality review. " +
+    "2b) If the selected type is mixed and the material cannot support clear, plausible distractors, use a short-answer item. For multiple-choice-only, choose a narrower task supported by the supplied material. " +
     "2c) Preserve the complete source subject, properties, conditions and relations in both the correct option and model_answer. A property of a substance is not the substance itself; never remove the head noun when shortening a source excerpt. Check both answer fields separately. " +
     "3) If type=='short': options must be [] and correct_index must be -1. " +
     "3b) If type=='graph': graph_spec must match the selected source: line uses kind='line', integer slope/intercept, empty points and empty x_label/y_label; scatter uses kind='scatter', null slope/intercept and exactly three source points with axis labels from the table. options must be [] and correct_index must be -1. " +
@@ -1954,11 +1982,11 @@ module.exports = async function handler(req, res, internalContext = null) {
     logBudgetGate("preflight", preflightRequiredMs);
     return json(res, 503, {
       ok: false,
-      error: internalBatch ? "generation_budget_insufficient" : "quality_review_unavailable",
+      error: "generation_budget_insufficient",
       requestId: quotaRequestId,
       message: lang === "en"
-        ? "There is not enough time to generate and check a reliable exam. Please try again."
-        : "Det finns inte tid nog att skapa och kvalitetskontrollera ett tillförlitligt prov. Försök igen."
+        ? "There is not enough time to generate the requested exam. Please try again."
+        : "Det finns inte tid nog att skapa provet. Försök igen."
     });
   }
 
@@ -2135,20 +2163,10 @@ module.exports = async function handler(req, res, internalContext = null) {
 
     // Ordinary AI-authored items need a complete review window. Do not start an
     // expensive generation if the remaining function time cannot accommodate it.
-    const generationReviewRequiredMs = minimumExamGenerationReviewBudgetMs(internalBatch);
-    const canVerify = budget.remaining() >= generationReviewRequiredMs;
-    if (!canVerify && qType !== "graph") {
-      logBudgetGate("after_quota_and_focus", generationReviewRequiredMs);
-      return fail(503, {
-        ok: false,
-        error: internalBatch ? "generation_budget_insufficient" : "quality_review_unavailable",
-        requestId: quotaRequestId,
-        message: lang === "en"
-          ? "There is not enough time to generate and check a reliable exam. Please try again."
-          : "Det finns inte tid nog att skapa och kvalitetskontrollera ett tillförlitligt prov. Försök igen."
-      });
-    }
-    const generationBudget = budget.remaining() - (canVerify ? verifierReserveMs : 0);
+    // The separate AI verifier and blind solver were blocking issuance and
+    // consuming most of the route budget. The student can now replace any
+    // weak item in place; schema, grading, signing and issuance checks remain.
+    const generationBudget = budget.remaining() - RESPONSE_RESERVE_MS;
 
     failureStage = "model_generation";
     const gen = await streamGeneration({ apiKey, payload, budgetMs: generationBudget, userId: user.id });
@@ -2207,9 +2225,17 @@ module.exports = async function handler(req, res, internalContext = null) {
     exam = normalizedInitial.exam;
     const initialCandidateCount = exam.questions.length;
 
+    failureStage = "question_validation";
+    const verifier = require("./_verifier");
+    const solver = require("./_solver");
+    let gate;
+    let verifierOutcome = { checked: 0, approved: 0, rejected: 0, callOk: false };
+    let solverOutcome = { checked: 0, rejected: 0, callOk: false, model: null, reasons: {} };
+    let verifierSkipped = true;
+    if (AI_QUESTION_REVIEW_ENABLED) {
     failureStage = "quality_review";
     // ── STRUCTURAL GATE (subject-agnostic, deterministic) ─────────────────
-    let gate = assessment.gateExam(exam, {
+    gate = assessment.gateExam(exam, {
       profile: subjectProfile,
       outputLanguage: lang,
       requireSourceReferences: true,
@@ -2242,9 +2268,9 @@ module.exports = async function handler(req, res, internalContext = null) {
     }
     exam.questions = gate.questions;
 
-    let verifierOutcome = { checked: 0, approved: 0, rejected: 0, callOk: false };
-    let solverOutcome = { checked: 0, rejected: 0, callOk: false, model: null, reasons: {} };
-    let verifierSkipped = false;
+    verifierOutcome = { checked: 0, approved: 0, rejected: 0, callOk: false };
+    solverOutcome = { checked: 0, rejected: 0, callOk: false, model: null, reasons: {} };
+    verifierSkipped = false;
     let repairAttempted = false;
     let structuralRepairAttempted = false;
     let qualityRepairAttempted = false;
@@ -2394,8 +2420,6 @@ module.exports = async function handler(req, res, internalContext = null) {
     }
 
     // ── VERIFIER PASS (separate role — checks, never fixes) ───────────────
-    const verifier = require("./_verifier");
-    const solver = require("./_solver");
     // The deterministic graph contract can stand without model review; other
     // question types must not be delivered unless the reviewer completes.
     repairVerifierCallOk = null;
@@ -2913,7 +2937,7 @@ module.exports = async function handler(req, res, internalContext = null) {
       }
     }
 
-    if (exam.questions.length > 0 && verifierSkipped && qType !== "graph") {
+    if (AI_QUESTION_REVIEW_ENABLED && exam.questions.length > 0 && verifierSkipped && qType !== "graph") {
       console.log(JSON.stringify({
         event: "exam_quality_review_unavailable",
         stage: "initial_verifier",
@@ -2930,7 +2954,7 @@ module.exports = async function handler(req, res, internalContext = null) {
       });
     }
 
-    if (exam.questions.length === 0 && !solverOutcome.callOk && solverOutcome.checked > 0) {
+    if (AI_QUESTION_REVIEW_ENABLED && exam.questions.length === 0 && !solverOutcome.callOk && solverOutcome.checked > 0) {
       return fail(503, {
         ok: false,
         error: "independent_check_unavailable",
@@ -2941,8 +2965,41 @@ module.exports = async function handler(req, res, internalContext = null) {
       });
     }
 
+    } else {
+      const seen = new Set();
+      const valid = [];
+      const dropped = [];
+      for (const question of exam.questions) {
+        const key = String(question.question || "").normalize("NFKC").trim().toLocaleLowerCase(lang === "sv" ? "sv-SE" : "en-US");
+        if (!generationOnlyStructureValid(question, qType, lang) || !key || seen.has(key)) {
+          dropped.push({ id: String(question.id || ""), issues: ["invalid_structure_or_duplicate"] });
+          continue;
+        }
+        seen.add(key);
+        // The existing DB pipeline contract calls structurally validated
+        // candidates "verified". This is an issuance/provenance state only;
+        // semantic AI review is disabled and reported as such in response meta.
+        question.validation_status = "verified";
+        question.review_mode = "generation_only";
+        // Focus matches are attached only by the pipeline's deterministic
+        // source-evidence matcher; never self-assert model/generated IDs here.
+        question.confidence_score = null;
+        question.detected_issues = [];
+        question.akey_sig = assessment.signAnswerKey(question);
+        valid.push(question);
+      }
+      exam.questions = valid;
+      if (["mix", "mixed"].includes(qType)) {
+        exam.questions = selectMixedQuestions(valid, mixedTypeTargets(numQuestions)).questions;
+      }
+      gate = { profile: subjectProfile, questions: valid, dropped, flagged: [] };
+      verifierOutcome = { checked: 0, approved: 0, rejected: 0, callOk: false };
+      solverOutcome = { checked: 0, rejected: 0, callOk: false, model: null, reasons: {} };
+      verifierSkipped = true;
+    }
+
     if (internalBatch) {
-      if (exam.questions.some((question) => question.validation_status !== "verified" && question.type !== "graph")) {
+      if (exam.questions.some((question) => question.validation_status !== "verified" && question.validation_status !== "gate_only")) {
         return fail(503, { ok: false, error: "unverified_internal_candidate" });
       }
       await flushUsage();
@@ -2953,31 +3010,23 @@ module.exports = async function handler(req, res, internalContext = null) {
         partial: exam.questions.length < numQuestions,
         quality: {
           structuralApproved: exam.questions.length,
-          verifierApproved: exam.questions.filter((question) => question.validation_status === "verified").length,
-          solverApprovedMc: exam.questions.filter((question) => question.type === "mc").length,
+          verifierApproved: 0,
+          solverApprovedMc: 0,
+          reviewMode: "generation_only",
         },
         qualityDiagnostics: {
-          ...(internalBatch ? { requestId: quotaRequestId } : {}),
-          candidates: initialCandidateCount + generatedRepairCandidateTotal,
+          requestId: quotaRequestId,
+          candidates: initialCandidateCount,
           structuralDropped: gate.dropped.length,
-          structuralIssueCounts: Object.fromEntries(Object.entries(gate.dropped.reduce((counts, item) => {
-            for (const issue of item.issues || []) {
-              if (/^[a-z][a-z0-9_]{0,63}$/.test(issue)) counts[issue] = (counts[issue] || 0) + 1;
-            }
-            return counts;
-          }, {})).slice(0, 20)),
-          verifierChecked: verifierOutcome.checked,
-          verifierApproved: verifierOutcome.approved,
-          verifierRejected: verifierOutcome.rejected,
-          reviewFailureCounts: mergeDiagnosticCounts(initialVerifierFailureCodes, repairVerifierFailureCodes),
-          solverChecked: solverOutcome.checked,
-          solverRejected: solverOutcome.rejected,
-          solverFailureCounts: solverOutcome.reasons,
-          verifierCallOk: verifierOutcome.callOk,
-          solverCallOk: solverOutcome.callOk,
-          repairAttempted,
-          repairFailureStage,
-          repairOutcomeStage,
+          verifierChecked: 0,
+          verifierApproved: 0,
+          verifierRejected: 0,
+          solverChecked: 0,
+          solverRejected: 0,
+          verifierCallOk: false,
+          solverCallOk: false,
+          repairAttempted: false,
+          reviewMode: "generation_only",
         },
       });
     }
@@ -3047,13 +3096,13 @@ module.exports = async function handler(req, res, internalContext = null) {
         requested: numQuestions,
         received: exam.questions.length,
         message: lang === "en"
-          ? "Too few questions passed the quality checks to form a useful exam. No exam was delivered. Add relevant study material or narrow the topic, then try again."
-          : "För få frågor klarade kvalitetskontrollen för att bilda ett användbart prov. Inget prov lämnades ut. Lägg till mer relevant material eller avgränsa området och försök igen."
+          ? "Too few valid questions could be generated. No incomplete exam was marked complete. Add relevant study material or narrow the topic, then try again."
+        : "Det gick inte att skapa tillräckligt många giltiga frågor. Inget ofullständigt prov markerades som komplett. Lägg till mer studiematerial eller försök igen."
       });
     }
 
     const partialExam = exam.questions.length < numQuestions;
-    if (partialExam) {
+    if (partialExam && AI_QUESTION_REVIEW_ENABLED) {
       console.log(JSON.stringify({
         event: "exam_quality_partial_delivery",
         requestId: quotaRequestId,
@@ -3103,16 +3152,17 @@ module.exports = async function handler(req, res, internalContext = null) {
     }
 
     // ── OBSERVABILITY (structured, no question/answer content logged) ─────
-    console.log(JSON.stringify({
+    if (AI_QUESTION_REVIEW_ENABLED) console.log(JSON.stringify({
       event: "exam_quality_gate",
       subjectProfile,
       numRequested: numQuestions,
       truncated,
       verifierSkipped,
+      reviewMode: "generation_only",
       elapsedMs: budget.elapsed(),
       generationMs: gen.latencyMs,
       generatorModel: model,
-      verifierModel: verifier.verifierModel(model),
+      verifierModel: null,
       solverModel: solverOutcome.model,
       solverCallOk: solverOutcome.callOk,
       solverChecked: solverOutcome.checked,
@@ -3138,6 +3188,17 @@ module.exports = async function handler(req, res, internalContext = null) {
       verifierRejected: verifierOutcome.rejected,
       verifierCallOk: verifierOutcome.callOk,
       finalQuestionCount: exam.questions.length,
+    }));
+
+    console.log(JSON.stringify({
+      event: "exam_generation_issued",
+      requestId: quotaRequestId,
+      requested: numQuestions,
+      generated: exam.questions.length,
+      partial: partialExam,
+      model,
+      elapsedMs: budget.elapsed(),
+      reviewMode: "generation_only",
     }));
 
     // Verifier-internal fields (validation_status/confidence_score/detected_issues)
@@ -3178,6 +3239,7 @@ module.exports = async function handler(req, res, internalContext = null) {
         partial: partialExam,
         truncated,
         verifierSkipped,
+        reviewMode: "generation_only",
         requested: numQuestions,
         elapsedMs: budget.elapsed(),
         gate: { profile: subjectProfile, dropped: gate.dropped.length, flagged: gate.flagged.length },
@@ -3258,6 +3320,7 @@ module.exports.makeBudget = makeBudget;             // pure — unit-tested
 module.exports.generationRequestId = generationRequestId;
 module.exports.regenerationGenerationTimeout = regenerationGenerationTimeout; // pure — unit-tested
 module.exports.minimumExamPreflightBudgetMs = minimumExamPreflightBudgetMs; // pure — unit-tested
+module.exports.generationOnlyStructureValid = generationOnlyStructureValid; // deterministic schema gate; no AI review
 module.exports.minimumExamGenerationReviewBudgetMs = minimumExamGenerationReviewBudgetMs; // pure — unit-tested
 module.exports.initialVerifierTimeoutMs = initialVerifierTimeoutMs; // pure — includes the response reserve
 module.exports.qualityRepairCandidateCountFor = qualityRepairCandidateCountFor; // pure — unit-tested
@@ -3274,34 +3337,25 @@ module.exports.finalizeVerifiedExam = async function finalizeVerifiedExam({ user
   const { lang, level, course, qType, numQuestions, pastedText } = payload;
   if (questions.length < minimumDeliverableQuestionCount(numQuestions) ||
       !canDeliverVerifiedQuestions(questions, { requested: numQuestions, qType }) ||
-      questions.some((question) => question.validation_status !== "verified")) {
-    throw new Error("Verified exam does not meet delivery requirements");
+      questions.some((question) => !generationOnlyStructureValid(question, qType, lang) ||
+        !["verified", "gate_only"].includes(question.validation_status))) {
+    throw new Error("Exam does not meet structural delivery requirements");
   }
   const subjectProfile = assessment.detectSubjectProfile(course, pastedText);
-  const finalGate = assessment.gateExam({ questions }, {
-    profile: subjectProfile,
-    outputLanguage: lang,
-    requireSourceReferences: true,
-    requireExtractiveAnswers: subjectProfile === "natural_sciences",
-    reviewSingleWordOptionOutliers: lang === "sv",
-    requireSourceSupportedOptionOutliers: lang === "sv",
-    sourceMaterial: pastedText,
-    requestedQuestionType: qType,
-  });
-  if (finalGate.dropped.length > 0 || finalGate.questions.length !== questions.length) {
-    throw new Error("Final structural validation rejected a candidate");
-  }
   const distinct = [];
-  for (const question of finalGate.questions) {
-    if (distinct.some((accepted) => assessment.questionPairConflict(accepted, question, { profile: subjectProfile, sourceMaterial: pastedText }))) {
-      throw new Error("Duplicate question in verified exam");
-    }
+  const seenText = new Set();
+  for (const question of questions) {
+    const key = String(question.question || "").normalize("NFKC").trim().toLocaleLowerCase(lang === "sv" ? "sv-SE" : "en-US");
+    if (!key || seenText.has(key)) throw new Error("Duplicate or empty question in exam");
+    if (!["mix", "mixed"].includes(qType) && question.type !== qType) throw new Error("Question type mismatch");
+    seenText.add(key);
+    question.akey_sig = assessment.signAnswerKey(question);
     distinct.push(question);
   }
   const mixed = ["mix", "mixed"].includes(qType);
   const isPartial = distinct.length < numQuestions;
-  // Eligible partials may be type-skewed; keep every approved item while still
-  // requiring both formats. Full exams continue to use the requested balance.
+  // A real partial exam is clearly marked in the response; do not discard it
+  // just because one requested format could not be generated in time.
   const partialTypeCounts = isPartial
     ? {
       mc: distinct.filter((question) => question.type === "mc").length,
@@ -3342,11 +3396,13 @@ module.exports.finalizeVerifiedExam = async function finalizeVerifiedExam({ user
       subjectProfile,
       partial: clientQuestions.length < numQuestions,
       truncated: false,
-      verifierSkipped: false,
+      verifierSkipped: true,
+      reviewMode: "generation_only",
       requested: numQuestions,
       gate: { profile: subjectProfile, dropped: 0, flagged: 0 },
-      verifier: { checked: balanced.questions.length, approved: balanced.questions.length, rejected: 0, callOk: true },
-      solver: { checked: balanced.questions.filter((question) => question.type === "mc").length, rejected: 0, callOk: true, model: null, reasons: {} },
+      reviewMode: "generation_only",
+      verifier: { checked: 0, approved: 0, rejected: 0, callOk: false },
+      solver: { checked: 0, rejected: 0, callOk: false, model: null, reasons: {} },
       model: pickModel({ isMath: looksLikeMath(course, pastedText) }),
       entitlements: payload.entitlements || {},
       quota: {

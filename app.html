@@ -826,7 +826,7 @@ function escapeHtml(s){
 
 let LANG = localStorage.getItem("proviaai_lang") || "sv";
 let selectedExamFocusTerms = [];
-const MATERIAL_CHAR_LIMIT = 16000;
+const MATERIAL_CHAR_LIMIT = 24000;
 // Nuvarande roll — laddas från Supabase vid inloggning, cachas i localStorage
 let currentRole = localStorage.getItem(LS_ROLE) || "gratis";
 
@@ -844,7 +844,7 @@ sv:{
   mImprove:"Min utveckling",mLang:"English",mLogout:"Logga ut",
   step1:"Material",step1Sub:"Klistra in texten du pluggar på — rubriker, definitioner, formler, exempel",
   pasteLabel:"Studiematerial",pastePH:"Rubriker → punktlista → definitioner/formler → exempel",
-  materialTooLong:"Materialet är för långt. Korta ner det till högst 16 000 tecken innan du fortsätter.",
+  materialTooLong:"Materialet är för långt. Korta ner det till högst 24 000 tecken innan du fortsätter.",
   ocrTitle:"Bild → OCR (valfritt)",ocrBtn:"OCR till material",
   ocrHint:"Tips: tydlig bild rakt ovanifrån, bra ljus, hög kontrast.",
   tip:"Tips: rubriker + punktlistor ger mer exakta frågor och bättre rättning.",
@@ -858,7 +858,7 @@ sv:{
   noExam:"Ingen provdata ännu.",noGrade:"Ingen rättning ännu.",
   needMat:"Klistra in material först.",
   genWorking:"Skapar mockprov…",gradeWorking:"Rättar prov…",
-  genDone:"Prov klart! Besvara frågorna nedan och tryck Rätta prov.",genPartial:"Kvalitetskontrollen godkände {received} av {requested} begärda frågor. Ett kortare, kontrollerat prov är klart.",gradeDone:"Rättning klar. Sparad till förbättring.",
+  genDone:"Prov klart! Besvara frågorna nedan och tryck Rätta prov.",genPartial:"Kunde skapa {received} av {requested} begärda frågor. Ett kortare delprov är klart.",gradeDone:"Rättning klar. Sparad till förbättring.",
   wrongCode:"Fel kod.",ocrNoFile:"Välj en bild först.",
   ocrWorking:"OCR pågår…",ocrDone:"OCR klart. Texten lades in i materialet.",
   writeAnswer:"Skriv ditt svar här…",fullScore:"Modellsvar (full poäng)",
@@ -891,7 +891,7 @@ en:{
   mImprove:"My progress",mLang:"Svenska",mLogout:"Log out",
   step1:"Material",step1Sub:"Paste the material you're studying — headings, definitions, formulas, examples",
   pasteLabel:"Study material",pastePH:"Headings → bullet points → definitions/formulas → examples",
-  materialTooLong:"The material is too long. Shorten it to 16,000 characters or fewer before continuing.",
+  materialTooLong:"The material is too long. Shorten it to 24,000 characters or fewer before continuing.",
   ocrTitle:"Image → OCR (optional)",ocrBtn:"OCR into material",
   ocrHint:"Tip: sharp photo from above, good light, high contrast.",
   tip:"Tip: headings + bullet points produce more accurate questions and grading.",
@@ -905,7 +905,7 @@ en:{
   noExam:"No exam data yet.",noGrade:"No grading yet.",
   needMat:"Paste material first.",
   genWorking:"Generating mock exam…",gradeWorking:"Grading…",
-  genDone:"Exam ready! Answer the questions below and press Grade exam.",genPartial:"Quality review approved {received} of {requested} requested questions. A shorter, checked exam is ready.",gradeDone:"Grading done. Saved to Improve page.",
+  genDone:"Exam ready! Answer the questions below and press Grade exam.",genPartial:"Could create {received} of {requested} requested questions. A shorter partial exam is ready.",gradeDone:"Grading done. Saved to Improve page.",
   wrongCode:"Wrong code.",ocrNoFile:"Choose an image first.",
   ocrWorking:"Running OCR…",ocrDone:"OCR done. Text was added to the material.",
   writeAnswer:"Write your answer here…",fullScore:"Full-score model answer",
@@ -1998,7 +1998,7 @@ function renderExam(exam){
   const droppedCount=rawQs.length-qs.length;
   if(qs.length===0||droppedCount>0){
     currentExam=null;
-    setStatus(LANG==="sv"?"Provet kunde inte skapas med tillräcklig kvalitet. Försök generera igen.":"The exam could not be built with sufficient quality. Please generate again.","bad");
+    setStatus(LANG==="sv"?"Provet kunde inte skapas komplett. Försök generera igen.":"The exam could not be completed. Please try generating it again.","bad");
     const g=$("gradeBtn");if(g)g.disabled=true;
     return false;
   }
@@ -2364,8 +2364,8 @@ try{
       const requested=Number.isInteger(state?.requested)?state.requested:payload.numQuestions;
       const retrying=state?.state==="retrying";
       const label=LANG==="sv"
-        ?`${retrying?"Inväntar nästa försök":"Skapar och granskar prov"}: ${approved} av ${requested} frågor godkända.`
-        :`${retrying?"Waiting for the next attempt":"Generating and reviewing exam"}: ${approved} of ${requested} questions approved.`;
+        ?`${retrying?"Inväntar nästa försök":"Skapar prov"}: ${approved} av ${requested} frågor klara.`
+        :`${retrying?"Waiting for the next attempt":"Generating exam"}: ${approved} of ${requested} questions ready.`;
       setStatus(label,"warn");
       if(typeof onProgress==="function"){
         try{onProgress({approved,requested,stage:state?.stage||"generate",state:state?.state||"queued"});}catch{}
@@ -2598,8 +2598,8 @@ try{
         const approved=Number.isInteger(res.data.approved)?res.data.approved:0;
         const requested=Number.isInteger(res.data.requested)?res.data.requested:payload.numQuestions;
         const message=LANG==="sv"
-          ?`Provet är inte färdigt ännu (${approved} av ${requested} frågor godkända). Du kan återuppta samma jobb utan ett nytt kvotdrag. Ladda om i samma flik om det behövs, men stäng inte fliken innan provet är färdigt.`
-          :`The exam is not ready yet (${approved} of ${requested} questions approved). You can resume the same job without another quota reservation. Reload this tab if needed, but keep it open until the exam is ready.`;
+          ?`Provet är inte färdigt ännu (${approved} av ${requested} frågor klara). Du kan återuppta samma jobb utan ett nytt kvotdrag. Ladda om i samma flik om det behövs, men stäng inte fliken innan provet är färdigt.`
+          :`The exam is not ready yet (${approved} of ${requested} questions ready). You can resume the same job without another quota reservation. Reload this tab if needed, but keep it open until the exam is ready.`;
         setStatus(message,"warn");hideDebug();
         return {ok:false,error:message,errorCode:"generation_in_progress",operationId:res.data.operationId||null};
       }
@@ -2668,13 +2668,13 @@ try{
           ? (budgetKind==="AI_BUDGET_EXHAUSTED"?"Stagingens AI-budget är slut. Inget prov lämnades ut. Kontakta pilotansvarig."
             :budgetKind==="AI_BUDGET_UNAVAILABLE"?"Stagingens AI-budget kunde inte verifieras. Inget prov lämnades ut. Kontakta pilotansvarig."
             :terminalUnknown?"Provet kunde inte färdigställas. Inget prov lämnades ut. Försök igen senare."
-            :res.data.message||"Kvalitetskontrollen kunde inte slutföras. Inget prov lämnades ut; försök igen.")
+            :res.data.message||"Provskapandet kunde inte slutföras. Inget prov lämnades ut; försök igen.")
           : (res.data?.error==="incomplete_exam"
             ? (budgetKind==="AI_BUDGET_EXHAUSTED"?"The staging AI budget is exhausted. No exam was issued. Please contact the pilot lead."
               :budgetKind==="AI_BUDGET_UNAVAILABLE"?"The staging AI budget could not be verified. No exam was issued. Please contact the pilot lead."
               :terminalUnknown?"The exam could not be completed. No exam was issued. Please try again later."
-              :"ExGen could not create a complete exam that passed review. No exam was issued; try again with more relevant material or fewer questions.")
-            : "ExGen could not complete the required quality checks. No exam was issued; please try again.");
+              :"ExGen could not create enough valid questions. No incomplete exam was marked complete; try again with relevant material or fewer questions.")
+            : "ExGen kunde inte skapa tillräckligt många giltiga frågor. Inget ofullständigt prov markerades som komplett; försök igen med mer material.");
         let terminalCleanupFailed=false;
         const definitiveTerminalFailure=res.status===502&&res.ok===false&&res.data?.ok===false
           &&res.data?.error==="incomplete_exam"&&!res.data?.failureKind
@@ -2694,7 +2694,7 @@ try{
           && Number.isInteger(res.data.received)&&Number.isInteger(res.data.requested)
           && res.data.received>=0&&res.data.requested>0&&res.data.received<res.data.requested;
         const countNote=hasSafeCounts
-          ? (LANG==="sv"?` ${res.data.received} av ${res.data.requested} frågor klarade kontrollen.`:` ${res.data.received} of ${res.data.requested} questions passed review.`)
+          ? (LANG==="sv"?` ${res.data.received} av ${res.data.requested} frågor kunde skapas.`:` ${res.data.received} of ${res.data.requested} questions were generated.`)
           : "";
         const cleanupNote=terminalCleanupFailed
           ?(LANG==="sv"?" Den avslutade begäran kunde inte rensas säkert. Starta inte ett nytt prov i en annan flik; kontakta pilotansvarig.":" The completed request could not be cleared safely. Do not start another exam in a different tab; contact the pilot lead.")
@@ -2803,7 +2803,7 @@ try{
     if(fh){
       const qCount=questionCount;
       fh.textContent=partialExam
-        ?(LANG==="sv"?`Besvara de ${qCount} godkända frågorna och tryck Rätta.`:`Answer the ${qCount} approved questions and press Grade.`)
+        ?(LANG==="sv"?`Besvara de ${qCount} frågorna och tryck Rätta.`:`Answer the ${qCount} questions and press Grade.`)
         :(LANG==="sv"?`Besvara alla ${qCount} frågor och tryck Rätta.`:`Answer all ${qCount} questions then grade.`);
     }
     return {ok:true,exam:currentExam,meta:res.data.meta||null};

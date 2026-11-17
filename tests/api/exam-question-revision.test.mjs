@@ -32,12 +32,12 @@ function issued({ examCourse = course, examMaterial = material, questions = orig
   };
 }
 
-test("a verified replacement is still refused when the source makes two MC options correct", () => {
+test("a replacement bypasses semantic option review but stays on the signed source", () => {
   const examCourse = "Biologi 1";
   const examMaterial = "Vid fotosyntesen används koldioxid och vatten och det bildas glukos och syre. Klorofyll fångar ljusenergi.";
   const questions = [{ id: "biology-original", type: "mc", points: 2,
     question: "Vilken uppgift har klorofyll?", options: ["Fånga ljusenergi", "Lagra stärkelse", "Bildar koldioxid"],
-    correct_index: 0, source_references: ["Klorofyll fångar ljusenergi."] }];
+    correct_index: 0, source_references: [examMaterial] }];
   const old = issued({ examCourse, examMaterial, questions });
   const ambiguous = { id: "biology-replacement", type: "mc", points: 2,
     question: "Vad omvandlas koldioxid och vatten till under fotosyntesen?",
@@ -45,7 +45,8 @@ test("a verified replacement is still refused when the source makes two MC optio
     cognitive_level: "minnas", source_references: ["Vid fotosyntesen används koldioxid och vatten och det bildas glukos och syre."],
     validation_status: "verified", confidence_score: 0.99 };
   assert.equal(revision.reviseIssuedExam({ userId, course: examCourse, material: examMaterial,
-    ...old, questionId: "biology-original", candidate: ambiguous }), null);
+    ...old, questionId: "biology-original", candidate: { ...ambiguous, validation_status: "gate_only" } })?.replacementQuestionId,
+    "biology-replacement");
 });
 
 const candidate = {
@@ -88,25 +89,30 @@ test("question revision binds an internally supplied verified candidate to a sig
   assert.equal(withMetadata.exam.level, "C");
 });
 
-test("question replacement can require an independent verifier match for the original learning target", () => {
+test("question replacement stays tied to the signed question source without requiring a verifier label", () => {
   const old = issued();
   const input = { userId, course, material, ...old, questionId: "q1", candidate };
-  assert.equal(revision.reviseIssuedExam({ ...input, requiredTrainingFocusId: "focus-1" }), null,
-    "a verified candidate without a matching-target decision cannot replace the question");
+  assert.equal(revision.reviseIssuedExam(input)?.replacementQuestionId, "q3",
+    "a replacement does not depend on a model-declared verifier focus ID");
   assert.equal(revision.reviseIssuedExam({
-    ...input, candidate: { ...candidate, training_focus_matches: ["focus-1"] },
-    requiredTrainingFocusId: "focus-1",
-  })?.replacementQuestionId, "q3");
+    ...input, candidate: { ...candidate, source_references: ["Värdet k är lutningen"] },
+  }), null, "a replacement must cite the source anchor from the signed original");
   assert.equal(revision.reviseIssuedExam({
-    ...input, candidate: { ...candidate, training_focus_matches: ["focus-2"] },
-    requiredTrainingFocusId: "focus-1",
-  }), null, "an unrelated or malformed focus ID fails closed");
+    ...input, candidate: { ...candidate, options: ["3", "3", "5"] },
+  }), null, "structurally duplicated multiple-choice options fail closed");
 });
 
-test("question revision refuses forged, stale, unreviewed and duplicated input", () => {
+test("question replacement is refused when the signed original has no source anchor", () => {
+  const unanchored = issued({ questions: [{ ...originals[0], source_references: [] }] });
+  assert.equal(revision.reviseIssuedExam({
+    userId, course, material, ...unanchored, questionId: "q1", candidate,
+  }), null);
+});
+
+test("question revision refuses forged, stale and duplicated input while accepting gate-only candidates", () => {
   const old = issued();
   const input = { userId, course, material, ...old, questionId: "q1", candidate };
-  assert.equal(revision.reviseIssuedExam({ ...input, candidate: { ...candidate, validation_status: "gate_only" } }), null);
+  assert.equal(revision.reviseIssuedExam({ ...input, candidate: { ...candidate, validation_status: "gate_only" } })?.replacementQuestionId, "q3");
   assert.equal(revision.reviseIssuedExam({ ...input, candidate: { ...candidate, id: "q2" } }), null);
   assert.equal(revision.reviseIssuedExam({ ...input, candidate: {
     ...candidate,

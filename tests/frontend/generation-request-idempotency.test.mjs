@@ -477,7 +477,7 @@ const boundedRecoveryCases = [
   { ...data, trainingFocus: [{ concept: "algebra", privateExtra: "must not be retained" }] },
   { ...data, priorQuestions: [{ question: "Vad är x?", privateExtra: "must not be retained" }] },
   { ...data, sourceReferences: [{ submissionId: "a".repeat(32), questionIds: ["q1"], privateExtra: "must not be retained" }] },
-  { ...data, pastedText: "x".repeat(16001) },
+  { ...data, pastedText: "x".repeat(24001) },
 ];
 for (const [index, payload] of boundedRecoveryCases.entries()) {
   assert.equal(await requestIdentity.savePendingGeneration(recoveryUser, payload, webcrypto.randomUUID(), null, {
@@ -487,11 +487,11 @@ for (const [index, payload] of boundedRecoveryCases.entries()) {
 assert.equal(recoveryValues.has(requestIdentity.RECOVERY_KEY), false,
   "invalid snapshots are not written to tab storage");
 
-const maximumRecoveryPayload = { ...data, pastedText: "x".repeat(16000) };
+const maximumRecoveryPayload = { ...data, pastedText: "x".repeat(24000) };
 const maximumRecoveryKey = webcrypto.randomUUID();
 assert.equal(await requestIdentity.savePendingGeneration(recoveryUser, maximumRecoveryPayload, maximumRecoveryKey, null, {
   storage: recoveryStorage, crypto: webcrypto, now: 41000,
-}), true, "same-tab recovery accepts the full shared 16,000-character material limit");
+}), true, "same-tab recovery accepts the full shared 24,000-character material limit");
 assert.equal(requestIdentity.clearPendingGeneration(maximumRecoveryKey, recoveryStorage), true,
   "the exact-boundary recovery fixture is removed after verification");
 

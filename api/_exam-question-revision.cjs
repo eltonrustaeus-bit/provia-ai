@@ -36,36 +36,34 @@ function inspectIssuedExam({ userId, course, material, exam, submissionId }) {
   return trusted;
 }
 
-function reviseIssuedExam({ userId, course, material, exam, submissionId, questionId, candidate, lang = "sv", level = "C", requiredTrainingFocusId = null }) {
+function reviseIssuedExam({ userId, course, material, exam, submissionId, questionId, candidate, lang = "sv", level = "C" }) {
   const originals = inspectIssuedExam({ userId, course, material, exam, submissionId });
   if (!originals || !["sv", "en"].includes(lang) || !["E", "C", "A"].includes(level) ||
       typeof questionId !== "string" || !questionId ||
-      !candidate || candidate.validation_status !== "verified" || !gradeTasks.validQuestion(candidate)) return null;
+      !candidate || !["verified", "gate_only"].includes(candidate.validation_status) ||
+      !gradeTasks.validQuestion(candidate)) return null;
   const index = originals.findIndex((question) => question.id === questionId);
   if (index < 0 || candidate.id === questionId ||
       originals.some((question) => question.id === candidate.id) ||
       candidate.type !== originals[index].type ||
       Number(candidate.points) !== Number(originals[index].points)) return null;
-  if (requiredTrainingFocusId &&
-      (!/^focus-[1-9][0-9]{0,1}$/.test(requiredTrainingFocusId) ||
-        !Array.isArray(candidate.training_focus_matches) ||
-        !candidate.training_focus_matches.includes(requiredTrainingFocusId))) return null;
+  if (candidate.type === "mc") {
+    const options = candidate.options.map((option) => String(option).normalize("NFKC").trim()
+      .toLocaleLowerCase(lang === "sv" ? "sv-SE" : "en-US"));
+    if (options.length !== 3 || options.some((option) => !option) || new Set(options).size !== options.length) return null;
+  } else if (candidate.options.length !== 0 || candidate.correct_index !== -1) return null;
   if (String(candidate.question).normalize("NFKC").trim().toLocaleLowerCase("sv-SE") ===
       String(originals[index].question).normalize("NFKC").trim().toLocaleLowerCase("sv-SE")) return null;
-  const profile = assessment.detectSubjectProfile(course, material);
-  const gate = assessment.gateExam({ questions: [candidate] }, {
-    profile,
-    outputLanguage: lang,
-    requireSourceReferences: true,
-    requireExtractiveAnswers: profile === "natural_sciences",
-    reviewSingleWordOptionOutliers: lang === "sv",
-    requireSourceSupportedOptionOutliers: lang === "sv",
-    sourceMaterial: material,
-    requestedQuestionType: candidate.type,
-  });
-  if (gate.dropped.length || gate.questions.length !== 1 ||
+  const references = Array.isArray(candidate.source_references) ? candidate.source_references : [];
+  const originalReferences = Array.isArray(originals[index].source_references) ? originals[index].source_references : [];
+  if (!originalReferences.length ||
+      !references.some((reference) => typeof reference === "string" && reference.trim() && material.includes(reference) &&
+        originalReferences.some((anchor) => typeof anchor === "string" && anchor.trim() &&
+          (anchor.includes(reference) || reference.includes(anchor)))) ||
       originals.some((question, n) => n !== index &&
-        assessment.questionPairConflict(question, candidate, { profile, sourceMaterial: material }))) return null;
+        String(question.question).normalize("NFKC").trim().toLocaleLowerCase("sv-SE") ===
+        String(candidate.question).normalize("NFKC").trim().toLocaleLowerCase("sv-SE"))) return null;
+  candidate.akey_sig = assessment.signAnswerKey(candidate);
 
   const contextHash = gradeTasks.hashContext(material, course, userId);
   const clientQuestion = publicQuestionFromTrusted(candidate,
