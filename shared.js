@@ -119,7 +119,6 @@
   });
 
   /* ── P.E.R FLOATING WIDGET ── */
-  var PER_HIST_KEY = 'proviaai_per_history';
   var PER_EXAM_HISTORY_MASK_KEY = 'proviaai_per_exam_history_masked';
   var PER_MEMORY_CLEAR_EPOCH_KEY = 'proviaai_per_memory_clear_epoch';
   var PER_PENDING_QUESTION_KEY = 'exgen_per_pending_question';
@@ -739,12 +738,20 @@
     return 'Vad kan jag hjälpa dig med?';
   }
 
-  function perGetHist() {
-    try { return JSON.parse(localStorage.getItem(PER_HIST_KEY) || '[]'); } catch (_) { return []; }
+  function perHistoryKey(accountId) {
+    return window.ExGenLocalDataBoundary?.perHistoryKeyFor(accountId) || null;
   }
-  function perSaveHist(h) {
-    if (_examHistoryMasked) return;
-    try { localStorage.setItem(PER_HIST_KEY, JSON.stringify(h.slice(-PER_MAX_HIST))); } catch (_) {}
+
+  function perGetHist(accountId) {
+    var id = arguments.length ? accountId : currentPilotAccountId();
+    var key = perHistoryKey(id);
+    if (!key || currentPilotAccountId() !== id) return [];
+    try { return JSON.parse(localStorage.getItem(key) || '[]'); } catch (_) { return []; }
+  }
+  function perSaveHist(h, accountId) {
+    var key = perHistoryKey(accountId);
+    if (_examHistoryMasked || !key || currentPilotAccountId() !== accountId || !Array.isArray(h)) return;
+    try { localStorage.setItem(key, JSON.stringify(h.slice(-PER_MAX_HIST))); } catch (_) {}
   }
 
   function perHistoryForCurrentPage(history) {
@@ -826,10 +833,11 @@
       }
       return;
     }
-    var history = perGetHist();
+    var accountId = currentPilotAccountId();
+    var history = perGetHist(accountId);
     if (current.length) history = history.concat(current).slice(-PER_MAX_HIST);
     if (current.length) {
-      try { localStorage.setItem(PER_HIST_KEY, JSON.stringify(history)); } catch (_) {}
+      perSaveHist(history, accountId);
     }
     renderPerHistory(history);
   }
@@ -860,7 +868,7 @@
       _examHistoryMasked = false;
       _perHistoryAppliedRequestGeneration = requestGeneration;
       try {
-        localStorage.setItem(PER_HIST_KEY, JSON.stringify(history));
+        perSaveHist(history, accountId);
         localStorage.removeItem(PER_EXAM_HISTORY_MASK_KEY);
       } catch (_) {}
       if (history.length) {
@@ -878,27 +886,30 @@
     } catch (_) { return null; }
   }
 
+  function syncPerHistoryAccount() {
+    var nextAccountId = currentPilotAccountId();
+    abortPerRequestForAccountId(nextAccountId);
+    if (nextAccountId === _perHistoryAccountId) return;
+    _perHistoryAccountId = nextAccountId;
+    setExamHistoryMasked(true);
+    refreshPerHistoryIfVerified();
+  }
+
+  window.addEventListener('exgen:per-session-saved', syncPerHistoryAccount);
   window.addEventListener('storage', function (event) {
-    if (event.key === EXGEN_RUNTIME.authStorageKey || event.key === null) {
-      var session = null;
-      try { session = JSON.parse(localStorage.getItem(EXGEN_RUNTIME.authStorageKey) || 'null'); } catch (_) {}
-      var nextAccountId = pilotSessionUserId(session) || null;
-      abortPerRequestForAccountId(nextAccountId);
-      if (nextAccountId !== _perHistoryAccountId) {
-        _perHistoryAccountId = nextAccountId;
-        setExamHistoryMasked(true);
-        refreshPerHistoryIfVerified();
-      }
-    }
+    if (event.key === EXGEN_RUNTIME.authStorageKey || event.key === null) syncPerHistoryAccount();
     if (event.key === PER_EXAM_HISTORY_MASK_KEY) {
       if (event.newValue === '1') setExamHistoryMasked(true);
       else if (event.newValue === null) refreshPerHistoryIfVerified();
       return;
     }
     if (event.key === PER_MEMORY_CLEAR_EPOCH_KEY && event.newValue && event.newValue !== event.oldValue) {
-      if (window.PER && typeof window.PER.clearAfterServerMemoryClear === 'function') {
-        window.PER.clearAfterServerMemoryClear();
-      }
+      try {
+        var clearedAccount = JSON.parse(event.newValue).accountId;
+        if (clearedAccount && clearedAccount === currentPilotAccountId()) {
+          window.PER?.clearAfterServerMemoryClear?.(clearedAccount);
+        }
+      } catch (_) {}
     }
   });
 
@@ -1272,10 +1283,12 @@
       }
     }
 
-    function clearAfterServerMemoryClear() {
+    function clearAfterServerMemoryClear(accountId) {
+      var clearedAccount = accountId || currentPilotAccountId();
+      window.ExGenLocalDataBoundary?.clearPerHistoryForAccount(clearedAccount);
+      if (!clearedAccount || currentPilotAccountId() !== clearedAccount) return;
       _perHistoryInvalidationGeneration++;
       if (_perActiveRequest && _perActiveRequest.cancel) _perActiveRequest.cancel();
-      try { localStorage.removeItem(PER_HIST_KEY); } catch (_) {}
       clearPerPendingQuestion();
       if (EXGEN_RUNTIME.environment === 'pilot') {
         try { sessionStorage.removeItem(PILOT_PENDING_QUESTION_KEY); } catch (_) {}
@@ -1990,11 +2003,11 @@ function finalizeMsg(div, text) {
                     }
                   }
                 }
-                if (ev.done && ev.history) perSaveHist(ev.history);
+                if (ev.done && ev.history) perSaveHist(ev.history, requestAccountId);
                 if (typeof ev.reviewedAnswer === 'string' && ev.reviewedAnswer.trim()) {
                   answerText = ev.reviewedAnswer;
                   if (answerCommitted && typing) finalizeMsg(typing, answerText);
-                  if (ev.history) perSaveHist(ev.history);
+                  if (ev.history) perSaveHist(ev.history, requestAccountId);
                 }
                 if (typeof ev.reviewUnavailable === 'string' && ev.reviewUnavailable.trim()) {
                   answerText = ev.reviewUnavailable;
@@ -2002,7 +2015,7 @@ function finalizeMsg(div, text) {
                     typing.className = 'per-msg teacher';
                     typing.textContent = answerText;
                   }
-                  if (ev.history) perSaveHist(ev.history);
+                  if (ev.history) perSaveHist(ev.history, requestAccountId);
                   announceFailure(answerText);
                 }
                 /* Exam-bound pages retain their separate correction UI.
@@ -2012,7 +2025,7 @@ function finalizeMsg(div, text) {
                   _perRättelse = ev.granskning.rättelse;
                   if (answerCommitted && typing) { visaRättelse(typing, _perRättelse); _perRättelse = null; }
                 }
-                if (ev.granskning && ev.history) perSaveHist(ev.history);
+                if (ev.granskning && ev.history) perSaveHist(ev.history, requestAccountId);
                 // Taket kommer alltid härifrån, aldrig ur en egen uträkning.
                 if (typeof ev.helpCap === 'number') _perHelpCap = ev.helpCap;
               } catch (_) {}
@@ -2052,7 +2065,7 @@ function finalizeMsg(div, text) {
               } else {
                 restoreFailedQuestion();
                 try { localStorage.removeItem(EXGEN_RUNTIME.authStorageKey); } catch (_) {}
-                if (window.ExGenLocalDataBoundary) window.ExGenLocalDataBoundary.clearForSignOut();
+                if (window.ExGenLocalDataBoundary) window.ExGenLocalDataBoundary.clearForSignOut(requestAccountId);
               }
               typing.className = 'per-msg teacher';
               if (EXGEN_RUNTIME.environment === 'pilot') {
@@ -2105,7 +2118,7 @@ function finalizeMsg(div, text) {
                 if (typeof data.helpCap === 'number') _perHelpCap = data.helpCap;
                 _perHelpIntent = data.helpIntent === 'self-check' ? 'self-check' : null;
                 finalizeMsg(typing, data.answer);
-                if (data.history) perSaveHist(data.history);
+                if (data.history) perSaveHist(data.history, requestAccountId);
                 if (isLandingMode) addAnswerCTA(typing);
                 stepsAfterAnswer(data.answer, isLandingMode);
               }
@@ -2550,7 +2563,7 @@ function finalizeMsg(div, text) {
           ? 'Clear this conversation from this device? Server-stored history and P.E.R memory will remain.'
           : 'Rensa konversationen från den här enheten? Serverlagrad historik och P.E.R-minne finns kvar.')) return;
         if (_perActiveRequest && _perActiveRequest.cancel) _perActiveRequest.cancel();
-        localStorage.removeItem(PER_HIST_KEY);
+        window.ExGenLocalDataBoundary?.clearPerHistoryForAccount(currentPilotAccountId());
         clearPerPendingQuestion();
         _restoredPerSend = null;
         if (EXGEN_RUNTIME.environment === 'pilot') {
@@ -2791,10 +2804,12 @@ function finalizeMsg(div, text) {
       }
 
       /* Background Supabase sync — load cross-device history */
+      var historyAccountId = currentPilotAccountId();
       refreshPerHistoryIfVerified().then(function(history) {
+          if (currentPilotAccountId() !== historyAccountId) return;
           if (_examHistoryMasked) return;
           if (!Array.isArray(history) || history.length <= hist.length) return;
-          perSaveHist(history);
+          perSaveHist(history, historyAccountId);
           /* Only update UI if chat is closed and user hasn't started a new conversation */
           var currentHist = perGetHist();
           var hasNewUserMsg = currentHist.some(function(m, i) { return m.role === 'user' && i >= hist.length; });
@@ -2841,6 +2856,7 @@ function finalizeMsg(div, text) {
           return;
         }
         if (document.getElementById('perBubble') && e.altKey && (e.key === 'p' || e.key === 'P')) {
+          if (target?.closest?.('input,textarea,[contenteditable="true"]')) return;
           e.preventDefault();
           toggle();
         }

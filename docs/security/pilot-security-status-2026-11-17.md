@@ -93,12 +93,15 @@ effective in the reviewed production catalog.
   claim release is logged safely and falls back to the stale-claim retry
   window. Retry alone cannot fix invalid metadata in Stripe's event snapshot;
   manual reconciliation, alerting and hosted payment tests remain open.
-- Account-deletion cleanup was reviewed but not changed: concurrent login in
-  another tab can race with clearing shared browser caches, while a revoked
-  session can leave the deleted account's local cache behind. A safe design
-  needs account-scoped storage or coordinated Auth/cache writes. This remains
-  a release gate. The staging SQL tool rejected a synthetic hosted deletion
-  transaction before execution, so hosted deletion readback is also unverified.
+- A later local diff scopes P.E.R transcripts to the signed-in account and
+  discards the ambiguous legacy shared transcript. Account-specific memory
+  clearing and delayed-history checks passed in a browser test. This partial
+  change has not been deployed. Concurrent login in another tab can still
+  race with clearing the other shared browser caches, while a revoked session
+  can leave the deleted account's local cache behind. A full account-scoped
+  cutover or coordinated Auth/cache writes remains a release gate. The staging
+  SQL tool rejected a synthetic hosted deletion transaction before execution,
+  so hosted deletion readback is also unverified.
 
 - `vercel.json`: adds `nosniff`, referrer, geolocation and frame protections.
   The CSP currently restricts framing only; full script-source restrictions

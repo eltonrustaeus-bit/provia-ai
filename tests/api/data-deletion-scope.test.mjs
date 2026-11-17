@@ -49,7 +49,7 @@ assert.match(app.slice(appClearStart, appClearEnd), /clearLocalExamData\(clearUs
 assert.match(improvementClear, /clearLocalExamData\(clearUserId\)/, "coach clear removes only the active account's draft, progress and pending queue");
 const appLogoutStart = app.indexOf("async function logout(options={})");
 const appLogoutEnd = app.indexOf("// ── CENTRAL: läser roll", appLogoutStart);
-assert.match(app.slice(appLogoutStart, appLogoutEnd), /await db\.auth\.signOut\(\)[\s\S]*?await db\.auth\.getSession\(\)[\s\S]*?afterSignOut\?\.session\?\.user\?\.id[\s\S]*?location\.reload\(\);return;[\s\S]*?clearForSignOut\(\)/,
+assert.match(app.slice(appLogoutStart, appLogoutEnd), /await db\.auth\.signOut\(\)[\s\S]*?await db\.auth\.getSession\(\)[\s\S]*?afterSignOut\?\.session\?\.user\?\.id[\s\S]*?location\.reload\(\);return;[\s\S]*?clearForSignOut\(signOutUserId\)/,
   "app logout rechecks the active account after sign-out before clearing shared local data");
 const deletionFinishStart = konto.indexOf("async function finishAccountDeletion");
 const deletionFinishEnd = konto.indexOf("document.getElementById(\"deleteAccountBtn\")", deletionFinishStart);

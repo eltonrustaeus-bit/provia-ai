@@ -22,6 +22,8 @@ shared cache behind. A safe cutover must move private readers and writers to
 account-scoped keys, preserve or explicitly clear ambiguous legacy data, and
 test two-tab interleavings. Keep the current behavior and this gap visible
 until that migration is complete; a single extra ownership check is insufficient.
+A local, undeployed change isolates P.E.R transcripts, but exam history,
+mistakes, material and other private caches still use shared keys.
 
 ## Required before real student accounts
 

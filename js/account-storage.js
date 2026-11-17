@@ -11,6 +11,7 @@
   var PENDING_GENERATION_INPUT_KEY = "exgen_pending_generation_input_v1";
   var GENERATION_REQUEST_KEY = "exgen_generation_request_v1";
   var GENERATION_RECOVERY_KEY = "exgen_generation_recovery_v1";
+  var PER_HISTORY_KEY = "proviaai_per_history";
   var PRIVATE_KEYS = [
     "proviaai_history",
     "proviaai_mistakes",
@@ -37,11 +38,22 @@
     } catch (_) { return false; }
   }
 
-  function clearPrivateData() {
+  function perHistoryKeyFor(userId) {
+    var id = String(userId || "");
+    return id && id.length <= 200 ? PER_HISTORY_KEY + ":" + encodeURIComponent(id) : null;
+  }
+
+  function clearPerHistoryForAccount(userId) {
+    var key = perHistoryKeyFor(userId);
+    return key ? removeAndVerify(localStorage, key) : false;
+  }
+
+  function clearPrivateData(userId) {
     var cleared = true;
     PRIVATE_KEYS.forEach(function (key) {
       if (!removeAndVerify(localStorage, key)) cleared = false;
     });
+    if (userId && !clearPerHistoryForAccount(userId)) cleared = false;
     if (!removeAndVerify(sessionStorage, PENDING_GENERATION_INPUT_KEY)) cleared = false;
     if (!removeAndVerify(sessionStorage, GENERATION_RECOVERY_KEY)) cleared = false;
     try {
@@ -118,17 +130,20 @@
   function syncSession() {
     var session = readSession(localStorage.getItem(AUTH_KEY));
     var owner = localStorage.getItem(OWNER_KEY);
+    // The old shared transcript may contain messages from several accounts.
+    // Its owner marker cannot establish provenance, so never import it.
+    removeAndVerify(localStorage, PER_HISTORY_KEY);
     if (!session) {
-      clearPrivateData();
+      clearPrivateData(owner);
       localStorage.removeItem(OWNER_KEY);
       return;
     }
-    if (owner !== session.id) clearPrivateData();
+    if (owner !== session.id) clearPrivateData(owner);
     localStorage.setItem(OWNER_KEY, session.id);
   }
 
-  function clearForSignOut() {
-    var cleared = clearPrivateData();
+  function clearForSignOut(userId) {
+    var cleared = clearPrivateData(userId || localStorage.getItem(OWNER_KEY));
     if (!removeAndVerify(localStorage, OWNER_KEY)) cleared = false;
     if (!removeAndVerify(sessionStorage, PILOT_PENDING_QUESTION_KEY)) cleared = false;
     if (!removeAndVerify(sessionStorage, PILOT_REAUTH_REQUIRED_KEY)) cleared = false;
@@ -167,7 +182,9 @@
     syncSession: syncSession,
     clearForSignOut: clearForSignOut,
     hasLocalExamData: hasLocalExamData,
-    clearLocalExamData: clearLocalExamData
+    clearLocalExamData: clearLocalExamData,
+    perHistoryKeyFor: perHistoryKeyFor,
+    clearPerHistoryForAccount: clearPerHistoryForAccount
   };
 
   syncSession();

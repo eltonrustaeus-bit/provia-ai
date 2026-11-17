@@ -160,19 +160,24 @@ try {
     await page.keyboard.press("Alt+p");
     await page.waitForFunction(() => document.querySelector("#perPanel").classList.contains("per-open"));
   }
-  await page.evaluate(() => localStorage.setItem("proviaai_per_history", JSON.stringify([{ role: "user", content: "Spara historiken" }])));
+  await page.evaluate(() => localStorage.setItem(window.ExGenLocalDataBoundary.perHistoryKeyFor("u1"), JSON.stringify([{ role: "user", content: "Spara historiken" }])));
   await page.locator("#perInput").fill("Utkast som ska finnas kvar");
   await page.locator("#perCloseBtn").click();
   assert.equal(await page.locator("#perPanel").isVisible(), false, "the dedicated close control closes the panel");
   assert.equal(await page.evaluate(() => document.activeElement.id !== "perInput" && document.activeElement.getClientRects().length > 0 && getComputedStyle(document.activeElement).visibility !== "hidden"), true, "closing P.E.R never leaves focus in its hidden panel");
-  assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem("proviaai_per_history"))[0].content), "Spara historiken", "closing P.E.R preserves conversation history");
+  assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem(window.ExGenLocalDataBoundary.perHistoryKeyFor("u1")))[0].content), "Spara historiken", "closing P.E.R preserves conversation history");
   assert.equal(await page.locator("#perInput").inputValue(), "Utkast som ska finnas kvar", "closing P.E.R preserves an unsent draft");
 
   await page.keyboard.press("Alt+p");
   await page.locator("#perInput").waitFor({ state: "visible" });
   await page.waitForFunction(() => document.activeElement.id === "perInput");
   await page.keyboard.press("Alt+p");
-  assert.equal(await page.locator("#perPanel").isVisible(), true, "Alt+P inside an editable field does not hijack typing or close the panel");
+  const editableAltP = await page.evaluate(() => ({
+    open: document.querySelector("#perPanel")?.classList.contains("per-open"),
+    visible: !!document.querySelector("#perPanel")?.getClientRects().length,
+    focus: document.activeElement?.id,
+  }));
+  assert.equal(editableAltP.open && editableAltP.visible, true, `Alt+P inside an editable field does not hijack typing or close the panel: ${JSON.stringify(editableAltP)}`);
   assert.equal(await page.evaluate(() => document.activeElement.id), "perInput", "ignored Alt+P keeps typing focus in the input");
   await page.keyboard.press("Escape");
   assert.equal(await page.locator("#perPanel").isVisible(), false, "Escape closes P.E.R");
@@ -183,12 +188,12 @@ try {
   page.once("dialog", dialog => dialog.dismiss());
   await page.locator("#perClearBtn").click();
   assert.equal(await page.locator("#perPanel").isVisible(), true, "cancelling clear keeps P.E.R open");
-  assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem("proviaai_per_history"))[0].content), "Spara historiken", "cancelling clear preserves conversation history");
+  assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem(window.ExGenLocalDataBoundary.perHistoryKeyFor("u1")))[0].content), "Spara historiken", "cancelling clear preserves conversation history");
   assert.equal(await page.locator("#perInput").inputValue(), "Utkast som ska finnas kvar", "cancelling clear preserves the draft");
   page.once("dialog", dialog => dialog.accept());
   await page.locator("#perClearBtn").click();
   await page.locator("#perMessages").getByText("Samtalet är rensat på den här enheten.").waitFor();
-  assert.equal(await page.evaluate(() => localStorage.getItem("proviaai_per_history")), null, "confirmed clear removes local conversation history");
+  assert.equal(await page.evaluate(() => localStorage.getItem(window.ExGenLocalDataBoundary.perHistoryKeyFor("u1"))), null, "confirmed clear removes local conversation history");
   console.log("PASS P.E.R close, Escape, Alt+P and confirmed conversation clearing");
 } finally {
   await ctx.close();

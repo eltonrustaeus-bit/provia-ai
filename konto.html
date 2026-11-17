@@ -823,10 +823,13 @@ document.getElementById("yr").textContent=new Date().getFullYear();
       });
       const data=await r.json().catch(()=>({}));
       if(r.ok&&data.ok){
-        try{localStorage.removeItem("proviaai_per_history")}catch{}
-        try{localStorage.setItem("proviaai_per_memory_clear_epoch",Date.now()+":"+Math.random().toString(36).slice(2))}catch{}
-        try{window.PER?.clearAfterServerMemoryClear?.()}catch{}
-        showMsg("Sparad P.E.R-historik och långtidsminne har rensats. Pågående svar kan inte återskapa dessa minnen.","ok");
+        try{localStorage.setItem("proviaai_per_memory_clear_epoch",JSON.stringify({accountId:user.id,nonce:Date.now()+":"+Math.random().toString(36).slice(2)}))}catch{}
+        try{window.PER?.clearAfterServerMemoryClear?.(user.id)}catch{}
+        const localHistoryCleared=window.ExGenLocalDataBoundary?.clearPerHistoryForAccount(user.id)===true;
+        showMsg(localHistoryCleared
+          ?"Sparad P.E.R-historik och långtidsminne har rensats. Pågående svar kan inte återskapa dessa minnen."
+          :"P.E.R-minnet har rensats på servern, men den lokala chatthistoriken kunde inte bekräftas rensad. Rensa webbplatsens lagring innan du delar enheten.",
+          localHistoryCleared?"ok":"err");
       }else{
         showMsg("Fel: "+(data.error||"Kunde inte rensa P.E.R-minnet."),"err");
       }
@@ -839,7 +842,7 @@ document.getElementById("yr").textContent=new Date().getFullYear();
 
   function clearDeletedAccountLocalData(userId){
     let cleared=true;
-    try{if(window.ExGenLocalDataBoundary?.clearForSignOut()===false)cleared=false;}catch{cleared=false;}
+    try{if(window.ExGenLocalDataBoundary?.clearForSignOut(userId)===false)cleared=false;}catch{cleared=false;}
     if(window.ExGenLocalDataBoundary?.clearLocalExamData(userId)===false)cleared=false;
     try{localStorage.removeItem(window.ExGenRuntime.authStorageKey);}catch{cleared=false;}
     try{sessionStorage.clear();}catch{cleared=false;}
@@ -847,21 +850,22 @@ document.getElementById("yr").textContent=new Date().getFullYear();
   }
 
   async function finishAccountDeletion(userId,unconfirmed){
+    const perHistoryCleared=window.ExGenLocalDataBoundary?.clearPerHistoryForAccount(userId)!==false;
     const{data:current}=await sb.auth.getSession().catch(()=>({data:null}));
     if(current?.session?.user?.id!==userId){
       const examDataCleared=window.ExGenLocalDataBoundary?.clearLocalExamData(userId)!==false;
-      showMsg(examDataCleared
+      showMsg(examDataCleared&&perHistoryCleared
         ?"Raderingen slutfördes för det ursprungliga kontot. Ett annat konto är nu aktivt och dess session och lokala data lämnades orörda."
-        :"Raderingen slutfördes för det ursprungliga kontot, men vissa lokala provdata kunde inte bekräftas rensade. Det andra kontots session och delade data lämnades orörda.","err");
+        :"Raderingen slutfördes för det ursprungliga kontot, men vissa lokala uppgifter kunde inte bekräftas rensade. Det andra kontots session och delade data lämnades orörda.","err");
       return false;
     }
     await sb.auth.signOut({scope:"local"}).catch(()=>{});
     const{data:afterSignOut}=await sb.auth.getSession().catch(()=>({data:null}));
     if(afterSignOut?.session?.user?.id&&afterSignOut.session.user.id!==userId){
       const examDataCleared=window.ExGenLocalDataBoundary?.clearLocalExamData(userId)!==false;
-      showMsg(examDataCleared
+      showMsg(examDataCleared&&perHistoryCleared
         ?"Raderingen slutfördes för det ursprungliga kontot. Ett annat konto loggades in under utloggningen; dess session och lokala data lämnades orörda."
-        :"Raderingen slutfördes för det ursprungliga kontot, men vissa lokala provdata kunde inte bekräftas rensade. Det andra kontots session och delade data lämnades orörda.","err");
+        :"Raderingen slutfördes för det ursprungliga kontot, men vissa lokala uppgifter kunde inte bekräftas rensade. Det andra kontots session och delade data lämnades orörda.","err");
       return false;
     }
     const examDataCleared=clearDeletedAccountLocalData(userId);
@@ -936,7 +940,7 @@ document.getElementById("yr").textContent=new Date().getFullYear();
       showMsg("Utloggningen kunde inte bekräftas. Lokal data lämnades orörd.","err");
       return;
     }
-    if(window.ExGenLocalDataBoundary?.clearForSignOut()===false){
+    if(window.ExGenLocalDataBoundary?.clearForSignOut(userId)===false){
       window.alert("Du är utloggad, men lokalt sparat provmaterial kunde inte bekräftas rensat på den här enheten. Rensa webbplatsens lagring innan du delar enheten.");
     }
     window.location.href="index.html";

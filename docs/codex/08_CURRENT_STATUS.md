@@ -1,14 +1,39 @@
 # 08 Current Status
 
+## P.E.R browser-history account isolation — local work, 2026-11-18
+
+- Signed-in P.E.R transcripts now use an account-specific browser key. The old
+  shared key is discarded rather than imported because its owner marker cannot
+  prove that the transcript never mixed two accounts. Delayed server history
+  and streamed answers use the account captured when the request began; an
+  account change masks the visible chat and prevents an old response from
+  entering the new account's local history.
+- Memory-clear and account-deletion cleanup target the captured account's
+  transcript. A failed local clear is reported separately from a successful
+  server clear. The local shortcut no longer closes P.E.R while typing in an
+  editable field. The privacy table names the new key pattern.
+- Offline checks: new same-tab A-to-B delayed-history test passed; storage
+  boundary test passed; P.E.R exam-context 104/104, page-targets 95/95,
+  pilot-session recovery 1/1, and P.E.R focus/clear test passed. These do not
+  establish hosted Auth or full account deletion. Other shared private keys
+  (exam history, mistakes, material, coach caches) still need a coordinated
+  account-scoped cutover and cross-tab deletion tests. This diff is local only;
+  it has not been pushed or deployed.
+- An independent read-only review found three specific issues in the first
+  diff: local-clear success wording, an outdated logout test assertion, and a
+  missing visible-history assertion. All three were corrected and the focused
+  tests rerun. The reviewer found no remaining P1/P2 issue introduced by this
+  transcript slice. This is still offline evidence only.
+
 ## Local security review follow-up — 2026-11-18
 
 - A draft technical data inventory now records purpose, location/access,
   observed retention and external recipients with explicit unknowns in
   `docs/security/student-data-inventory-2026-11-18.md`.
-- Local admin role guards prevent self-demotion and ordinary demotion of any
+- Feature-Preview admin role guards prevent self-demotion and ordinary demotion of any
   existing admin; approval conditionally updates only existing non-privileged
   profiles. Synthetic helper and handler tests passed 6/6. These changes are
-  local only. The bearer-only admin write risk remains until an admin-wide
+  published only in Preview. The bearer-only admin write risk remains until an admin-wide
   step-up, safe enrollment/recovery, and staging rollout are designed.
 - Account-deletion browser cleanup remains unresolved: shared cache keys
   cannot guarantee protection of another account under concurrent tabs.

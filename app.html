@@ -1690,7 +1690,7 @@ async function logout(options={}){
   if(db){try{await db.auth.signOut();}catch{}}
   const{data:afterSignOut}=db?await db.auth.getSession().catch(()=>({data:null})):({data:null});
   if(afterSignOut?.session?.user?.id){location.reload();return;}
-  const localDataCleared=window.ExGenLocalDataBoundary?.clearForSignOut()!==false;
+  const localDataCleared=window.ExGenLocalDataBoundary?.clearForSignOut(signOutUserId)!==false;
   showLock();
   if(!localDataCleared){
     setLockError(LANG==="sv"

@@ -591,7 +591,7 @@ await assertPageTopic("/förbättring.html", "förbättring");
   await routeFinished;
   const afterSwitch = await page.evaluate(() => ({
     messages: document.querySelector("#perMessages")?.textContent || "",
-    history: localStorage.getItem("proviaai_per_history") || "",
+    history: localStorage.getItem(window.ExGenLocalDataBoundary.perHistoryKeyFor("u2")) || "",
   }));
   ok("ordinary chat A→B switch discards the delayed answer", !afterSwitch.messages.includes("PRIVATE_OLD_ACCOUNT_PER_MARKER"));
   ok("ordinary chat A→B switch does not cache the delayed answer", !afterSwitch.history.includes("PRIVATE_OLD_ACCOUNT_PER_MARKER"));
@@ -639,7 +639,7 @@ await assertPageTopic("/förbättring.html", "förbättring");
   await page.waitForFunction(() => document.querySelector("#perSendBtn")?.disabled === false, null, { timeout: 5000 });
   const afterLateResponse = await page.evaluate(() => ({
     messages: document.querySelector("#perMessages")?.textContent || "",
-    history: localStorage.getItem("proviaai_per_history") || "",
+    history: localStorage.getItem(window.ExGenLocalDataBoundary.perHistoryKeyFor("u2")) || "",
   }));
   ok("late response after account switch is not shown", !afterLateResponse.messages.includes("PRIVATE_LATE_OLD_ACCOUNT_PER_MARKER"));
   ok("late response after account switch is not cached", !afterLateResponse.history.includes("PRIVATE_LATE_OLD_ACCOUNT_PER_MARKER"));
