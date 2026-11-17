@@ -1,5 +1,15 @@
 # 08 Current Status
 
+## Main release — 2026-11-17
+
+- PR #125 was merged to `main` as merge commit `f82c28c0643bc9e5e6d4581cedf744871f4cd28d`.
+- Production includes the source-grounded question-coverage guidance, soft preference for non-repeated candidates when alternatives exist, the active-exam P.E.R. definition hint ladder, and in-place question replacement with the same exam's saved material and verified source.
+- The two question-replacement migrations were applied to production in order: `20261117205901_atomic_exam_question_replacements` and `20261117205902_schedule_exam_question_replacement_retention`. A read-only migration-list check confirmed both versions.
+- Vercel deployment `dpl_2ADqASfYUw9g3J4ce6NU9u4g1TNB` reached `READY` for the exact `main` merge SHA and serves `exgen.se` and `www.exgen.se`.
+- Production HTTP smoke check: `/`, `/index.html`, `/app.html`, and `/js/exam-flow.js` returned **200**. Read-only GET checks to `/api/generate-exam` and `/api/explain` returned **405** and **401** respectively, consistent with method/auth requirements; no model request was made.
+- Offline evidence on the release: exam-generation pipeline tests passed; question-replacement API/database-emulation/browser-recovery and P.E.R. lifecycle tests passed **19/19**; P.E.R. pedagogy tests passed **2/2**; prompt/eval assertions and syntax checks passed. The full `per-exam-review-handler` suite was not completed, as documented below.
+- Limitation: no new production model-backed generation or P.E.R. conversation was run after deployment. HTTP availability and offline tests do not prove generated question quality in live use.
+
 ## Exam variation and active P.E.R tutoring — 2026-11-17
 
 - Exam generation now includes a compact source-grounded coverage instruction:
