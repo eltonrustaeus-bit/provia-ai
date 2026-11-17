@@ -7,6 +7,9 @@ attack test was run against production.
 
 ## Personal-data map
 
+A purpose/access/location/retention/recipient inventory with explicit unknowns
+is maintained in `docs/security/student-data-inventory-2026-11-18.md`.
+
 | Data | Current location | Access and deletion boundary | Remaining check |
 | --- | --- | --- | --- |
 | Identity, role, billing links | Supabase Auth and `profiles` | Server-verified user and role; free student self-deletion has eligibility checks | Confirm all account types, provider retention and old-session expiry |
@@ -56,6 +59,11 @@ JavaScript access to those tokens.
    would lock out other admins, while allowing bearer-only first enrollment
    would let a stolen bearer register an attacker's credential. A separate
    admin-write proof, safe enrollment/recovery path and UI are required.
+   A local, unreleased guard now prevents self-demotion (including uppercase
+   UUID spelling), prevents any existing administrator from being demoted by
+   the ordinary role route, and makes approval a conditional update of an
+   existing non-privileged profile. Synthetic route tests passed. This does
+   not address a stolen administrator bearer token or provide step-up.
 
 These are distinct from Supabase advisor warnings on internal trigger and
 event-trigger functions. `user_exams` currently combines permissive allow

@@ -18,6 +18,7 @@ import {
   beginAuthentication, finishAuthentication, rpConfig,
 } from "./_admin-passkey.js";
 import pilotScope from "./_pilot-scope.cjs";
+import { isSelfDemotion, setEligibleRole, approveEligibleProfile } from "./_admin-role-writes.js";
 
 const { createSupabaseServerClient, getSupabaseUrl } = supabaseKeys;
 
@@ -183,7 +184,8 @@ export default async function handler(req, res) {
 
   /* ── SET ROLE ── */
   if (action === "set-role") {
-    if (!await requireAdmin(req, res)) return;
+    const admin = await requireAdmin(req, res);
+    if (!admin) return;
 
     if (!targetId || !UUID_RE.test(String(targetId))) {
       return res.status(400).json({ ok: false, error: "Invalid targetId" });
@@ -191,12 +193,13 @@ export default async function handler(req, res) {
     if (!VALID_ROLES.includes(role)) {
       return res.status(400).json({ ok: false, error: "Invalid role" });
     }
+    if (isSelfDemotion(admin.id, String(targetId), role)) {
+      return res.status(409).json({ ok: false, error: "Du kan inte ta bort din egen administratörsroll." });
+    }
 
-    const { error } = await supabase
-      .from("profiles")
-      .upsert({ id: targetId, role }, { onConflict: "id" });
-
-    if (error) return res.status(500).json({ ok: false, error: error.message });
+    const result = await setEligibleRole(supabase, String(targetId), role);
+    if (result === "error") return res.status(503).json({ ok: false, error: "Rollen kunde inte sparas." });
+    if (result !== "changed") return res.status(409).json({ ok: false, error: "Kontots roll kan inte ändras med denna åtgärd." });
     return res.status(200).json({ ok: true, targetId, role });
   }
 
@@ -208,11 +211,9 @@ export default async function handler(req, res) {
       return res.status(400).json({ ok: false, error: "Invalid targetId" });
     }
 
-    const { error } = await supabase
-      .from("profiles")
-      .upsert({ id: targetId, approved: true, role: "premium" }, { onConflict: "id" });
-
-    if (error) return res.status(500).json({ ok: false, error: error.message });
+    const result = await approveEligibleProfile(supabase, String(targetId));
+    if (result === "error") return res.status(503).json({ ok: false, error: "Godkännandet kunde inte sparas." });
+    if (result !== "approved") return res.status(409).json({ ok: false, error: "Kontot kan inte godkännas med denna åtgärd." });
     return res.status(200).json({ ok: true });
   }
 

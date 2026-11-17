@@ -1,6 +1,19 @@
 # 08 Current Status
 
-## Security follow-up in local feature worktree — 2026-11-18
+## Local security review follow-up — 2026-11-18
+
+- A draft technical data inventory now records purpose, location/access,
+  observed retention and external recipients with explicit unknowns in
+  `docs/security/student-data-inventory-2026-11-18.md`.
+- Local admin role guards prevent self-demotion and ordinary demotion of any
+  existing admin; approval conditionally updates only existing non-privileged
+  profiles. Synthetic helper and handler tests passed 6/6. These changes are
+  local only. The bearer-only admin write risk remains until an admin-wide
+  step-up, safe enrollment/recovery, and staging rollout are designed.
+- Account-deletion browser cleanup remains unresolved: shared cache keys
+  cannot guarantee protection of another account under concurrent tabs.
+
+## Security feature Preview checkpoint — 2026-11-18
 
 - Production's approved class/profile permission changes remain applied and
   verified as recorded below. No new production change was made in this
@@ -15,6 +28,11 @@
   before execution; no hosted deletion claim is made. The detailed evidence
   and remaining release gates are in
   `docs/security/pilot-security-status-2026-11-17.md`.
+- Commit `5c177ae` was pushed to the feature branch. Vercel Preview
+  `dpl_wZaeFKJ2sXbucsT8aG3XaVe3YnZa` is READY for its exact Git SHA;
+  PR #128 remains draft. This verifies deployment/build state, not live
+  payment, passkey or account-deletion behavior. `main` and Production app
+  code were not changed by this checkpoint.
 
 ## Production class/profile access restrictions — 2026-11-17
 
