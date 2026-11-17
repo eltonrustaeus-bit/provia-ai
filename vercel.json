@@ -1,6 +1,18 @@
 {
   "buildCommand": "node tools/prepare-vercel-runtime.mjs",
   "outputDirectory": ".",
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+        { "key": "Permissions-Policy", "value": "geolocation=()" },
+        { "key": "X-Frame-Options", "value": "SAMEORIGIN" },
+        { "key": "Content-Security-Policy", "value": "frame-ancestors 'self'" }
+      ]
+    }
+  ],
   "git": {
     "deploymentEnabled": {
       "codex/exgen-school-pilot-review-2026-10-13": true,

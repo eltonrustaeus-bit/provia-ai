@@ -1788,11 +1788,6 @@ async function handleExplainRequest(req, res, perAnswerLease) {
       structured:     mergedStructured,
     });
 
-    const rawNamePart = (user.email || '').split('@')[0].split(/[.\-_+]/)[0];
-    const studentName = /^[a-zåäöA-ZÅÄÖ]{2,15}$/.test(rawNamePart)
-      ? rawNamePart.charAt(0).toUpperCase() + rawNamePart.slice(1).toLowerCase()
-      : null;
-
     /* Taket avgörs av servern ur provkontexten. helpLevel från klienten är ett
        önskemål — se api/_per-help.js för hela tabellen och skälet. */
     /* Stilen härleds ur samtalshistoriken som redan finns i kroppen — samma
@@ -1830,7 +1825,6 @@ async function handleExplainRequest(req, res, perAnswerLease) {
         quotaRemaining,
         recentMistakes: contextPack.recentMistakes,
         longMemory,
-        studentName,
       });
 
     /* Vilka delar av P.E.R. som faktiskt användes i det här svaret.
