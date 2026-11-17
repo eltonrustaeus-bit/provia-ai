@@ -1,10 +1,27 @@
 # Data deletion: pilot gate
 
-## Current release boundary — 2026-10-19
+## Current release boundary — 2026-11-18
 
-This document describes a local, unpublished self-service deletion candidate, not a verified release. The code and offline tests do not establish that account deletion, database cascades, Storage cleanup, provider retention, browser queues, or cross-device revocation work end to end.
+The self-service deletion route is present in current `origin/main` source, but
+it is not a verified end-to-end deletion release. Source and offline tests do
+not establish that Auth deletion, database cascades, Storage cleanup, provider
+retention, browser queues, or cross-device revocation work together on the
+deployed service. Do not describe the presence of a route as proof of erasure.
 
-The deletion flow must be verified using synthetic accounts in isolated staging before any real-student pilot. Staging schema, Auth/Storage behavior, deployed route availability, and database cascade behavior must be checked independently. This is not a staging/end-to-end deletion test and the route is not deployed.
+The deletion flow must be verified using synthetic accounts in isolated staging
+before any real-student pilot. Staging schema, Auth/Storage behavior, route
+availability, and database cascade behavior must be checked independently.
+The missing evidence is a hosted deletion readback. A synthetic
+staging SQL transaction was rejected before execution, so no deletion rows
+were created or removed by that attempt.
+
+The browser still uses shared unscoped cache keys. Concurrent login on another
+tab can race with deletion cleanup and remove the other account's local data;
+after session revocation the cleanup can instead leave the deleted account's
+shared cache behind. A safe cutover must move private readers and writers to
+account-scoped keys, preserve or explicitly clear ambiguous legacy data, and
+test two-tab interleavings. Keep the current behavior and this gap visible
+until that migration is complete; a single extra ownership check is insufficient.
 
 ## Required before real student accounts
 
