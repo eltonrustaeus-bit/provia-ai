@@ -1,5 +1,25 @@
 # 08 Current Status
 
+## Single-route staging recovery hotfix — 2026-11-17 (in progress)
+
+- The first recovery checkpoint (`0ef8106`) was pushed to the existing
+  feature branch, but its Preview build failed because the added API route
+  exceeded Vercel Hobby's 12-serverless-function deployment limit.
+- The same authenticated stale-attempt cleanup is now routed through the
+  existing `/api/generate-exam?pipeline=cleanup-stale-attempts` handler. It
+  retains the account-scoped, exact-key, 15-minute stale threshold,
+  conditional `retryable` to `expired` fence, final state readback, and
+  fail-closed behavior. The extra serverless route has been removed; no
+  history, saved material, exam, or quota rows are targeted.
+- Local tests after this integration: cleanup API + browser terminal-state
+  tests **4/4**; idempotency + pending-input tests **2/2**; syntax and
+  `git diff --check` passed. The full exam-flow regression is running. A
+  read-only independent review of this integration is pending.
+- Not yet committed, pushed, or live-verified. Next: finish the broad
+  regression, commit/push to the existing feature branch, verify the Preview
+  reaches READY under the function limit, then use the same signed-in tab for
+  one synthetic 10-question Buddhism/Hinduism test and complete it.
+
 ## Safe recovery from the saved-attempt limit — 2026-11-17
 
 - The authenticated generation start previously stopped locally at

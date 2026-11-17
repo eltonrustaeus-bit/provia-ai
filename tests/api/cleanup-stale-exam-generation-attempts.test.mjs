@@ -58,7 +58,7 @@ globalThis.fetch = async (input, init = {}) => {
 };
 
 try {
-  const { default: handler } = await import(`../../api/cleanup-stale-exam-generation-attempts.js?test=${Date.now()}`);
+  const { default: handler } = await import("../../api/generate-exam.js");
   const invoke = async (method, body) => {
     const result = { code: 200, headers: {}, body: null };
     const res = {
@@ -66,7 +66,7 @@ try {
       status(code) { result.code = code; return this; },
       json(value) { result.body = value; return this; },
     };
-    await handler({ method, headers: { authorization: "Bearer synthetic-user-token" }, body }, res);
+    await handler({ method, url: "/api/generate-exam?pipeline=cleanup-stale-attempts", headers: { authorization: "Bearer synthetic-user-token" }, body }, res);
     return result;
   };
 

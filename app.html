@@ -2476,7 +2476,7 @@ try{
         try{
           const oldRequests=window.ExGenGenerationRequest?.listPendingRequestKeys?.()||[];
           if(oldRequests.length){
-            const status=await postJson("/api/cleanup-stale-exam-generation-attempts",{requests:oldRequests},{timeoutMs:12000,token:authSnapshot.token});
+            const status=await postJson("/api/generate-exam?pipeline=cleanup-stale-attempts",{requests:oldRequests},{timeoutMs:12000,token:authSnapshot.token});
             const checks=status?.data?.checks;
             if(status.ok&&status.data?.ok===true&&Array.isArray(checks)&&checks.length===oldRequests.length&&checks.every(check=>check?.safeToClear===true)){
               const cleared=await window.ExGenGenerationRequest.clearVerifiedTerminalGenerations(checks);

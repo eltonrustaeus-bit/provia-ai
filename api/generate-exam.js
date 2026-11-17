@@ -1802,7 +1802,7 @@ module.exports = async function handler(req, res, internalContext = null) {
       return (await import("../src/exam-question-replacement.mjs")).default(req, res);
     }
     const pipelineMode = new URL(req.url || "/api/generate-exam", "https://exgen.invalid").searchParams.get("pipeline");
-    if (["start", "advance", "status"].includes(pipelineMode)) {
+    if (["start", "advance", "status", "cleanup-stale-attempts"].includes(pipelineMode)) {
       const pipelineHandler = pipelineMode === "advance"
         ? (await import("./_exam-generation-advance.mjs")).default
         : (await import("./_exam-generation-start.mjs")).default;
