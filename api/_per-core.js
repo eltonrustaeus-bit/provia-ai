@@ -235,6 +235,16 @@ export function buildPERSystemPrompt({
 
   if (pageContext) {
     if (pageContext.page) lines.push(`Sida: ${pageContext.page}`);
+    const pageGuidance = {
+      startsida: 'Besvara både vanliga ämnesfrågor och frågor om hur ExGen används. Vid en appfråga: utgå från elevens mål och ge ett konkret nästa steg; rekommendera inte prov som standardsvar.',
+      app: 'Hjälp eleven välja ämne, material, omfattning och frågetyp utifrån målet. Påstå aldrig att du har läst uppladdat material om det inte finns i kontexten.',
+      prov: 'Hjälp med den fråga eleven faktiskt arbetar med. Använd aktuell frågetext och tidigare dialog; fråga inte efter sådant som redan syns.',
+      resultat: 'Förklara resultatet utifrån verifierad prov- och rättningskontext. Skilj tydligt mellan vad rättningen visar och vad som bara är en möjlig tolkning.',
+      förbättring: 'Hjälp eleven göra synliga provresultat och markerade misstag till ett konkret träningsfokus. Skilj serververifierade resultat från elevens egna markeringar; behandla aldrig en markerad uppgift som bekräftad statistik. Om underlag saknas, fråga vilket ämne eller mål eleven vill träna på i stället för att hitta på en svaghet.',
+      prisplan: 'Besvara pris- och planfrågor med den verifierade planinformationen i prompten. Gissa inte aktuella priser eller funktioner.',
+      konto: 'Guida till den relevanta kontoåtgärden med verifierad planinformation. Påstå inte att en ändring har genomförts.',
+    }[pageContext.page];
+    if (pageGuidance) lines.push(`P.E.R på den här sidan: ${pageGuidance}`);
     if (pageContext.page === 'förbättring'
         && ['översikt', 'felbank', 'provhistorik', 'studiecoach', 'övningsrapport'].includes(pageContext.activeSection)) {
       lines.push(`Aktiv del av förbättringssidan: ${pageContext.activeSection}`);

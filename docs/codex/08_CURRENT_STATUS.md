@@ -1,5 +1,41 @@
 # 08 Current Status
 
+## Exam variation and active P.E.R tutoring — 2026-11-17
+
+- Exam generation now includes a compact source-grounded coverage instruction:
+  plan a distinct learning objective for each question, avoid repeating the
+  same relationship with changed wording/numbers/type, and keep each target
+  within the material. The existing deterministic gates and generation-only
+  issuance path are unchanged.
+- When the pipeline has more eligible candidates than open slots, it now ranks
+  candidates that do not conflict with already accepted presented work first.
+  This is a soft preference only: it does not reject candidates or shorten an
+  exam; a repeated candidate can still fill a slot when there is no alternative.
+- Active P.E.R remains on its signed, deterministic hint path. Short definition
+  questions now get a three-step source-based ladder: locate the concept in the
+  material, define it in the learner's own words, then self-check against the
+  requested scope. It does not provide or validate the definition. Function
+  and calculation questions keep their existing specialized scaffolds.
+- P.E.R page guidance now distinguishes server-verified exam evidence from
+  learner-selected mistakes on the improvement page; ordinary subject help
+  and app guidance remain available across pages.
+- Local evidence: exam-generation pipeline **35/35**; focused active-exam P.E.R
+  cases **4/4**; active-scaffold tests **4/4**; P.E.R prompt contracts and
+  generator prompt/normalization contracts passed; syntax and `git diff
+  --check` passed. The full `per-exam-review-handler` run was interrupted after
+  69 tests passed because the suite remained active for nearly five minutes;
+  it is not reported as a full-suite pass. The changed active cases were then
+  rerun in isolation and passed.
+- No paid model call, staging test, database change, commit, push, Preview,
+  `main`, or Production action occurred. Model output quality and live behavior
+  remain unverified for this prompt/ranking change.
+- Independent read-only review found no remaining blocker or high-risk
+  finding. It confirmed candidate ranking remains soft and that the active
+  answer-free hint path is unchanged outside the new definition ladder.
+- Next: checkpoint only to the already-approved feature Preview if continuing
+  deployment work. Do not merge to `main` or touch Production as part of this
+  change.
+
 ## Single-route stale-attempt recovery and live religion test — 2026-11-17
 
 - The first recovery checkpoint (`0ef8106`) was pushed to the existing

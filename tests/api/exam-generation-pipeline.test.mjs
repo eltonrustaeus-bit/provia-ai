@@ -12,6 +12,16 @@ const mistakeTrainingGold = JSON.parse(readFileSync(
   new URL("../evals/exam-quality/mistake-training-gold.v1.json", import.meta.url), "utf8",
 ));
 
+test("surplus candidate ranking can prefer a distinct item without rejecting a repeat", () => {
+  const accepted = { type: "short", question: "Beskriv hur vatten rör sig genom membranet." };
+  const repeated = { type: "short", question: "Beskriv hur vatten rör sig genom membranet." };
+  const distinct = { type: "short", question: "Förklara vad cellandning frigör." };
+  assert.equal(pipeline.candidateRepeatPenalty(repeated, [accepted]), 1);
+  assert.equal(pipeline.candidateRepeatPenalty(distinct, [accepted]), 0);
+  assert.equal(pipeline.noSemanticDuplicate([accepted], repeated), false,
+    "the existing duplicate predicate remains available, but this ranking helper is only advisory");
+});
+
 test("mixed tied deficits alternate MC and short after a no-progress attempt", () => {
   const targets = generation.mixedTypeTargets(12);
   const accepted = [
@@ -392,7 +402,7 @@ test("later batch uses approved stems for novelty while duplicate filtering rema
   }
 });
 
-test("candidate selection prefers a new learning objective without blocking approved practice", async () => {
+test("candidate selection prefers distinct presented work without blocking approved practice", async () => {
   const job = {
     id: "00000000-0000-4000-8000-000000000021",
     user_id: "11111111-1111-4111-8111-111111111111",
@@ -423,15 +433,15 @@ test("candidate selection prefers a new learning objective without blocking appr
   };
   try {
     generation.generateVerifiedBatch = async () => ({ status: 200, body: { ok: true, questions: [
-      { id: "same-skill", type: "short", question: "Beräkna x när 2x + 3 = 11.",
-        learning_objective: "Lös linjära ekvationer", validation_status: "verified" },
+      { id: "repeated-work", type: "short", question: "Beräkna x när x + 2 = 5.",
+        learning_objective: "En ny etikett som annars ser ut som bredd", validation_status: "verified" },
       { id: "new-skill", type: "short", question: "Bestäm nollställena till f(x)=x²-4.",
-        learning_objective: "Bestäm nollställen till en andragradsfunktion", validation_status: "verified" },
+        learning_objective: "Lös linjära ekvationer", validation_status: "verified" },
     ] } });
     await pipeline.advance(job);
     assert.deepEqual(job.accepted_questions.map(({ id }) => id), [
       "approved", pipeline.batchQuestionId(job, { id: "new-skill" }),
-    ], "a new learning objective wins the final slot");
+    ], "a distinct item wins even if the repeated stem claims a new objective");
 
     job.requested_count = 3;
     job.payload.numQuestions = 3;

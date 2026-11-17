@@ -28,6 +28,29 @@ for (const [lang, example, sourceRule] of [
   assert.ok(systemPrompt.includes(sourceRule), `${lang}: keep the correct answer grounded in the notes`);
 }
 
+for (const [lang, expected] of [
+  ["sv", "TÄCKNING OCH VARIATION"],
+  ["en", "COVERAGE AND VARIETY"],
+]) {
+  const prompts = buildExamPrompts({
+    lang, level: "C", course: "Biologi 1", qType: "mix", numQuestions: 12,
+    pastedText: material, isMath: false,
+  });
+  assert.ok(prompts.userPrompt.includes(expected), `${lang}: coverage planning is present`);
+  assert.match(prompts.userPrompt, /Do not repeat the same question|Upprepa inte samma fråga/i,
+    `${lang}: repeated learning targets are explicitly discouraged`);
+  assert.match(prompts.userPrompt, /source-grounded|källförankras/i,
+    `${lang}: answer and scoring remain tied to the source`);
+}
+
+const mistakePrompt = buildExamPrompts({
+  lang: "sv", level: "C", course: "Religion 1", qType: "short", numQuestions: 2,
+  pastedText: "Buddhismen beskriver begär som en orsak till lidande.", isMath: false,
+  trainingFocus: [{ concept: "begär", skill: "förklara kopplingen till lidande" }],
+});
+assert.match(mistakePrompt.userPrompt, /specifika verifierade felmoment/i,
+  "mistake practice keeps the coverage instruction anchored to the verified missed skill");
+
 const shortOptions = normalizeAndGateFirstPass({ questions: [{ ...candidate, options: candidate.options.slice(0, 2) }] }, options);
 assert.equal(shortOptions.failure?.payload.error, "MC options invalid",
   "the eval must not skip production normalization and count a two-option draft as viable");

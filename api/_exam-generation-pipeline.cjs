@@ -49,6 +49,11 @@ function questionBreadthKey(question) {
     : "";
 }
 
+function candidateRepeatPenalty(question, previousQuestions, options = {}) {
+  return (Array.isArray(previousQuestions) ? previousQuestions : []).reduce((penalty, previous) =>
+    penalty + Number(Boolean(assessment.questionPairConflict(previous, question, options))), 0);
+}
+
 function batchQuestionId(job, question) {
   return "q-" + crypto.createHash("sha256")
     .update(JSON.stringify([job.id, job.lease_token, String(question.id)]))
@@ -507,6 +512,10 @@ async function advance(job, { deadlineAt = null } = {}) {
     (!targets || question.type === batchType)).length;
   if (eligibleCount > slots) {
     const representedBreadth = new Set(existing.map(questionBreadthKey).filter(Boolean));
+    const conflictOptions = {
+      sourceMaterial: typeof job.payload.pastedText === "string" ? job.payload.pastedText : "",
+      ...(typeof job.payload.profile === "string" ? { profile: job.payload.profile } : {}),
+    };
     const breadthCounts = new Map();
     for (const { question } of rankedQuestions) {
       const key = questionBreadthKey(question);
@@ -520,7 +529,13 @@ async function advance(job, { deadlineAt = null } = {}) {
     const newSections = (entry) => entry.sourceIndices.filter((index) => sourceCounts[index] === 0).length;
     const lowestCount = (entry) => entry.sourceIndices.length
       ? Math.min(...entry.sourceIndices.map((index) => sourceCounts[index])) : Infinity;
-    rankedQuestions.sort((left, right) => addsBreadth(right) - addsBreadth(left) ||
+    // This is a preference among already-eligible surplus candidates, never
+    // an acceptance rule. If no alternative exists, the repeated candidate
+    // can still fill the requested slot and preserve count/yield.
+    rankedQuestions.sort((left, right) =>
+      candidateRepeatPenalty(left.question, existing, conflictOptions) -
+        candidateRepeatPenalty(right.question, existing, conflictOptions) ||
+      addsBreadth(right) - addsBreadth(left) ||
       breadthAvailability(left) - breadthAvailability(right) ||
       newSections(right) - newSections(left) || lowestCount(left) - lowestCount(right) || left.index - right.index);
   }
@@ -699,4 +714,4 @@ async function assemble(job) {
   return { status: "completed", response: completed.response };
 }
 
-module.exports = { advance, batchQuestionId, nextBatchType, missingForType, noSemanticDuplicate, comparisonQuestionsFor, comparisonAnswerTargetsFor, uncoveredTrainingFocusIds, supportedTrainingFocusMatches, mergeRepairFeedback, safeRequestId, safeRepairFailureStage, safeRepairOutcomeStage, MAX_COMPARISON_CONTEXT_BYTES };
+module.exports = { advance, batchQuestionId, nextBatchType, missingForType, noSemanticDuplicate, candidateRepeatPenalty, comparisonQuestionsFor, comparisonAnswerTargetsFor, uncoveredTrainingFocusIds, supportedTrainingFocusMatches, mergeRepairFeedback, safeRequestId, safeRepairFailureStage, safeRepairOutcomeStage, MAX_COMPARISON_CONTEXT_BYTES };

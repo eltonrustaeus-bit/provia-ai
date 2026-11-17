@@ -784,6 +784,9 @@ function sendActiveExamGuidance(req, res, body, issuanceState = "active", truste
       (/[0-9]/.test(normalizedQuestion) ||
         /\b(ekvation|formel|samband|funktion|värde|uttryck|x|y|equation|formula|relationship|function|value|expression)\b/i.test(normalizedQuestion)))
   );
+  const definitionQuestion = type === "short" && !calculationQuestion && !comparisonQuestion &&
+    !/\b(?:vad gör|funktion|producerar|bildar|frigör|do|produce|produces|release|releases|function|role|purpose)\b/i.test(normalizedQuestion) &&
+    /^\s*(?:vad är|vad innebär|vad betyder|vad menas med|beskriv vad|förklara vad|ange vad|what is|what does|describe what|explain what|what is meant by)\b/i.test(normalizedQuestion);
   if (type === "graph") {
     contextualSequence = graphMode === "line" || graphMode === "scatter" ? ladder[graphMode] : ladder.genericGraph;
   } else if (!calculationQuestion && !comparisonQuestion && !causeEffectQuestion && /fotosyntes|photosynthesis/.test(normalizedQuestion)) {
@@ -889,7 +892,7 @@ function sendActiveExamGuidance(req, res, body, issuanceState = "active", truste
       "Följ ämnena var för sig genom beskrivningen. Vilken väg in i växten anger källan för respektive ämne?",
       "Bygg två korta steg med stöd i materialet, ett för varje ämne. Kontrollera sedan att du inte blandat ihop vägarna. Vilken mening stöder varje steg?",
     ];
-  } else if (causeEffectQuestion && !comparisonQuestion) {
+  } else if (causeEffectQuestion && !comparisonQuestion && !definitionQuestion) {
     contextualSequence = en ? [
         "Identify what the question says changes. Where in your material is a possible cause or mechanism described?",
         "Trace the process in order: what happens first, and what follows? Which source detail connects the steps?",
@@ -899,6 +902,21 @@ function sendActiveExamGuidance(req, res, body, issuanceState = "active", truste
         "Följ processen i ordning: vad händer först och vad följer? Vilken detalj i materialet binder ihop stegen?",
         "Bygg en kort orsakskedja från materialet och kontrollera att varje led har stöd, inte bara antas.",
       ];
+  }
+  if (!contextualSequence && definitionQuestion) {
+    // Definition/recall prompts are common active-exam questions. A generic
+    // “look in your material” hint is too vague, while stating the definition
+    // would reveal the answer. Guide the learner through source lookup,
+    // distinction from an example, then a self-check without validating it.
+    contextualSequence = en ? [
+      "Find the concept in your material and locate the sentence that describes it. Which defining feature does the source emphasize?",
+      "Write a short definition in your own words. How can you distinguish the concept itself from an example of it?",
+      "Compare your wording with the source and the question's scope. Have you described the concept and addressed what is asked? I have not judged whether your answer is correct.",
+    ] : [
+      "Leta upp begreppet i materialet och hitta meningen som beskriver det. Vilket kännetecken lyfter källan fram?",
+      "Skriv en kort definition med egna ord. Hur skiljer du själva begreppet från ett exempel på det?",
+      "Jämför din formulering med materialet och frågans avgränsning. Har du beskrivit begreppet och svarat på det som efterfrågas? Jag har inte bedömt om svaret är rätt.",
+    ];
   }
   if (!contextualSequence && /^(?:vad gör |vilken (?:främsta |huvudsakliga )?funktion har |vad har .+? för funktion|vad är .+?(?::s|s) (?:främsta |huvudsakliga )?funktion|what does .+? do(?:[?.!]|$)|what is (?:the )?(?:main |primary )?(?:role|function|purpose) of )/i.test(normalizedQuestion)) {
     contextualSequence = en ? [

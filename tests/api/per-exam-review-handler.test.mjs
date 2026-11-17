@@ -3703,3 +3703,34 @@ test("unknown lease outcome fails closed before response generation", async () =
     answerLeaseState = "acquired";
   }
 });
+
+test("active definition questions get a source-based hint ladder without the definition", async () => {
+  activeCount = 1;
+  try {
+    for (const [lang, request, question, expected] of [
+      ["sv", "Vad är den andra ädla sanningen?", "Beskriv vad den andra ädla sanningen säger om lidandets orsak.", /Leta upp begreppet i materialet/],
+      ["en", "What is the second noble truth?", "Describe what the second noble truth says about the cause of suffering.", /Find the concept in your material/],
+    ]) {
+      const response = await invoke({
+        lang,
+        helpLevel: 0,
+        userQuestion: request,
+        pageContext: createActiveQuestionContext({ type: "short", text: question }),
+      });
+      assert.equal(response.statusCode, 200);
+      assert.match(response.body.answer, expected);
+      assert.doesNotMatch(response.body.answer, /begär|samudaya|craving|desire|the answer is|svaret är/i,
+        "the question's actual definition must remain for the student to retrieve");
+      assert.equal(response.body.examActive, true);
+    }
+    const functionResponse = await invoke({
+      lang: "en",
+      userQuestion: "How can I approach this?",
+      pageContext: createActiveQuestionContext({ type: "short", text: "What does the nucleus do?" }),
+    });
+    assert.match(functionResponse.body.answer, /Distinguish the thing's role/i,
+      "a function question should keep its function-specific teaching path");
+    assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("reserve_per_chat_quota")),
+      "the improved ladder remains deterministic, signed-question-scoped and quota-free");
+  } finally { activeCount = 0; }
+});
