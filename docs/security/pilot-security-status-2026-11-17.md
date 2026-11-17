@@ -52,18 +52,19 @@ event-trigger functions. `user_exams` currently combines permissive allow
 policies with restrictive owner policies; the restrictive owner check remains
 effective in the reviewed production catalog.
 
-## Current local changes
+## Feature-branch changes
 
 - `vercel.json`: adds `nosniff`, referrer, geolocation and frame protections.
   The CSP currently restricts framing only; full script-source restrictions
   need a separate staged change because the app uses inline scripts.
 - `api/knowledge.js`: removes raw error-message logging and bounds blueprint
-  fields before quota or storage. Neither change is deployed.
+  fields before quota or storage. These changes are live only in the feature
+  Preview, not Production.
 - `api/explain.js`: stops deriving a first name from the account email for
   P.E.R.'s model prompt. Study and exam context remain unchanged; this only
   removes an unnecessary identity field from the provider payload. A mocked
-  request-level regression now confirms a synthetic email name is absent from
-  the sent model payload.
+  request-level regression confirms a synthetic email name is absent from
+  the sent model payload. This is live only in the feature Preview.
 - `20261117220908_restrict_direct_class_writes.sql` and its PGlite test:
   closes direct class mutation paths. The migration is applied only in staging;
   it is not deployed to production.
@@ -85,6 +86,14 @@ effective in the reviewed production catalog.
 - A fresh unauthenticated HTTPS HEAD check of `https://exgen.se/app.html`
   returned HTTP 200 and HSTS, but none of the five prepared response headers.
   This confirms the local `vercel.json` change has not reached Production.
+- Vercel CLI environment metadata (names/scopes only, no values) shows
+  `SECRET_KEY_SUPABASE` and `DEEPSEEK_API_KEY` still configured for Development,
+  Preview and Production. A current source search outside docs/dependencies
+  found no references to either name, but their presence must be
+  reconciled with the historical exposed-key report before removal or any
+  claim that revocation is complete. `PER_OWNER_USER_ID` and
+  `PASSKEY_STEPUP_SECRET` are scoped to Production, so an admin passkey change
+  needs a separate staging setup before it can be verified there.
 - Staging's Supabase security advisor reports leaked-password protection
   disabled, plus warnings for some executable definer functions and mutable
   search paths. The no-policy RLS notices need grant checks before being
@@ -120,6 +129,35 @@ effective in the reviewed production catalog.
   service_role retains all three write privileges. The existing open Preview
   loads the app, but its account was not established as a disposable synthetic
   account, so no class mutation or two-account data test was run through it.
+- Security commit `5967b0f` was pushed to the existing feature branch after
+  separate approval. Vercel created a READY Preview at
+  `provia-cbw1n9o5v-eltons-projects-4adfb1a3.vercel.app` for that exact SHA.
+  The deployment is behind Vercel SSO, so plain curl reaches the protection
+  page. An authenticated `vercel curl` from a temporary, exact project link
+  returned the application response with HTTP 200 and all five prepared
+  headers. The served runtime script contained the staging project ref
+  `yhcinqejsocpmmetazpz`, not the production ref. Live authenticated class
+  API behavior has not been verified on this deployment.
+- A POST to `/api/check-role` that passed Vercel's Preview protection but
+  carried no Supabase bearer token reached the application and returned HTTP
+  401 with `{"error":"Unauthorized"}`
+  plus the five prepared headers. This confirms the route starts and rejects
+  an anonymous request; it does not establish that authenticated class flows
+  work or that server-side staging credentials are valid.
+- A new local mocked-handler regression in `knowledge-exam-gate.test.mjs`
+  confirms malformed or oversized blueprint fields return status 400 before
+  quota or exam-blueprint storage. It is not yet part of the pushed commit.
+- With separate approval, a hosted staging PostgreSQL transaction created two
+  passwordless, email-less synthetic Auth identities, a class/membership, an
+  exam and P.E.R. session/memory rows. Under `authenticated` role with A's
+  claim, A could read its own class, member, profile, exam and P.E.R. records.
+  Under B's claim, B could read its own membership/profile but not A's class,
+  exam or P.E.R. records. Direct class insert/leave and a cross-account exam
+  insert were denied. Both count RPCs rejected browser roles; `anon` could
+  not read the fixture class or call the weekly count RPC. The transaction
+  ended with `ROLLBACK`, and a separate readback found zero fixture rows in
+  Auth, profiles, classes, memberships, exams and both P.E.R. tables. This is
+  hosted database RLS evidence, not an authenticated API or login test.
 - The focused request test for email-name minimization passes. Four of five
   teacher/class local tests pass; `tests/frontend/teacher-pilot-ux.test.mjs`
   fails on an existing static expectation for question-dot navigation in the
@@ -127,11 +165,11 @@ effective in the reviewed production catalog.
   hosted class-route failure. A broader P.E.R. test batch was interrupted after
   72 passing cases because its remaining cases were slow; it is not reported
   as a completed green suite.
-- Staging: test anonymous, learner A, learner B, teacher and admin on the hosted
-  API with synthetic data.
-  Verify direct class insert and class creation are denied, server join works,
-  count RPCs reject browser roles, account deletion removes intended rows and
-  storage, and headers appear on the actual Preview response.
+- Staging: the anonymous and two-identity database boundary above passed.
+  Still test authenticated learner, teacher and admin routes on the hosted API
+  with disposable synthetic accounts. Verify server class creation/join/leave,
+  account deletion including storage, and normal exam/P.E.R. journeys; the
+  database transaction could not exercise JWT validation or those routes.
 - Production: separate approval is required for migrations, Auth settings,
   secrets, push, merge or deployment. After each approved release, verify live
   ACL/policy metadata and denied calls; check login, class join, exam and P.E.R.
