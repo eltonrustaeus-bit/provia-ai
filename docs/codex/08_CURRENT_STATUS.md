@@ -26,15 +26,18 @@
   69 tests passed because the suite remained active for nearly five minutes;
   it is not reported as a full-suite pass. The changed active cases were then
   rerun in isolation and passed.
-- No paid model call, staging test, database change, commit, push, Preview,
-  `main`, or Production action occurred. Model output quality and live behavior
-  remain unverified for this prompt/ranking change.
+- No paid model call, staging test, database change, `main`, or Production
+  action occurred. Model output quality and live behavior remain unverified
+  for this prompt/ranking change.
 - Independent read-only review found no remaining blocker or high-risk
   finding. It confirmed candidate ranking remains soft and that the active
   answer-free hint path is unchanged outside the new definition ladder.
-- Next: checkpoint only to the already-approved feature Preview if continuing
-  deployment work. Do not merge to `main` or touch Production as part of this
-  change.
+- Code checkpoint `9bc8c66` was pushed to the existing feature branch. Vercel
+  deployment `dpl_HVxWxupJWoxf1v8ABFaF4uYp4DfN` reached READY for that exact SHA
+  and carries the existing feature Preview alias. No `main` merge, Production
+  deploy, or database action occurred.
+- Next: test the Preview's question variety and active definition hints with
+  ordinary use; this code-only checkpoint has no live-model quality result.
 
 ## Single-route stale-attempt recovery and live religion test — 2026-11-17
 
