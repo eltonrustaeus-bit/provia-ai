@@ -126,6 +126,11 @@ effective in the reviewed production catalog.
   not prove Auth deletion was completed, nor cover unkeyed caches, Storage,
   backups or external-provider retention. The P.E.R. cache above is one
   deliberate unkeyed exception and currently has zero rows.
+- A planned synthetic Auth-deletion cascade test in staging did not execute:
+  the Supabase SQL tool rejected the transaction with `INVALID_ARGUMENT`
+  without a further reason. A separate readback found zero test users,
+  classes, exams and P.E.R. rows after the rejection. Account deletion remains
+  unverified on the hosted service; do not infer it from the FK catalog.
 - Staging's Supabase security advisor reports leaked-password protection
   disabled, plus warnings for some executable definer functions and mutable
   search paths. The no-policy RLS notices need grant checks before being
@@ -168,11 +173,13 @@ effective in the reviewed production catalog.
   do not replay either SQL blindly or edit the ledger without review.
 - The open staging Preview is logged in as the existing ExGen staging account,
   but `konto.html` deliberately hides the class card and skips
-  `student_classes` in pilot mode. This UI cannot establish teacher
-  create/student join/leave behavior after the migration. The server route uses
-  a service-role client and the local class tests pass, but an authenticated
-  hosted API check still needs a safe test path before claiming end-to-end
-  compatibility.
+  `student_classes` in pilot mode. `api/check-role.js` also rejects these class
+  actions at the pilot-scope gate. This Preview cannot establish teacher
+  create/student join/leave behavior after the migration. A new mocked
+  production-mode handler test exercises teacher-role denial for a student,
+  service-client class creation, code lookup and member upsert. It passes,
+  alongside the PGlite ACL test, but neither is a hosted authenticated API
+  test of normal-mode deployment.
 - Security commit `5967b0f` was pushed to the existing feature branch after
   separate approval. Vercel created a READY Preview at
   `provia-cbw1n9o5v-eltons-projects-4adfb1a3.vercel.app` for that exact SHA.
@@ -210,8 +217,10 @@ effective in the reviewed production catalog.
   72 passing cases because its remaining cases were slow; it is not reported
   as a completed green suite.
 - Staging: the anonymous and two-identity database boundary above passed.
-  Still test authenticated learner, teacher and admin routes on the hosted API
-  with disposable synthetic accounts. Verify server class creation/join/leave,
+  The current pilot Preview intentionally denies class actions, even with a
+  valid login. A safe non-pilot staging path is needed to test authenticated
+  learner, teacher and admin routes with disposable synthetic accounts.
+  Verify server class creation/join/leave,
   account deletion including storage, and normal exam/P.E.R. journeys; the
   database transaction could not exercise JWT validation or those routes.
 - Production: separate approval is required for migrations, Auth settings,

@@ -66,6 +66,10 @@ test("class writes require the authenticated server route", async () => {
 
     await db.exec("set role service_role");
     await db.query("insert into public.class_members values ($1,$2)", [classId, student]);
+    await db.query(`insert into public.class_members values ($1,$2)
+      on conflict(class_id, student_id) do update set student_id = excluded.student_id`, [classId, student]);
+    assert.equal((await db.query("select class_id from public.class_members")).rows.length, 1,
+      "the server can repeat a class join without duplicating membership");
     await db.query("insert into public.classes values ($1,$2,$3)",
       ["66666666-6666-4666-8666-666666666666", teacher, "Server-created class"]);
     await db.exec("reset role");
