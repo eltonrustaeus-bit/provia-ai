@@ -3,15 +3,18 @@
 
   var AUTH_KEY = global.ExGenRuntime.authStorageKey;
   var OWNER_KEY = "exgen_local_data_owner";
+  var sessionRevision = 0;
   var EXAM_DRAFT_PREFIX = "exgen_flow_draft_";
   var EXAM_PROGRESS_PREFIX = "exgen_flow_progress_";
   var PENDING_EXAMS_PREFIX = "proviaai_pending_exams:";
   var PILOT_PENDING_QUESTION_KEY = "exgen_pilot_pending_per_question";
+  var PER_PENDING_QUESTION_KEY = "exgen_per_pending_question";
   var PILOT_REAUTH_REQUIRED_KEY = "exgen_pilot_reauth_required";
   var PENDING_GENERATION_INPUT_KEY = "exgen_pending_generation_input_v1";
   var GENERATION_REQUEST_KEY = "exgen_generation_request_v1";
   var GENERATION_RECOVERY_KEY = "exgen_generation_recovery_v1";
   var PER_HISTORY_KEY = "proviaai_per_history";
+  var STUDY_KEYS = ["proviaai_history", "proviaai_mistakes", "proviaai_last_result", "proviaai_last_material", "proviaai_train_pick", "proviaai_custom_courses"];
   var PRIVATE_KEYS = [
     "proviaai_history",
     "proviaai_mistakes",
@@ -43,6 +46,68 @@
     return id && id.length <= 200 ? PER_HISTORY_KEY + ":" + encodeURIComponent(id) : null;
   }
 
+  function tipsCacheKeyFor(userId) {
+    var id = String(userId || "");
+    return id && id.length <= 200 ? "proviaai_smart_tips_cache:" + encodeURIComponent(id) : null;
+  }
+
+  function clearTipsForAccount(userId) {
+    var key = tipsCacheKeyFor(userId);
+    return key ? removeAndVerify(localStorage, key) : false;
+  }
+
+  function clearPerDraftForAccount(userId) {
+    var cleared = true;
+    [PER_PENDING_QUESTION_KEY, PILOT_PENDING_QUESTION_KEY].forEach(function (key) {
+      try {
+        var raw = sessionStorage.getItem(key);
+        if (!raw) return;
+        var pending = JSON.parse(raw);
+        if (pending && pending.accountId === String(userId)) {
+          if (!removeAndVerify(sessionStorage, key)) cleared = false;
+        } else if (!pending || !pending.accountId) cleared = false;
+      } catch (_) { cleared = false; }
+    });
+    return cleared;
+  }
+
+  function studyKeyFor(base, userId) {
+    var id = String(userId || "");
+    return STUDY_KEYS.indexOf(base) >= 0 && id && id.length <= 200
+      ? base + ":" + encodeURIComponent(id) : null;
+  }
+
+  function activeStudyKey(base) {
+    var session = readSession(localStorage.getItem(AUTH_KEY));
+    return session && localStorage.getItem(OWNER_KEY) === session.id
+      ? studyKeyFor(base, session.id) : null;
+  }
+
+  function getStudyItem(base) {
+    var key = activeStudyKey(base);
+    try { return key ? localStorage.getItem(key) : null; } catch (_) { return null; }
+  }
+
+  function setStudyItem(base, value) {
+    var key = activeStudyKey(base);
+    if (!key) return false;
+    try { localStorage.setItem(key, value); return true; } catch (_) { return false; }
+  }
+
+  function removeStudyItem(base) {
+    var key = activeStudyKey(base);
+    return key ? removeAndVerify(localStorage, key) : false;
+  }
+
+  function clearStudyDataForAccount(userId) {
+    var cleared = true;
+    STUDY_KEYS.forEach(function (base) {
+      var key = studyKeyFor(base, userId);
+      if (key && !removeAndVerify(localStorage, key)) cleared = false;
+    });
+    return cleared;
+  }
+
   function clearPerHistoryForAccount(userId) {
     var key = perHistoryKeyFor(userId);
     return key ? removeAndVerify(localStorage, key) : false;
@@ -54,6 +119,8 @@
       if (!removeAndVerify(localStorage, key)) cleared = false;
     });
     if (userId && !clearPerHistoryForAccount(userId)) cleared = false;
+    if (userId && !clearTipsForAccount(userId)) cleared = false;
+    if (userId && !clearStudyDataForAccount(userId)) cleared = false;
     if (!removeAndVerify(sessionStorage, PENDING_GENERATION_INPUT_KEY)) cleared = false;
     if (!removeAndVerify(sessionStorage, GENERATION_RECOVERY_KEY)) cleared = false;
     try {
@@ -90,6 +157,7 @@
     keys.forEach(function (key) {
       if (!removeAndVerify(localStorage, key)) cleared = false;
     });
+    if (!clearStudyDataForAccount(userId)) cleared = false;
     try {
       var pending = JSON.parse(sessionStorage.getItem(PENDING_GENERATION_INPUT_KEY) || "null");
       if (Array.isArray(pending?.requests)) {
@@ -130,9 +198,12 @@
   function syncSession() {
     var session = readSession(localStorage.getItem(AUTH_KEY));
     var owner = localStorage.getItem(OWNER_KEY);
+    if (owner !== (session ? session.id : null)) sessionRevision++;
     // The old shared transcript may contain messages from several accounts.
     // Its owner marker cannot establish provenance, so never import it.
     removeAndVerify(localStorage, PER_HISTORY_KEY);
+    removeAndVerify(localStorage, "proviaai_smart_tips_cache");
+    STUDY_KEYS.forEach(function (key) { removeAndVerify(localStorage, key); });
     if (!session) {
       clearPrivateData(owner);
       localStorage.removeItem(OWNER_KEY);
@@ -143,6 +214,7 @@
   }
 
   function clearForSignOut(userId) {
+    sessionRevision++;
     var cleared = clearPrivateData(userId || localStorage.getItem(OWNER_KEY));
     if (!removeAndVerify(localStorage, OWNER_KEY)) cleared = false;
     if (!removeAndVerify(sessionStorage, PILOT_PENDING_QUESTION_KEY)) cleared = false;
@@ -183,8 +255,16 @@
     clearForSignOut: clearForSignOut,
     hasLocalExamData: hasLocalExamData,
     clearLocalExamData: clearLocalExamData,
+    studyKeyFor: studyKeyFor,
+    getStudyItem: getStudyItem,
+    setStudyItem: setStudyItem,
+    removeStudyItem: removeStudyItem,
+    clearStudyDataForAccount: clearStudyDataForAccount,
+    getSessionRevision: function () { return sessionRevision; },
     perHistoryKeyFor: perHistoryKeyFor,
-    clearPerHistoryForAccount: clearPerHistoryForAccount
+    clearPerHistoryForAccount: clearPerHistoryForAccount,
+    clearTipsForAccount: clearTipsForAccount,
+    clearPerDraftForAccount: clearPerDraftForAccount
   };
 
   syncSession();

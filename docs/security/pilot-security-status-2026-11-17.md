@@ -317,3 +317,38 @@ review of the release diff. Code review and local tests alone do not meet it.
   whether a data-protection impact assessment is required before real pupils.
 - Verify that the historically exposed service-role key is revoked using
   metadata/status only. Do not read or record key values.
+
+## Local browser-isolation follow-up — 2026-11-18
+
+The earlier account-scoped P.E.R transcript change is on the feature Preview
+at commit `c69a9c3`; it is not on Production. The work below is a **local
+checkpoint** and has not been pushed, deployed or tested against hosted
+student accounts.
+
+- Provhistorik, felbank, senaste resultat, material, träningsurval and custom
+  course names now use account-specific browser keys. Ambiguous old shared
+  values are discarded rather than assigned to the next signed-in account.
+  Saved account exams and already account-keyed local queues remain the
+  recovery source. Locally cached values that existed only under old shared
+  keys may therefore disappear at upgrade.
+- The app rejects a late account-exam fetch after a session change; the
+  improvement page rejects late P.E.R tips and next-focus responses. Tips are
+  account-specific, and a deleted account's identifiable P.E.R draft can be
+  cleared without removing another account's draft.
+- Focused browser tests for A-to-B exam sync, tips, next focus, storage
+  boundary, grading and pilot reauthentication passed. The improvement flow,
+  graph exam flow and P.E.R exam-context regressions also passed locally.
+  A broad legacy exam-flow regression did not finish. The partial-graph
+  fixture was updated for the intentional local-result recovery and passed;
+  neither result is live evidence.
+- A synthetic local browser deletion journey now passed a post-navigation
+  readback: A's session, scoped study history, tips, P.E.R history and draft,
+  exam draft, owner marker and legacy name were gone; B's separate history,
+  tips and draft remained. The test does not prove hosted Auth deletion,
+  Supabase cascades, provider erasure, or all cross-tab interleavings. Some
+  ambiguous tab recovery still relies on the next page's startup cleanup;
+  the deletion UI reports incomplete local cleanup when it cannot prove it.
+
+The targeted regression fixtures and independent review found no code-proven
+blocker for a feature Preview checkpoint. Production and school-pilot release
+remain behind the hosted two-account and deletion gates above.

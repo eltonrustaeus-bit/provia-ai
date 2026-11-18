@@ -40,7 +40,7 @@ async function mk(path, { explainHandler, additionalMocks = [], waitUntil = "net
       extra,
     },
     state: {
-      storage: { proviaai_history: [{ percent: 62, course: "Biologi 1", level: "C", ts: Date.now() }] },
+      storage: { "proviaai_history:u1": [{ percent: 62, course: "Biologi 1", level: "C", ts: Date.now() }] },
     },
   });
 }
@@ -70,10 +70,10 @@ async function assertPageTopic(path, expectedPage) {
         mode: "exam",
       };
       window.PER.describe({ page: "startsida" });
-      localStorage.setItem("proviaai_mistakes", JSON.stringify([
+      window.ExGenLocalDataBoundary.setStudyItem("proviaai_mistakes", JSON.stringify([
         { course: "PRIVATE_STALE_COURSE", concept_tag: "PRIVATE_STALE_MISTAKE" },
       ]));
-      localStorage.setItem("proviaai_history", JSON.stringify([{ percent: 92 }]));
+      window.ExGenLocalDataBoundary.setStudyItem("proviaai_history", JSON.stringify([{ percent: 92 }]));
       window.__homepageReadLocalStudyData = false;
       const originalGetItem = Storage.prototype.getItem;
       Storage.prototype.getItem = function (key) {

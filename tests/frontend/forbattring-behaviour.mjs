@@ -91,7 +91,7 @@ async function mk(nExams = 3, screen = "") {
 }
 
 const pick = page => page.evaluate(() => {
-  try { return JSON.parse(localStorage.getItem("proviaai_train_pick") || "null"); } catch { return null; }
+  try { return JSON.parse(window.ExGenLocalDataBoundary.getStudyItem("proviaai_train_pick") || "null"); } catch { return null; }
 });
 
 // Markerar en fråga utan att anta HUR markeringen ser ut. Idag är det en
@@ -136,8 +136,8 @@ async function mark(page, id) {
 {
   const { ctx, page } = await mk(3, "felbank");
   const st = await page.evaluate(() => ({
-    hist: JSON.parse(localStorage.getItem("proviaai_history") || "[]").length,
-    mist: JSON.parse(localStorage.getItem("proviaai_mistakes") || "[]").length,
+    hist: JSON.parse(window.ExGenLocalDataBoundary.getStudyItem("proviaai_history") || "[]").length,
+    mist: JSON.parse(window.ExGenLocalDataBoundary.getStudyItem("proviaai_mistakes") || "[]").length,
   }));
   ok("0a tre prov synkade", st.hist === 3, JSON.stringify(st));
   ok("0b tre misstag härledda", st.mist === 3, JSON.stringify(st));
@@ -215,14 +215,14 @@ async function mark(page, id) {
 {
   const { ctx, page } = await mk(1, "felbank");
   await page.evaluate(() => {
-    const mistakes = JSON.parse(localStorage.getItem("proviaai_mistakes") || "[]");
+    const mistakes = JSON.parse(window.ExGenLocalDataBoundary.getStudyItem("proviaai_mistakes") || "[]");
     const biologyKey = mistakes.find(item => item.id === "m1")?.mistake_key;
     const hidden = [1, 2, 3].map(n => ({
       mistake_key: `hidden-math-${n}`, course: "Matematik 2b", question: `Dolt mattefel ${n}`,
       user_answer: "fel", feedback: "Öva vidare", model_answer: "Rätt svar", points: 0, max_points: 2,
     }));
-    localStorage.setItem("proviaai_mistakes", JSON.stringify([...mistakes, ...hidden]));
-    localStorage.setItem("proviaai_train_pick", JSON.stringify({
+    window.ExGenLocalDataBoundary.setStudyItem("proviaai_mistakes", JSON.stringify([...mistakes, ...hidden]));
+    window.ExGenLocalDataBoundary.setStudyItem("proviaai_train_pick", JSON.stringify({
       keys: [biologyKey, ...hidden.map(item => item.mistake_key)], mode: "selected", course: "Matematik 2b",
     }));
   });
@@ -243,14 +243,14 @@ async function mark(page, id) {
   await mark(page, "m1");
   await page.waitForTimeout(300);
   const p1 = await pick(page);
-  const m1Key = await page.evaluate(() => JSON.parse(localStorage.getItem("proviaai_mistakes") || "[]").find(item => item.id === "m1")?.mistake_key);
+  const m1Key = await page.evaluate(() => JSON.parse(window.ExGenLocalDataBoundary.getStudyItem("proviaai_mistakes") || "[]").find(item => item.id === "m1")?.mistake_key);
   ok("2b markeringen hamnar i LS_TRAIN_PICK", !!p1 && !!m1Key && p1.keys.map(String).includes(m1Key), JSON.stringify({ p1, m1Key }));
   ok("2c räknaren visar ett", /\b1\b/.test((await page.textContent("#selCountPill")) || ""), (await page.textContent("#selCountPill")) || "");
 
   await mark(page, "m3");
   await page.waitForTimeout(300);
   const p2 = await pick(page);
-  const expectedKeys = await page.evaluate(() => JSON.parse(localStorage.getItem("proviaai_mistakes") || "[]").filter(item => ["m1", "m3"].includes(item.id)).map(item => item.mistake_key));
+  const expectedKeys = await page.evaluate(() => JSON.parse(window.ExGenLocalDataBoundary.getStudyItem("proviaai_mistakes") || "[]").filter(item => ["m1", "m3"].includes(item.id)).map(item => item.mistake_key));
   ok("2d två markerade", p2.keys.length === 2 && expectedKeys.every(key => p2.keys.includes(key)), JSON.stringify({ picked: p2.keys, expectedKeys }));
   ok("2e räknaren följer med", /\b2\b/.test((await page.textContent("#selCountPill")) || ""));
   const selectedContext = await page.evaluate(() => window.__perManifestForTest?.selectedMistakes || []);
@@ -275,7 +275,7 @@ async function mark(page, id) {
   // träningsprovet byggs. Att kräva att den överlever hade varit att kräva att
   // överlämningen misslyckas.
   const handed = await pick(page);
-  const m2Key = await page.evaluate(() => JSON.parse(localStorage.getItem("proviaai_mistakes") || "[]").find(item => item.id === "m2")?.mistake_key);
+  const m2Key = await page.evaluate(() => JSON.parse(window.ExGenLocalDataBoundary.getStudyItem("proviaai_mistakes") || "[]").find(item => item.id === "m2")?.mistake_key);
   ok("3a urvalet är överlämnat vid klick", !!handed && !!m2Key && handed.keys.map(String).includes(m2Key), JSON.stringify({ handed, m2Key }));
 
   await reveal(page, "#trainSelectedBtn");

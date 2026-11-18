@@ -814,10 +814,12 @@ const ROLE_LIMITS = {
 
 const $ = (id) => document.getElementById(id);
 function safeJsonParse(s, fallback){ try{ return JSON.parse(s); } catch { return fallback; } }
-function lsGetArray(key){ const v = localStorage.getItem(key); const arr = safeJsonParse(v, []); return Array.isArray(arr) ? arr : []; }
-function lsGetObj(key){ const v = localStorage.getItem(key); const obj = safeJsonParse(v, null); return (obj && typeof obj === "object") ? obj : null; }
-function lsSet(key, val){ try{ localStorage.setItem(key, JSON.stringify(val)); } catch {} }
-function lsRemove(key){ try{ localStorage.removeItem(key); } catch {} }
+function isStudyKey(key){return [LS_HISTORY,LS_MISTAKES,LS_LAST,LS_MATERIAL,LS_TRAIN_PICK,LS_CUSTOM_COURSES].includes(key);}
+function lsRead(key){return isStudyKey(key)?window.ExGenLocalDataBoundary?.getStudyItem(key):localStorage.getItem(key);}
+function lsGetArray(key){ const arr = safeJsonParse(lsRead(key), []); return Array.isArray(arr) ? arr : []; }
+function lsGetObj(key){ const obj = safeJsonParse(lsRead(key), null); return (obj && typeof obj === "object") ? obj : null; }
+function lsSet(key, val){ try{if(isStudyKey(key))window.ExGenLocalDataBoundary?.setStudyItem(key,JSON.stringify(val));else localStorage.setItem(key, JSON.stringify(val));} catch {} }
+function lsRemove(key){ try{if(isStudyKey(key))window.ExGenLocalDataBoundary?.removeStudyItem(key);else localStorage.removeItem(key);} catch {} }
 function escapeHtml(s){
   return String(s ?? "")
     .replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;")
@@ -1304,8 +1306,14 @@ function mergeMistakesFromExamRows(rows){
 
 async function loadExamsFromAccountToLocal(notifyHistoryUpdate=true){
   if(!db)return; const uid=await getUserId(); if(!uid)return;
+  const sessionRevision=window.ExGenLocalDataBoundary?.getSessionRevision?.();
   const{data,error}=await db.from("user_exams").select("id,submission_id,created_at,course,level,qtype,material,exam,answers,result").eq("user_id",uid).order("created_at",{ascending:true}).limit(500);
   if(error)return;
+  const currentUserId=await getUserId();
+  // The request can finish after sign-out or an account switch. Never project
+  // the old account's rows into the shared browser cache for the new session.
+  if(uid!==verifiedUserId||localStorage.getItem("exgen_local_data_owner")!==uid
+    ||sessionRevision!==window.ExGenLocalDataBoundary?.getSessionRevision?.()||uid!==currentUserId)return;
   const remote=data||[]; const queued=readPendingExams(uid);
   const pending=queued.filter(local=>!remote.some(saved=>sameSavedExam(saved,local)));
   if(pending.length!==queued.length)writePendingExams(uid,pending);
@@ -1323,8 +1331,8 @@ async function loadExamsFromAccountToLocal(notifyHistoryUpdate=true){
   });
   lsSet(LS_HISTORY,history);
   const last=filtered&&filtered.length?filtered[filtered.length-1]:null;
-  if(last){lsSet(LS_LAST,{ts:Date.parse(last.created_at)||Date.now(),attempt:history[history.length-1],exam:last.exam,result:last.result,examProof:last.exam?.submission_receipt||null,training_batch_id:last.exam?.training_batch_id||last.submission_id||legacyTrainingBatchId(last),accountSaved:!last.local_only});if(typeof last.material==="string")localStorage.setItem(LS_MATERIAL,last.material);}
-  else{try{localStorage.removeItem(LS_LAST);}catch{}}
+  if(last){lsSet(LS_LAST,{ts:Date.parse(last.created_at)||Date.now(),attempt:history[history.length-1],exam:last.exam,result:last.result,examProof:last.exam?.submission_receipt||null,training_batch_id:last.exam?.training_batch_id||last.submission_id||legacyTrainingBatchId(last),accountSaved:!last.local_only});if(typeof last.material==="string")window.ExGenLocalDataBoundary?.setStudyItem(LS_MATERIAL,last.material);}
+  else{lsRemove(LS_LAST);}
   const oldMistakes=lsGetArray(LS_MISTAKES),newMistakes=mergeMistakesFromExamRows(filtered);
   migrateTrainingPick(oldMistakes,newMistakes);lsSet(LS_MISTAKES,newMistakes);
   if(notifyHistoryUpdate)window.dispatchEvent(new Event("exgen:history-updated"));
@@ -1878,7 +1886,7 @@ function runTrainModeIfRequested(){
   }
   pendingMistakeTraining={course:training.course,sourceMaterial:training.sourceMaterial,trainingFocus:training.trainingFocus,priorQuestions:training.priorQuestions,sourceReferences:training.sourceReferences};
   if(pastedTextEl())pastedTextEl().value=training.sourceMaterial;
-  try{localStorage.setItem(LS_MATERIAL,training.sourceMaterial);}catch{}
+  window.ExGenLocalDataBoundary?.setStudyItem(LS_MATERIAL,training.sourceMaterial);
   if(qTypeEl())qTypeEl().value="mix";
   let trainingQuestionCount=3;
   if(numQuestionsEl()){
@@ -2790,7 +2798,7 @@ try{
       return deferForAuthVerification();
     }
 
-    try{localStorage.setItem(LS_MATERIAL,pastedText);}catch{}
+    window.ExGenLocalDataBoundary?.setStudyItem(LS_MATERIAL,pastedText);
     if(!renderExam(res.data.exam)){setBusy(false);return {ok:false,error:"Provet kunde inte visas säkert. Försök igen."};}
     let resumeKeyCleared=true;
     let recoveryCleared=true;
@@ -2868,6 +2876,7 @@ try{
     let gradingSession=null;
     try{const snapshot=await db?.auth.getSession();if(!snapshot?.error)gradingSession=snapshot?.data?.session||null;}catch{}
     const gradingOwnerId=gradingSession?.user?.id||"";
+    const gradingSessionRevision=window.ExGenLocalDataBoundary?.getSessionRevision?.();
     if(!gradingOwnerId||!gradingSession?.access_token){
       const msg=LANG==="sv"?"Logga in igen innan du lämnar in provet. Dina svar finns kvar.":"Sign in again before submitting the exam. Your answers are still here.";
       setStatus(msg,"bad");return {ok:false,error:msg};
@@ -2968,6 +2977,11 @@ try{
           const queued=userId?readPendingExams(userId).find(row=>row.exam?.submission_receipt===examProof):null;
           if(queued){
             const retry=await retryPendingExamSave(queued.local_id).catch(()=>({ok:false}));
+            if(gradingSessionRevision!==window.ExGenLocalDataBoundary?.getSessionRevision?.()
+              ||localStorage.getItem("exgen_local_data_owner")!==gradingOwnerId||verifiedUserId!==gradingOwnerId){
+              relockForAuthChange();
+              return {ok:false,error:LANG==="sv"?"Kontot ändrades medan resultatet sparades.":"The account changed while saving the result."};
+            }
             accountSaveFailed=!retry.ok;
             if(retry.ok)lsSet(LS_LAST,{...previous,accountSaved:true});
           }
@@ -3017,7 +3031,7 @@ try{
         if(item.unanswered!==true&&m>0&&got<m){const q=qById.get(String(item.id))||{},mistakeKey=`exam:${localId}:${questionIndex}`;mistakeSourceByKey.set(mistakeKey,{examId:localId,submissionId,course:attempt.course,material:pastedText,accountSaved:!accountSaveFailed,questions:sourceQuestions});mistakes.push({mistake_key:mistakeKey,source_exam_id:localId,ts,course:attempt.course,level:attempt.level,qType:q.type||(qTypeEl()?.value||"mix"),id:String(item.id),question:String(q.question||""),user_answer:String(aById.get(String(item.id))||""),feedback:String(item.feedback||""),model_answer:String(item.model_answer||""),concept_tag:String(item.concept_tag||q.concept_tag||""),error_tags:Array.isArray(item.error_tags)?item.error_tags.slice(0,5):[],topic:String(q.topic||""),subtopic:String(q.subtopic||""),learning_objective:String(item.learning_objective||q.learning_objective||""),points:got,max_points:m});}
       });
       while(mistakes.length>200)mistakes.shift();lsSet(LS_MISTAKES,mistakes);
-      try{localStorage.setItem(LS_MATERIAL,pastedText);}catch{}
+      window.ExGenLocalDataBoundary?.setStudyItem(LS_MATERIAL,pastedText);
       const analyticsSaveFailed=res?.data?.persistence?.mock_result_saved===false;
       const saveWarning=accountSaveFailed?(localCopySaved?(LANG==="sv"?"Resultatet finns kvar på den här enheten men syns inte i ditt konto eller för läraren ännu.":"The result is kept on this device but is not in your account or visible to your teacher yet."):(LANG==="sv"?"Kontosparningen kunde inte bekräftas och webbläsaren kunde inte säkra en lokal kopia. Lämna inte sidan innan du sparat resultatet på annat sätt.":"Account saving could not be confirmed and the browser could not keep a local copy. Do not leave before saving the result another way.")):analyticsSaveFailed?(LANG==="sv"?"Rättningen är sparad i ditt konto, men lärarens resultatsammanställning kunde inte bekräftas.":"Your graded exam is saved to your account, but the teacher's result summary could not be confirmed."):"";
       setStatus(saveWarning||t.gradeDone,accountSaveFailed?"bad":"ok");if(!accountSaveFailed)showToast(t.gradeDone,"ok");setWizardStep(3);
@@ -3090,9 +3104,7 @@ try{
     }
 
     // 2. Clear all local history, mistakes, and cached data
-    [LS_HISTORY, LS_MISTAKES, LS_LAST, LS_MATERIAL, LS_TRAIN_PICK].forEach(k => {
-      try { localStorage.removeItem(k); } catch (_) {}
-    });
+    [LS_HISTORY, LS_MISTAKES, LS_LAST, LS_MATERIAL, LS_TRAIN_PICK].forEach(k => lsRemove(k));
     mistakeSourceByKey.clear();
     pendingMistakeTraining=null;
     currentUnsavedAccountExam=null;

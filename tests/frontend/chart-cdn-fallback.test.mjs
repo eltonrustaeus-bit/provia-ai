@@ -128,7 +128,7 @@ test("history chart exposes the same result values when Chart.js loads", async (
         assert.deepEqual(await page.evaluate(() => window.__chartConfig.data.datasets[0].data), [50, 100, null, null, null, null, null]);
         await page.waitForFunction(() => window.__perTestCtx()?.page === "förbättring");
         const perContext = await page.evaluate(() => ({
-          context: window.__perTestCtx(), history: JSON.parse(localStorage.getItem("proviaai_history") || "[]"),
+          context: window.__perTestCtx(), history: JSON.parse(window.ExGenLocalDataBoundary.getStudyItem("proviaai_history") || "[]"),
         }));
         assert.equal(perContext.context.userScore, undefined,
           `the improvement page does not send browser-derived scores as verified context: ${JSON.stringify(perContext)}`);

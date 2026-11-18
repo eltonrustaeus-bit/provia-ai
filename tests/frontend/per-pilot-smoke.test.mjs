@@ -22,7 +22,7 @@ try {
       user: { id: "pilot-student", email: "pilot-student@example.test" },
       storage: {
         exgen_local_data_owner: "pilot-student",
-        proviaai_history: [{ percent: 60, course: "Biologi 1", level: "C", ts: Date.now() }],
+        "proviaai_history:u1": [{ percent: 60, course: "Biologi 1", level: "C", ts: Date.now() }],
       },
     },
     mocks: {
@@ -104,7 +104,7 @@ try {
 
     await page.evaluate(() => {
       localStorage.setItem("exgen_local_data_owner", "pilot-student");
-      localStorage.setItem("proviaai_history", JSON.stringify([{
+      window.ExGenLocalDataBoundary.setStudyItem("proviaai_history", JSON.stringify([{
         percent: 60,
         course: "Biologi 1",
         level: "C",

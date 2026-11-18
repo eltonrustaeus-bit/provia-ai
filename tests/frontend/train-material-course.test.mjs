@@ -102,8 +102,8 @@ try {
       mistake_key: `focus-${index + 1}`, course: "Matematik 2b", id: `q${index + 1}`,
       question: `Fråga ${index + 1}`,
     }));
-    localStorage.setItem("proviaai_mistakes", JSON.stringify(mistakes));
-    localStorage.setItem("proviaai_train_pick", JSON.stringify({
+    window.ExGenLocalDataBoundary.setStudyItem("proviaai_mistakes", JSON.stringify(mistakes));
+    window.ExGenLocalDataBoundary.setStudyItem("proviaai_train_pick", JSON.stringify({
       mode: "selected", keys: mistakes.map((item) => item.mistake_key), course: "Matematik 2b",
     }));
     window.buildMistakeTrainingContext = () => ({

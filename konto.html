@@ -841,20 +841,24 @@ document.getElementById("yr").textContent=new Date().getFullYear();
   });
 
   function clearDeletedAccountLocalData(userId){
-    let cleared=true;
-    try{if(window.ExGenLocalDataBoundary?.clearForSignOut(userId)===false)cleared=false;}catch{cleared=false;}
-    if(window.ExGenLocalDataBoundary?.clearLocalExamData(userId)===false)cleared=false;
-    try{localStorage.removeItem(window.ExGenRuntime.authStorageKey);}catch{cleared=false;}
-    try{sessionStorage.clear();}catch{cleared=false;}
-    return cleared;
+    // Never sweep shared keys here: a second tab can sign in as B after the
+    // sign-out readback. Only A-keyed data can be removed without racing B.
+    const cleared=window.ExGenLocalDataBoundary?.clearLocalExamData(userId)!==false;
+    const ambiguousLocalData=localStorage.getItem("exgen_local_data_owner")===userId
+      ||sessionStorage.getItem("exgen_generation_recovery_v1")!==null;
+    return cleared&&!ambiguousLocalData;
   }
 
   async function finishAccountDeletion(userId,unconfirmed){
     const perHistoryCleared=window.ExGenLocalDataBoundary?.clearPerHistoryForAccount(userId)!==false;
+    const perDraftCleared=window.ExGenLocalDataBoundary?.clearPerDraftForAccount(userId)!==false;
+    const tipsCleared=window.ExGenLocalDataBoundary?.clearTipsForAccount(userId)!==false;
+    // These keys are owned by A, so clear them even if another tab switches
+    // accounts before the later sign-out readback completes.
+    const ownerExamDataCleared=window.ExGenLocalDataBoundary?.clearLocalExamData(userId)!==false;
     const{data:current}=await sb.auth.getSession().catch(()=>({data:null}));
     if(current?.session?.user?.id!==userId){
-      const examDataCleared=window.ExGenLocalDataBoundary?.clearLocalExamData(userId)!==false;
-      showMsg(examDataCleared&&perHistoryCleared
+      showMsg(ownerExamDataCleared&&perHistoryCleared&&perDraftCleared&&tipsCleared
         ?"Raderingen slutfördes för det ursprungliga kontot. Ett annat konto är nu aktivt och dess session och lokala data lämnades orörda."
         :"Raderingen slutfördes för det ursprungliga kontot, men vissa lokala uppgifter kunde inte bekräftas rensade. Det andra kontots session och delade data lämnades orörda.","err");
       return false;
@@ -862,13 +866,18 @@ document.getElementById("yr").textContent=new Date().getFullYear();
     await sb.auth.signOut({scope:"local"}).catch(()=>{});
     const{data:afterSignOut}=await sb.auth.getSession().catch(()=>({data:null}));
     if(afterSignOut?.session?.user?.id&&afterSignOut.session.user.id!==userId){
-      const examDataCleared=window.ExGenLocalDataBoundary?.clearLocalExamData(userId)!==false;
-      showMsg(examDataCleared&&perHistoryCleared
+      showMsg(ownerExamDataCleared&&perHistoryCleared&&perDraftCleared&&tipsCleared
         ?"Raderingen slutfördes för det ursprungliga kontot. Ett annat konto loggades in under utloggningen; dess session och lokala data lämnades orörda."
         :"Raderingen slutfördes för det ursprungliga kontot, men vissa lokala uppgifter kunde inte bekräftas rensade. Det andra kontots session och delade data lämnades orörda.","err");
       return false;
     }
-    const examDataCleared=clearDeletedAccountLocalData(userId);
+    if(afterSignOut?.session?.user?.id===userId){
+      showMsg(ownerExamDataCleared
+        ?"Kontot raderades på servern, men utloggningen kunde inte bekräftas. Ladda om sidan och rensa webbplatsens lagring om sessionen fortfarande visas."
+        :"Kontot raderades på servern, men utloggning och rensning av lokala provdata kunde inte bekräftas. Rensa webbplatsens lagring på den här enheten.","err");
+      return false;
+    }
+    const examDataCleared=clearDeletedAccountLocalData(userId)&&ownerExamDataCleared&&perHistoryCleared&&perDraftCleared&&tipsCleared;
     if(!examDataCleared)window.alert("Kontot har raderats, men vissa lokala provdata kunde inte bekräftas rensade på den här enheten.");
     window.location.replace(unconfirmed?"index.html?accountDeletion=unconfirmed":"index.html");
     return true;
@@ -976,7 +985,7 @@ document.getElementById("yr").textContent=new Date().getFullYear();
     var el = document.getElementById("kontoSub");
     if (!el) return;
     var hist = [];
-    try { var v = JSON.parse(localStorage.getItem("proviaai_history") || "[]"); if (Array.isArray(v)) hist = v; } catch (_) {}
+    try { var v = JSON.parse(window.ExGenLocalDataBoundary?.getStudyItem("proviaai_history") || "[]"); if (Array.isArray(v)) hist = v; } catch (_) {}
 
     if (!hist.length) {
       el.textContent = "Inget prov gjort än. Börja i Mockprov så börjar det här fyllas.";

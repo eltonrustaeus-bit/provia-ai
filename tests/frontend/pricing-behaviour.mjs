@@ -67,7 +67,7 @@ async function mk(s = {}) {
     state: {
       signedIn,
       role: s.role || null,
-      storage: { proviaai_history: s.history || [], ...(signedIn ? { exgen_local_data_owner: "u1" } : {}) },
+      storage: { "proviaai_history:u1": s.history || [], ...(signedIn ? { exgen_local_data_owner: "u1" } : {}) },
     },
   });
 }

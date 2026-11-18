@@ -758,7 +758,7 @@ await page.locator("#perInput").waitFor({ state: "visible", timeout: 3000 });
 await page.fill("#perInput", "Hjälp mig förstå lutningen i en linjär funktion.");
 await page.evaluate(() => {
   document.getElementById("course").value = "Biologi 1";
-  localStorage.setItem("proviaai_mistakes", JSON.stringify([
+  window.ExGenLocalDataBoundary.setStudyItem("proviaai_mistakes", JSON.stringify([
     { course: "Matematik 2b", question: "Lös andragradsekvationen", concept_tag: "andragradsekvationer", user_answer: "x=1" },
     { course: "Biologi  1", question: "Förklara cellandning", concept_tag: "cellandning", user_answer: "i cellen" },
     { course: "Matematik 2b", question: "Beräkna derivatan", concept_tag: "derivata", user_answer: "2x" },

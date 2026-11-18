@@ -45,6 +45,8 @@ try {
   assert.equal(initial.language, "sv", "non-personal preferences are preserved");
 
   await page.evaluate((authKey) => {
+    window.ExGenLocalDataBoundary.setStudyItem("proviaai_history", JSON.stringify([{ course: "A-scoped" }]));
+    window.ExGenLocalDataBoundary.setStudyItem("proviaai_mistakes", JSON.stringify([{ question: "A-scoped" }]));
     localStorage.setItem("proviaai_history", JSON.stringify([{ course: "A-private" }]));
     localStorage.setItem("proviaai_per_history", JSON.stringify([{ content: "A-private" }]));
     localStorage.setItem("exgen_generation_request_v1", JSON.stringify({ version: 1, requests: [{ fingerprint: "a".repeat(64), idempotencyKey: "00000000-0000-4000-8000-000000000001", expiresAt: Date.now() + 60000 }] }));
@@ -62,6 +64,9 @@ try {
   const switched = await page.evaluate(() => ({
     owner: localStorage.getItem("exgen_local_data_owner"),
     history: localStorage.getItem("proviaai_history"),
+    activeStudyHistory: window.ExGenLocalDataBoundary.getStudyItem("proviaai_history"),
+    oldScopedHistory: localStorage.getItem("proviaai_history:account-a"),
+    oldScopedMistakes: localStorage.getItem("proviaai_mistakes:account-a"),
     perHistory: localStorage.getItem("proviaai_per_history"),
     teacherInsight: localStorage.getItem("proviaai_teacher_insight_class-a"),
     pendingGeneration: sessionStorage.getItem("exgen_pending_generation_input_v1"),
@@ -75,6 +80,9 @@ try {
   }));
   assert.equal(switched.owner, "account-b");
   assert.equal(switched.history, null, "account switch clears the previous account's exam summary");
+  assert.equal(switched.activeStudyHistory, null, "B cannot read A's scoped history");
+  assert.equal(switched.oldScopedHistory, null, "A's scoped history is removed at sign-out");
+  assert.equal(switched.oldScopedMistakes, null, "A's scoped mistakes are removed at sign-out");
   assert.equal(switched.perHistory, null, "account switch clears the previous account's P.E.R transcript");
   assert.equal(switched.teacherInsight, null, "account switch clears cached teacher class reports");
   assert.equal(switched.pendingGeneration, null, "account switch clears pending exam material from this tab");
@@ -88,6 +96,31 @@ try {
 
   const pendingB = await page.evaluate(() => localStorage.getItem("proviaai_pending_exams:account-b"));
   assert.equal(JSON.parse(pendingB)[0].user_id, "account-b", "account B can only address its own queue key");
+
+  const tipsAfterDelete = await page.evaluate(() => {
+    localStorage.setItem("proviaai_smart_tips_cache:account-a", JSON.stringify({ a: "A-private tip" }));
+    localStorage.setItem("proviaai_smart_tips_cache:account-b", JSON.stringify({ b: "B-private tip" }));
+    const cleared = window.ExGenLocalDataBoundary.clearTipsForAccount("account-a");
+    return {
+      cleared,
+      a: localStorage.getItem("proviaai_smart_tips_cache:account-a"),
+      b: localStorage.getItem("proviaai_smart_tips_cache:account-b")
+    };
+  });
+  assert.equal(tipsAfterDelete.cleared, true);
+  assert.equal(tipsAfterDelete.a, null, "deleting A clears only A's private tips");
+  assert.ok(tipsAfterDelete.b?.includes("B-private tip"), "B's tips survive A's deletion cleanup");
+
+  const draftsAfterDelete = await page.evaluate(() => {
+    sessionStorage.setItem("exgen_per_pending_question", JSON.stringify({ accountId: "account-a", question: "A-private draft" }));
+    const removedA = window.ExGenLocalDataBoundary.clearPerDraftForAccount("account-a");
+    sessionStorage.setItem("exgen_per_pending_question", JSON.stringify({ accountId: "account-b", question: "B-private draft" }));
+    const removedAgain = window.ExGenLocalDataBoundary.clearPerDraftForAccount("account-a");
+    return { removedA, removedAgain, remaining: sessionStorage.getItem("exgen_per_pending_question") };
+  });
+  assert.equal(draftsAfterDelete.removedA, true);
+  assert.equal(draftsAfterDelete.removedAgain, true);
+  assert.ok(draftsAfterDelete.remaining?.includes("B-private draft"), "deleting A preserves B's P.E.R draft");
 
   await page.evaluate((authKey) => {
     localStorage.setItem(authKey, JSON.stringify({ access_token: "opaque", user: { id: "account-a" } }));
@@ -104,6 +137,8 @@ try {
 
   await page.evaluate(() => {
     localStorage.setItem("proviaai_history", JSON.stringify([{ course: "B-private" }]));
+    localStorage.setItem("proviaai_smart_tips_cache:account-a", JSON.stringify({ a: "A-private tip" }));
+    localStorage.setItem("proviaai_smart_tips_cache:account-b", JSON.stringify({ b: "B-private tip" }));
     localStorage.setItem("proviaai_teacher_insight_class-b", JSON.stringify({ insight: "B-private class report", ts: Date.now() }));
     sessionStorage.setItem("exgen_pilot_pending_per_question", JSON.stringify({ question: "private draft", savedAt: Date.now() }));
     sessionStorage.setItem("exgen_pilot_reauth_required", "1");
@@ -115,6 +150,8 @@ try {
   const signedOut = await page.evaluate(() => ({
     owner: localStorage.getItem("exgen_local_data_owner"),
     history: localStorage.getItem("proviaai_history"),
+    tipsA: localStorage.getItem("proviaai_smart_tips_cache:account-a"),
+    tipsB: localStorage.getItem("proviaai_smart_tips_cache:account-b"),
     teacherInsight: localStorage.getItem("proviaai_teacher_insight_class-b"),
     pendingA: localStorage.getItem("proviaai_pending_exams:account-a"),
     draftA: localStorage.getItem("exgen_flow_draft_account-a"),
@@ -129,6 +166,8 @@ try {
   }));
   assert.equal(signedOut.owner, null);
   assert.equal(signedOut.history, null, "sign-out removes shared study caches");
+  assert.equal(signedOut.tipsA, null, "sign-out removes this account's private tips");
+  assert.ok(signedOut.tipsB, "sign-out leaves another account's private tips untouched");
   assert.equal(signedOut.teacherInsight, null, "sign-out removes cached teacher class reports");
   assert.ok(signedOut.pendingA, "per-account recovery data stays in its isolated key");
   assert.ok(signedOut.draftA, "sign-out preserves the account's unfinished exam for same-account recovery");

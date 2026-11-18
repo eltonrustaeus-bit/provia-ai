@@ -663,7 +663,7 @@
          medvetet från dagens beteende. */
       if (ctx.page !== 'startsida' && ctx.page !== 'förbättring' && typeof ctx.userScore !== 'number') {
         try {
-          var hist = JSON.parse(localStorage.getItem('proviaai_history') || '[]');
+          var hist = JSON.parse(window.ExGenLocalDataBoundary?.getStudyItem('proviaai_history') || '[]');
           if (Array.isArray(hist) && hist.length) {
             var scored = hist.map(function(x) {
               return validPercent(x && x.percent);
@@ -1142,7 +1142,7 @@
 
     function buildWeeklyMsg() {
       var hist = [];
-      try { hist = JSON.parse(localStorage.getItem('proviaai_history') || '[]'); } catch (_) {}
+      try { hist = JSON.parse(window.ExGenLocalDataBoundary?.getStudyItem('proviaai_history') || '[]'); } catch (_) {}
       var now = Date.now();
       var lastWeek = hist.filter(function(e) { return e.ts && (now - Number(e.ts)) < 7 * 86400000; });
       if (lastWeek.length < 1) return 'Ny vecka! Dags att komma igång med skolarbetet. Vad vill du fokusera på?';
@@ -1165,7 +1165,7 @@
       var key = getWeekKey();
       try { if (localStorage.getItem(COACH_KEY) === key) return; } catch (_) {}
       var hist = [];
-      try { hist = JSON.parse(localStorage.getItem('proviaai_history') || '[]'); } catch (_) {}
+      try { hist = JSON.parse(window.ExGenLocalDataBoundary?.getStudyItem('proviaai_history') || '[]'); } catch (_) {}
       if (hist.length < 3) return;
       try { localStorage.setItem(COACH_KEY, key); } catch (_) {}
       setTimeout(function() {
@@ -1197,7 +1197,7 @@
     function notifyExamDone(pct, weakCatNames) {
       if (EXGEN_RUNTIME.environment === 'pilot') return;
       var hist = [];
-      try { hist = JSON.parse(localStorage.getItem('proviaai_history') || '[]'); } catch (_) {}
+      try { hist = JSON.parse(window.ExGenLocalDataBoundary?.getStudyItem('proviaai_history') || '[]'); } catch (_) {}
       var totalExams = hist.length + 1;
       if (totalExams < 3) return;
       var todayKey = new Date().toISOString().slice(0, 10);
@@ -1216,7 +1216,7 @@
         var scores = [];
         var wAreas = Array.isArray(weakCatNames) ? weakCatNames : [];
         try {
-          var lsH = JSON.parse(localStorage.getItem('proviaai_history') || '[]');
+          var lsH = JSON.parse(window.ExGenLocalDataBoundary?.getStudyItem('proviaai_history') || '[]');
           scores = lsH.slice(-20).map(function(e) { var p = validPercent(e && e.percent); return p === null ? null : p / 100; })
             .filter(function(score) { return score !== null; });
         } catch (_) {}
@@ -1904,7 +1904,7 @@ function finalizeMsg(div, text) {
             && pageCtx.page !== 'prov' && pageCtx.page !== 'exam'
             && pageCtx.examState?.phase !== 'exam';
           if (mayUseMistakeContext) {
-            var lsMistakes = JSON.parse(localStorage.getItem('proviaai_mistakes') || '[]');
+            var lsMistakes = JSON.parse(window.ExGenLocalDataBoundary?.getStudyItem('proviaai_mistakes') || '[]');
             var activeCourse = String(pageCtx.course || '').trim();
             var normalizeCourse = function(value) {
               return String(value || '').normalize('NFKC').replace(/\s+/g, ' ').trim().toLocaleLowerCase('sv');

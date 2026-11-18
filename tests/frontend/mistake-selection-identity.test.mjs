@@ -27,18 +27,18 @@ try {
   });
   await page.waitForTimeout(1800);
   const initial = await page.evaluate(() => ({
-    mistakes: JSON.parse(localStorage.getItem("proviaai_mistakes") || "[]"),
+    mistakes: JSON.parse(window.ExGenLocalDataBoundary.getStudyItem("proviaai_mistakes") || "[]"),
     status: document.querySelector("#mistakeStatus")?.innerText || "",
     rows: document.querySelectorAll("#mistakeList .xfMissRow").length,
   }));
   assert.equal(initial.mistakes.length, 2, JSON.stringify(initial));
 
-  const mistakes = await page.evaluate(() => JSON.parse(localStorage.getItem("proviaai_mistakes") || "[]"));
+  const mistakes = await page.evaluate(() => JSON.parse(window.ExGenLocalDataBoundary.getStudyItem("proviaai_mistakes") || "[]"));
   assert.deepEqual(mistakes.map(m => m.id), ["q1", "q1"], "the regression fixture reuses the same question ID across exams");
   assert.deepEqual(mistakes.map(m => m.mistake_key), ["exam:batch-a:0", "exam:batch-b:0"]);
 
   await page.locator('.xfMissRow[data-mistake-key="exam:batch-a:0"]').click();
-  const selection = await page.evaluate(() => JSON.parse(localStorage.getItem("proviaai_train_pick") || "null"));
+  const selection = await page.evaluate(() => JSON.parse(window.ExGenLocalDataBoundary.getStudyItem("proviaai_train_pick") || "null"));
   assert.deepEqual(selection, { keys: ["exam:batch-a:0"], mode: "selected", course: "" });
 
   await page.locator("#trainSelectedBtn").click();

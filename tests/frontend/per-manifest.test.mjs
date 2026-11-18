@@ -1,4 +1,4 @@
-import { ROOT, serve, mockApis, report } from "./_harness.mjs";
+import { AUTH_KEY, ROOT, serve, mockApis, report, sessionValue } from "./_harness.mjs";
 // Kontraktstester för P.E.R:s sidmanifest (shared.js).
 //
 // Bakgrunden: js/exam-flow.js skickade { focus: … } medan getPageContext()
@@ -245,19 +245,21 @@ ok("T14a knappen anropar inte ett försvunnet måls gamla go()", t14.calls === 0
 ok("T14b knappen ger besked i stället för en tyst no-op", t14.disabled === true && /Inte längre tillgänglig/.test(t14.text || ""), JSON.stringify(t14));
 
 // ── T15-T16: poänglösa försök får inte bli nollor i P.E.R:s snitt ──────────
-const t15 = await page.evaluate(() => {
+const t15 = await page.evaluate(({ key, session }) => {
+  localStorage.setItem(key, session);
+  window.ExGenLocalDataBoundary.syncSession();
   window.clearPerContext();
-  localStorage.setItem("proviaai_history", JSON.stringify([
+  window.ExGenLocalDataBoundary.setStudyItem("proviaai_history", JSON.stringify([
     { percent: 20 }, { percent: 40 }, { percent: 60 }, { percent: 80 }, { percent: 100 },
     { percent: null }, { percent: -1 }, { percent: 101 }, { percent: "" }
   ]));
   return window.__perTestCtx();
-});
+}, { key: AUTH_KEY, session: sessionValue({ id: "u1" }) });
 ok("T15 snittet använder de fem senaste poängsatta proven", Math.abs((t15.userScore ?? 0) - 0.6) < 1e-9, String(t15.userScore));
 
 const t16 = await page.evaluate(() => {
   window.clearPerContext();
-  localStorage.setItem("proviaai_history", JSON.stringify([
+  window.ExGenLocalDataBoundary.setStudyItem("proviaai_history", JSON.stringify([
     { percent: null }, { percent: "" }, { percent: "saknas" }, { percent: false }, { percent: -1 }, { percent: 101 }
   ]));
   return window.__perTestCtx();

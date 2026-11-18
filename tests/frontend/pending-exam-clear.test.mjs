@@ -36,7 +36,7 @@ try {
     "exgen_flow_progress_u1": { uid: "u1", answers: { q1: "synthetic answer" } },
     "exgen_flow_draft_u2": { uid: "u2", material: "other account draft" },
     exgen_local_data_owner: "u1",
-    proviaai_history: [{ ts: Date.now(), course: "Matematik" }],
+    "proviaai_history:u1": [{ ts: Date.now(), course: "Matematik" }],
   } });
   await page.goto(`${server.url}/förbättring.html`, { waitUntil: "networkidle" });
   await page.waitForSelector("#resetBtn", { state: "attached" });
@@ -48,7 +48,7 @@ try {
   await page.evaluate(([key, value]) => {
     localStorage.setItem(key, JSON.stringify(value));
     localStorage.setItem("exgen_local_data_owner", "u2");
-    localStorage.setItem("proviaai_history", JSON.stringify([{ user_id: "u2", course: "Historia" }]));
+    window.ExGenLocalDataBoundary.setStudyItem("proviaai_history", JSON.stringify([{ user_id: "u2", course: "Historia" }]));
   }, [AUTH_KEY, {
     access_token: "token-account-b", refresh_token: "refresh-b", expires_in: 7200,
     expires_at: Math.floor(Date.now() / 1000) + 7200, token_type: "bearer",
@@ -61,7 +61,7 @@ try {
   const localState = await page.evaluate(() => ({
     pending: localStorage.getItem("proviaai_pending_exams:u1"),
     otherAccountPending: localStorage.getItem("proviaai_pending_exams:u2"),
-    history: JSON.parse(localStorage.getItem("proviaai_history") || "null"),
+    history: JSON.parse(window.ExGenLocalDataBoundary.getStudyItem("proviaai_history") || "null"),
   }));
   assert.equal(localState.pending, null, "clear removes this account's local pending exams");
   assert.ok(localState.otherAccountPending, "clear preserves another account's unsynced exam queue");
@@ -79,7 +79,7 @@ try {
   await noSessionPage.waitForSelector("#resetBtn", { state: "attached" });
   await noSessionPage.evaluate(() => {
     localStorage.setItem("exgen_local_data_owner", "u2");
-    localStorage.setItem("proviaai_history", JSON.stringify([{ user_id: "u2", course: "Fysik" }]));
+    localStorage.setItem("proviaai_history:u2", JSON.stringify([{ user_id: "u2", course: "Fysik" }]));
   });
   let noSessionMessage = "";
   noSessionPage.on("dialog", async (dialog) => { noSessionMessage = dialog.message(); await dialog.accept(); });
@@ -87,10 +87,10 @@ try {
     document.querySelector(".xg-menu").hidden = false;
     document.querySelector("#resetBtn").click();
   });
-  await noSessionPage.waitForFunction(() => localStorage.getItem("proviaai_history") !== null);
+  await noSessionPage.waitForFunction(() => localStorage.getItem("proviaai_history:u2") !== null);
   const noSessionState = await noSessionPage.evaluate(() => ({
     owner: localStorage.getItem("exgen_local_data_owner"),
-    history: JSON.parse(localStorage.getItem("proviaai_history") || "null"),
+    history: JSON.parse(localStorage.getItem("proviaai_history:u2") || "null"),
   }));
   assert.match(noSessionMessage, /Kontosessionen kunde inte verifieras/);
   assert.equal(noSessionState.owner, "u2");
@@ -127,7 +127,7 @@ try {
     "exgen_flow_progress_u1": { uid: "u1", answers: { q1: "synthetic answer" } },
     "exgen_flow_draft_u2": { uid: "u2", material: "other account draft" },
     exgen_local_data_owner: "u1",
-    proviaai_history: [{ course: "Matematik" }],
+    "proviaai_history:u1": [{ course: "Matematik" }],
   } });
   await appPage.goto(`${server.url}/app.html`, { waitUntil: "networkidle" });
   let appDialog = "";
@@ -140,7 +140,7 @@ try {
   await appPage.evaluate(([key, value]) => {
     localStorage.setItem(key, JSON.stringify(value));
     localStorage.setItem("exgen_local_data_owner", "u2");
-    localStorage.setItem("proviaai_history", JSON.stringify([{ user_id: "u2", course: "Historia" }]));
+    window.ExGenLocalDataBoundary.setStudyItem("proviaai_history", JSON.stringify([{ user_id: "u2", course: "Historia" }]));
   }, [AUTH_KEY, {
     access_token: "token-account-b", refresh_token: "refresh-b", expires_in: 7200,
     expires_at: Math.floor(Date.now() / 1000) + 7200, token_type: "bearer",
@@ -154,7 +154,7 @@ try {
     draftA: localStorage.getItem("exgen_flow_draft_u1"),
     progressA: localStorage.getItem("exgen_flow_progress_u1"),
     draftB: localStorage.getItem("exgen_flow_draft_u2"),
-    history: JSON.parse(localStorage.getItem("proviaai_history") || "null"),
+    history: JSON.parse(window.ExGenLocalDataBoundary.getStudyItem("proviaai_history") || "null"),
   }));
   assert.match(appDialog, /Rensa sparade provdata/);
   assert.match(appDialog, /osynkade resultat/i);
@@ -177,7 +177,7 @@ try {
   await appNoSessionPage.waitForSelector("#clearBtn", { state: "attached" });
   await appNoSessionPage.evaluate(() => {
     localStorage.setItem("exgen_local_data_owner", "u2");
-    localStorage.setItem("proviaai_history", JSON.stringify([{ user_id: "u2", course: "Fysik" }]));
+    localStorage.setItem("proviaai_history:u2", JSON.stringify([{ user_id: "u2", course: "Fysik" }]));
   });
   let appNoSessionDialog = "";
   appNoSessionPage.on("dialog", async (dialog) => {
@@ -188,7 +188,7 @@ try {
   await appNoSessionPage.getByText(/Kontosessionen kunde inte verifieras/).waitFor({ state: "visible" });
   const appNoSessionState = await appNoSessionPage.evaluate(() => ({
     owner: localStorage.getItem("exgen_local_data_owner"),
-    history: JSON.parse(localStorage.getItem("proviaai_history") || "null"),
+    history: JSON.parse(localStorage.getItem("proviaai_history:u2") || "null"),
   }));
   assert.match(appNoSessionDialog, /Rensa sparade provdata/);
   assert.equal(appNoSessionRemoteDelete, false, "app missing-session clear never calls remote deletion");
@@ -219,7 +219,7 @@ try {
   } });
   await coachPage.goto(`${server.url}/förbättring.html`, { waitUntil: "networkidle" });
   await coachPage.waitForSelector("#resetBtn", { state: "attached" });
-  await coachPage.evaluate(() => localStorage.setItem("proviaai_last_material", "synthetic saved study material"));
+  await coachPage.evaluate(() => window.ExGenLocalDataBoundary.setStudyItem("proviaai_last_material", "synthetic saved study material"));
   await coachPage.getByRole("button", { name: "Meny" }).click();
   let coachAlert = "";
   let coachConfirmation = "";
@@ -229,9 +229,9 @@ try {
     await dialog.accept();
   });
   await coachPage.locator("#resetBtn").click({ force: true });
-  await coachPage.waitForFunction(() => localStorage.getItem("proviaai_last_material") === null);
+  await coachPage.waitForFunction(() => window.ExGenLocalDataBoundary.getStudyItem("proviaai_last_material") === null);
   const coachState = await coachPage.evaluate(() => ({
-    material: localStorage.getItem("proviaai_last_material"),
+    material: window.ExGenLocalDataBoundary.getStudyItem("proviaai_last_material"),
     pendingA: localStorage.getItem("proviaai_pending_exams:u1"),
     pendingB: localStorage.getItem("proviaai_pending_exams:u2"),
     draftA: localStorage.getItem("exgen_flow_draft_u1"),
