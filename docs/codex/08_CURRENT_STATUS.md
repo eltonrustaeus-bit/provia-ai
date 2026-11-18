@@ -2,12 +2,19 @@
 
 ## Security audit checkpoint — 2026-11-18
 
-- Latest feature checkpoint: commit `07edf28` is pushed to
+- Latest feature checkpoint: commit `1088653` is pushed to
   `codex/exgen-generation-quality-2026-10-20`; Vercel deployment
-  `dpl_9YjcyMMAXqVHVhMjqsTgxTmbMmPs` is READY. `/app.html` returns 200 and
-  includes the configured frame, MIME, referrer and CSP headers. This is a
+  `dpl_5FzE7tws56NQX7daiqbyiPcmhWfi` is READY. `/app.html` returns 200 and
+  includes `X-Frame-Options: DENY`, MIME/referrer protections, and
+  `frame-src 'none'; form-action 'self'` in CSP. This is a
   feature Preview, not Production. Focused security/usage tests pass 24/24;
   migration-file, syntax and diff checks pass.
+- The CSP extension passed its focused configuration test 3/3. Static-source
+  review found no forms or iframes in the site HTML; an independent reviewer
+  found no apparent break to the dynamic auth form or redirect flows.
+- The working tree further restricts the feature CSP with `frame-src 'none'`
+  and `form-action 'self'`. Source search found no HTML iframe or form usage;
+  the focused config test is being extended before this change is published.
 - The checkpoint replaces three raw database-error logs with fixed event
   labels and an allowlisted SQLSTATE. It also includes a reviewed but unapplied
   migration candidate restricting `ai_usage_events` to server-role INSERT.

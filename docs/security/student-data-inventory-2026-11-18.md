@@ -127,3 +127,24 @@ Before real pupil data: the school and privacy owner must decide purpose,
 controller/processor responsibilities, lawful basis, retention for each row,
 guardian information, backups, support access and incident handling. A technical
 cache expiry alone does not set those decisions.
+
+## Production web headers and API CORS — live read-only check 2026-11-18
+
+At 11:18 UTC, `https://exgen.se/app.html` returned HTTP 200 with HSTS and
+`Access-Control-Allow-Origin: *`, but without the feature branch's
+`X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`,
+`X-Frame-Options` or CSP headers. This is a public static document; the
+wildcard does not by itself grant access to authenticated API data.
+
+Unauthenticated `GET /api/explain` returned 401 with no
+`Access-Control-Allow-Origin` header and `Cache-Control: public, max-age=0,
+must-revalidate`. `OPTIONS /api/explain` returned 405 with no CORS allow
+headers. Thus this route does not grant browser cross-origin reads under the
+observed response, but the Production API cache policy has not yet received the
+feature branch's `private, no-store` rule. No authenticated API response was
+tested. Production was not modified.
+
+The feature branch's current static headers were verified on READY deployment
+`dpl_5FzE7tws56NQX7daiqbyiPcmhWfi` (`/app.html` HTTP 200), including the
+additional `frame-src 'none'` and `form-action 'self'` CSP directives. This is
+Preview evidence only; it is not evidence for `exgen.se`.
