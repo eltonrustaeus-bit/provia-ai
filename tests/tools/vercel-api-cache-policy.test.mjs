@@ -14,3 +14,13 @@ test("all API routes receive a private no-store response policy", () => {
 test("streamed P.E.R responses do not weaken the no-store policy", () => {
   assert.match(explainSource, /setHeader\(['"]Cache-Control['"],\s*['"]private, no-store, no-transform['"]\)/);
 });
+
+test("content security policy blocks plugin content and injected base URLs without changing script policy", () => {
+  const pageRule = config.headers.find(({ source }) => source === "/(.*)");
+  const csp = pageRule?.headers.find(({ key }) => key.toLowerCase() === "content-security-policy")?.value;
+  assert.ok(csp);
+  assert.match(csp, /(?:^|;\s*)base-uri 'self'(?:;|$)/);
+  assert.match(csp, /(?:^|;\s*)object-src 'none'(?:;|$)/);
+  assert.match(csp, /(?:^|;\s*)frame-ancestors 'self'(?:;|$)/);
+  assert.doesNotMatch(csp, /script-src/);
+});
