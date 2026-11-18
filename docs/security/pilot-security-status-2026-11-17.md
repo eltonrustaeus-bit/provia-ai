@@ -93,10 +93,10 @@ effective in the reviewed production catalog.
   claim release is logged safely and falls back to the stale-claim retry
   window. Retry alone cannot fix invalid metadata in Stripe's event snapshot;
   manual reconciliation, alerting and hosted payment tests remain open.
-- A later local diff scopes P.E.R transcripts to the signed-in account and
+- A later feature-Preview diff scopes P.E.R transcripts to the signed-in account and
   discards the ambiguous legacy shared transcript. Account-specific memory
   clearing and delayed-history checks passed in a browser test. This partial
-  change has not been deployed. Concurrent login in another tab can still
+  change is deployed only to the feature Preview. Concurrent login in another tab can still
   race with clearing the other shared browser caches, while a revoked session
   can leave the deleted account's local cache behind. A full account-scoped
   cutover or coordinated Auth/cache writes remains a release gate. The staging
@@ -177,8 +177,9 @@ effective in the reviewed production catalog.
   price before an upgrade decision. The advisors also report some executable
   definer functions and mutable search paths; no-policy RLS notices need
   grant checks before being treated as exposure.
-- Production's security advisor lists six anon-executable definer functions.
-  Two are the confirmed exam-count RPC exposure. The four others return
+- The earlier audit found six anon-executable definer functions, including
+  the two then-exposed exam-count RPCs. The current production advisor lists
+  four; the exam-count exposure was closed. These four return
   `trigger` or `event_trigger` (`handle_new_user`, `rls_auto_enable`,
   `student_error_events_consistency`, `sync_report_count`), so they require a
   separate invocation/grant review rather than being counted as four proven
@@ -320,10 +321,11 @@ review of the release diff. Code review and local tests alone do not meet it.
 
 ## Local browser-isolation follow-up — 2026-11-18
 
-The earlier account-scoped P.E.R transcript change is on the feature Preview
-at commit `c69a9c3`; it is not on Production. The work below is a **local
-checkpoint** and has not been pushed, deployed or tested against hosted
-student accounts.
+The account-scoped P.E.R transcript and browser-data changes are on the feature
+Preview at commit `a6888b2` (Vercel deployment
+`dpl_BXoRJkkE3WS5Hm1oVUiJZJZAtTNA`, READY on 2026-11-18). They are not on
+Production. The Preview login gate loads, but the two-account flows below have
+not been tested against hosted student accounts.
 
 - Provhistorik, felbank, senaste resultat, material, träningsurval and custom
   course names now use account-specific browser keys. Ambiguous old shared
@@ -352,3 +354,49 @@ student accounts.
 The targeted regression fixtures and independent review found no code-proven
 blocker for a feature Preview checkpoint. Production and school-pilot release
 remain behind the hosted two-account and deletion gates above.
+
+## Hosted catalog recheck — 2026-11-18
+
+- Supabase security advisors still report four `SECURITY DEFINER`
+  trigger/event-trigger functions executable by `anon` and `authenticated` in
+  both staging and production: `handle_new_user`, `rls_auto_enable`,
+  `student_error_events_consistency` and `sync_report_count`. Catalog checks
+  confirmed their trigger/event-trigger return types and bindings. They are
+  not evidence of four callable student-data leaks, but their browser-role
+  `EXECUTE` grants are unnecessary and warrant a staged least-privilege fix.
+- `get_mock_exam_generation_pipeline_status(uuid)` is executable by
+  `authenticated`, not `anon`, and its current hosted SQL requires
+  `auth.uid()` and a matching `user_id`. This is a catalog/body check, not a
+  two-account HTTP proof.
+- The sole public view, `concept_collective_stats`, has no `SELECT` grant to
+  `anon` or `authenticated` in either project. A production catalog check
+  found no public table with browser-role `SELECT`/`INSERT`/`UPDATE` grants
+  and RLS disabled. These checks do not establish that all policies or RPC
+  ownership rules are correct.
+
+## Local browser-dependency hardening — 2026-11-18
+
+- This feature checkpoint replaces the executable CDN assets
+  used by app, account, improvement, pricing, admin, P.E.R, teacher and graph
+  pages with fixed files served from ExGen's origin. KaTeX remains lazy-loaded
+  but now comes from a pinned local bundle. Package versions, license notices
+  and byte hashes are recorded in `js/vendor/README.md` and the vendor-boundary
+  test. This removes the reviewed path where CDN JavaScript can execute before
+  OAuth fragment cleanup; it does not establish that any vendor previously
+  extracted tokens.
+- The local Supabase, Chart, animation, network and math bundles loaded in a
+  synthetic browser fixture without a remote JavaScript request. A separate
+  local test loaded the real app, account and improvement pages with synthetic
+  OAuth-shaped URL fragments; their scripts loaded locally with no external
+  script request or script initialization error, and the pilot callback path
+  removed each fragment. It did not test a real OAuth callback or token exchange. Focused
+  pricing, account fallback, chart fallback, math rendering, P.E.R page,
+  pilot session and schema tests passed. The favicon check passed after the
+  build-only `sharp` update. `npm audit --audit-level=low` reported zero known
+  advisories for the currently installed dependency tree. This is a local
+  dependency scan, not a security certification or a hosted functional test.
+- Google OAuth still uses a URL fragment and stores the session in browser
+  storage. An attacker-controlled first-party script or DOM XSS would remain
+  able to reach it. A dedicated code/PKCE callback and coordinated session
+  architecture remain work for staging; they are not implied by this vendor
+  change. Hosted login, reset and P.E.R flows after this diff are untested.

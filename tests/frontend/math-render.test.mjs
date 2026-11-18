@@ -3,11 +3,9 @@ import { ROOT, serve, mockApis, seed, report } from "./_harness.mjs";
  *
  * Användning:  node tests/frontend/math-render.test.mjs
  *
- * KaTeX-CDN:t stubbas. Testet mäter VÅR inkoppling — att renderMath anropas på
- * rätt noder vid rätt tillfälle — inte att KaTeX fungerar. Att hämta 280 kB
- * från jsdelivr i en testsvit vore ett nätverksberoende utan motsvarande
- * upptäckt: går CDN:t ner är det inte den här kodens fel, och js/math-render.js
- * används skarpt av skolproven.
+ * Det lokala KaTeX-paketet stubbas här. Testet mäter inkopplingen — att
+ * renderMath anropas på rätt noder vid rätt tillfälle. Ett separat test
+ * verifierar att de faktiska lokala paketfilerna finns och laddar.
  *
  * Det som bevakas:
  *   - matematik i en fråga renderas
@@ -45,7 +43,7 @@ async function öppna(exam, ämne) {
 
   /* Stubbar hela KaTeX-leveransen. renderMathInElement märker noden i stället
      för att rendera, så testet kan se PRECIS vilka noder vi skickar in. */
-  await page.route("**/katex@**", async r => {
+  await page.route("**/js/vendor/katex/**", async r => {
     const u = r.request().url();
     katexHämtad.push(u);
     if (u.endsWith(".css")) return r.fulfill({ contentType: "text/css", body: "" });
@@ -148,7 +146,7 @@ try {
 
   /* ── Prestandabudgeten ──────────────────────────────────────────────────── */
   {
-    /* En ren textfråga får aldrig kosta 280 kB. js/math-render.js har en
+    /* En ren textfråga får aldrig ladda KaTeX. js/math-render.js har en
        förhandskontroll just för det, och den måste hålla även här. */
     const t = await öppna(TEXTPROV, "Historia 1b");
     await t.page.waitForTimeout(900);

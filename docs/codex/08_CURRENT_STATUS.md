@@ -1,6 +1,26 @@
 # 08 Current Status
 
-## P.E.R browser-history account isolation — local work, 2026-11-18
+## Browser script supply chain — feature checkpoint, 2026-11-18
+
+- The approved account-isolation checkpoint `a6888b2` is on the feature
+  Preview (`dpl_BXoRJkkE3WS5Hm1oVUiJZJZAtTNA`, READY), not `main` or
+  Production. See `docs/security/pilot-security-status-2026-11-17.md` for
+  evidence and limits.
+- This checkpoint replaces runtime CDN JavaScript with
+  fixed first-party bundles for Supabase, Chart, GSAP, KaTeX and vis-network.
+  Source versions, licenses and hashes are in `js/vendor/README.md`; the
+  complete vendor directory must be included in any later commit or pages
+  will fail to load. A browser check loaded real app/account/improvement pages
+  with synthetic OAuth-shaped URL fragments and saw no external script
+  requests. It did not exercise a live OAuth callback.
+- Focused frontend, schema and favicon tests passed; `npm audit
+  --audit-level=low` reported zero advisories for the installed dependencies.
+  Independent review found no code-proven blocker in the reviewed diff, while
+  confirming that the OAuth fragment and browser-stored session remain
+  reachable to first-party JavaScript. This checkpoint changes no database or
+  Production code. Hosted two-account, deletion and Auth flows remain open.
+
+## P.E.R browser-history account isolation — feature Preview, 2026-11-18
 
 - Signed-in P.E.R transcripts now use an account-specific browser key. The old
   shared key is discarded rather than imported because its owner marker cannot
@@ -15,10 +35,9 @@
 - Offline checks: new same-tab A-to-B delayed-history test passed; storage
   boundary test passed; P.E.R exam-context 104/104, page-targets 95/95,
   pilot-session recovery 1/1, and P.E.R focus/clear test passed. These do not
-  establish hosted Auth or full account deletion. Other shared private keys
-  (exam history, mistakes, material, coach caches) still need a coordinated
-  account-scoped cutover and cross-tab deletion tests. This diff is local only;
-  it has not been pushed or deployed.
+  establish hosted Auth or full account deletion. A later checkpoint scoped
+  exam history, mistakes, material and coach caches to the account; see the
+  security status document for limits and the feature Preview deployment.
 - An independent read-only review found three specific issues in the first
   diff: local-clear success wording, an outdated logout test assertion, and a
   missing visible-history assertion. All three were corrected and the focused
