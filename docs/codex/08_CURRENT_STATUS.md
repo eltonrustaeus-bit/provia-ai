@@ -1,5 +1,122 @@
 # 08 Current Status
 
+## Security goal: trigger grants tested in staging — 2026-11-18
+
+- A migration narrows `EXECUTE` on four installed trigger functions and pins
+  the legacy report trigger's `search_path`. The PGlite trigger/temporary-table
+  test, migration-file check and focused deletion/RLS tests pass. The migration
+  was applied only to staging as hosted version `20261118003207`; production
+  was not changed. Rollback-only hosted trigger checks passed. See
+  `docs/security/trigger-function-release-check-2026-11-18.md` for exact
+  preflight and functional staging gates.
+- `docs/security/session-hardening-plan-2026-11-18.md` records why current
+  browser Supabase calls prevent a simple HttpOnly-cookie switch and how to
+  stage PKCE/callback and server-session changes. The current implicit OAuth
+  flow and browser-stored session remain in place.
+- API hardening now adds `Cache-Control: private, no-store` to all
+  `/api/:path*` responses via `vercel.json`, and explicitly sets it on P.E.R
+  history before authentication. The focused config test and two handler tests
+  pass. The change is included in feature commit `c06aeff` and the later
+  security-header commit `e70189d`.
+- The global CSP in the working tree now also sets `base-uri 'self'` and
+  `object-src 'none'` alongside the existing `frame-ancestors 'self'`. This
+  narrow policy avoids inline-script breakage while blocking injected base
+  URLs and plugin content. A source scan found no `<base>`, `<object>` or
+  `<embed>` elements; the focused policy test passes. It does not include
+  `script-src` and is not an XSS mitigation. The change is committed as
+  `e70189d`; its Vercel Preview is READY, and authenticated `vercel curl`
+  verified the actual configured headers on `/app.html` and an unauthenticated
+  JSON response from `/api/explain` (401, `private, no-store`). An authenticated
+  P.E.R stream remains untested.
+- `docs/security/hosted-two-account-test-plan-2026-11-18.md` defines a
+  bounded staging ownership probe. Two synthetic accounts were used, then
+  deleted after explicit approval; readback found zero matching rows in 44
+  public owner-ID tables plus Auth, sessions, exams, P.E.R and Storage.
+- Re-ran focused account deletion, local storage isolation, logout and stale
+  session suites: 9/9 top-level tests passed across seven files. This confirms
+  local account scoping and mock/UI behavior, not hosted cascades or provider
+  deletion. A source review confirmed bearer/refresh tokens remain in
+  `localStorage`, and the logout UI deliberately offers to retain account-
+  scoped drafts/results with no expiry. See the data inventory and deletion
+  gap; do not introduce automatic local deletion until the school-approved
+  retention period and recovery expectations are set.
+- Staging SQL role/claim checks and account pages showed A could see only A's
+  two synthetic exams and B only B's one. This is not a full HTTP/API test;
+  P.E.R history, classes, provider retention and ordinary account deletion
+  remain open.
+- Commit `883af94` fixes account-page logout binding in three DOM-ready states.
+  It is pushed to the feature branch and the exact Vercel Preview
+  `dpl_4QZUXi3g7oM49qyLNJs7BHx6pih2` is READY on that SHA. Local UI tests pass;
+  the hosted app-menu logout was verified after staging login: the app returned
+  to its login gate. The account-page button and server-side session revocation
+  were not separately exercised in this hosted click test.
+- Production `exgen.se` still does not return the configured security headers:
+  a fresh static-page read returned 200 without them, and unauthenticated
+  `GET /api/explain` returned 401 with the generic public cache header. The
+  latest production deployment is `0e267a4`; `origin/main:vercel.json` has no
+  header rules, which explains the gap. The feature Preview has the correct
+  runtime headers, but production remains unchanged pending a separate release
+  approval.
+- Fresh Supabase reads show the trigger-function grant migration is present
+  only in staging, while production still has the four unnecessary browser
+  `EXECUTE` grants. They are trigger/event-trigger functions, not confirmed
+  student-data RPC leaks. Leaked-password protection is still disabled; the
+  Supabase organization is on the Free plan.
+- Metadata-only catalog reads on 2026-11-18 found 15 `public` tables in
+  production and 14 in staging with RLS enabled, zero policies, and effective
+  `SELECT`, `INSERT`, `UPDATE`, `DELETE` and `TRUNCATE` privileges for both
+  `anon` and `authenticated`. The exception is `anon_rate_limit`, whose browser
+  privileges are already absent in staging but remain in production. RLS with
+  no policy denies ordinary row operations, so this is not proof of current
+  row exposure; `TRUNCATE` is not governed by RLS and remains an excessive
+  database privilege. Source review found no direct browser-client references
+  to these tables; observed application uses go through server code. No grant
+  was changed. A narrow staging-first revocation needs its own approval and
+  route regression check before any production decision.
+- A metadata-only function ACL check confirms the exam-count RPC migration is
+  active in both environments: `get_weekly_exam_count(uuid)` and
+  `get_monthly_exam_count(uuid)` are not executable by browser roles. The
+  owner-checked `get_mock_exam_generation_pipeline_status(uuid)` remains
+  executable by `authenticated`; its body checks `auth.uid()` against the
+  requested job owner and returns only that owner's status. Production still
+  grants browser EXECUTE on four trigger/event-trigger functions; staging has
+  revoked those grants. `match_knowledge_chunks(...)` is an invoker RPC
+  executable by browser roles, but its source tables have RLS and no policies;
+  no direct browser call was found, while server retrieval uses it. Treat the
+  excess EXECUTE as unnecessary exposure/abuse surface, not as a confirmed
+  cross-user content leak.
+- In the current feature branch, every OpenAI `/v1/responses` call passes
+  through `budgetedOpenAIFetch`, which forces `store: false` even if a caller
+  attempts `store: true`. The focused offline test passes 13/13, including a
+  production/staging body assertion. `origin/main` does not yet contain this
+  privacy default, so it is not confirmed for Production. OpenAI's current
+  documentation says API abuse-monitoring logs can contain prompts/responses
+  and are generally retained up to 30 days; whether ExGen's actual organization
+  has an approved retention-control exception was not verified. See
+  https://platform.openai.com/docs/guides/your-data.
+- Text sanitizers in `src/per/sanitize.mjs` remove selected prompt-injection
+  phrases and bound lengths; they do not remove personal identifiers such as
+  names, email addresses or student numbers. Study material and answers are
+  intentionally sent to the model; OCR sends the submitted image itself.
+  Existing tests do not establish identifier redaction. Do not claim all PII
+  is filtered before AI processing; define and test a safe redaction policy,
+  including the OCR path, before broadening pupil use.
+- Production `GET /api/explain` returned 401 without a token and the generic
+  Vercel cache header. Local `api/explain.js` now explicitly uses
+  `private, no-store` on GET history; the focused handler tests pass, but this
+  change is not deployed. `OPTIONS /api/explain` returned 405 without CORS
+  allow headers; the production static page did return `Access-Control-Allow-Origin: *`.
+- Vercel environment metadata was read without decrypting values. The CLI lists
+  both `SUPABASE_SERVICE_ROLE_KEY` and legacy `SECRET_KEY_SUPABASE` slots, but
+  metadata cannot prove whether the historically exposed value was revoked.
+  The Vercel connector returned 403 for the same metadata request. No key was
+  read or changed; confirm key status in Supabase before claiming rotation.
+- A protected-preview access attempt accidentally created a separate empty
+  Vercel project `exgen-generation-quality-2026-10-30`. Read-only checks found
+  zero deployments and no environment variables. It is separate from the
+  ExGen project; deletion awaits explicit approval. The temporary local OIDC
+  environment file was removed after use.
+
 ## Browser script supply chain — feature checkpoint, 2026-11-18
 
 - The approved account-isolation checkpoint `a6888b2` is on the feature

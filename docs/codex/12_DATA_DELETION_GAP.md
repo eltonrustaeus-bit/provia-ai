@@ -15,15 +15,13 @@ The missing evidence is a hosted deletion readback. A synthetic
 staging SQL transaction was rejected before execution, so no deletion rows
 were created or removed by that attempt.
 
-The browser still uses shared unscoped cache keys. Concurrent login on another
-tab can race with deletion cleanup and remove the other account's local data;
-after session revocation the cleanup can instead leave the deleted account's
-shared cache behind. A safe cutover must move private readers and writers to
-account-scoped keys, preserve or explicitly clear ambiguous legacy data, and
-test two-tab interleavings. Keep the current behavior and this gap visible
-until that migration is complete; a single extra ownership check is insufficient.
-A local, undeployed change isolates P.E.R transcripts, but exam history,
-mistakes, material and other private caches still use shared keys.
+The feature Preview at `b07e57f` uses account-scoped keys for P.E.R transcripts,
+exam history, mistakes, material and coach caches and discards ambiguous legacy
+values. Its local two-tab and deletion tests reduce the earlier shared-cache
+risk, but they do not prove a hosted Auth deletion, cross-device clearing or
+every concurrent tab ordering. Production still runs the older browser code.
+Keep this gap visible until a synthetic hosted deletion and second-device
+readback pass; a single local ownership check is insufficient.
 
 ## Required before real student accounts
 

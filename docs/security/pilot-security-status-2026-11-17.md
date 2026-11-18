@@ -398,5 +398,124 @@ remain behind the hosted two-account and deletion gates above.
 - Google OAuth still uses a URL fragment and stores the session in browser
   storage. An attacker-controlled first-party script or DOM XSS would remain
   able to reach it. A dedicated code/PKCE callback and coordinated session
-  architecture remain work for staging; they are not implied by this vendor
-  change. Hosted login, reset and P.E.R flows after this diff are untested.
+  architecture remain work for staging; the reviewed migration sequence is in
+  `docs/security/session-hardening-plan-2026-11-18.md`. They are not implied by
+  this vendor change. Hosted login, reset and P.E.R flows after this diff are
+  untested.
+
+## Staging applied — trigger-function grants
+
+The four earlier anonymous definer-function warnings were installed row or
+event triggers, not demonstrated callable data leaks. A narrow migration
+`20261118003207_restrict_trigger_function_execute.sql` removes their excess
+browser-role `EXECUTE` grants and pins the legacy report trigger's search
+path. Its PGlite mechanics test and migration-file check pass. It was applied
+only to staging as hosted version `20261118003207`; production remains
+unchanged. Rollback-only synthetic trigger tests and post-test absence checks
+passed in staging. The advisor's anonymous-definer warning count is now zero,
+and the authenticated count is one. The preflight, exact staging evidence,
+remaining Auth API limit, and safe recovery path are recorded in
+`docs/security/trigger-function-release-check-2026-11-18.md`.
+
+An additional local API fix makes authenticated `GET /api/explain` set
+`Cache-Control: private, no-store` before it checks authentication or returns
+P.E.R history. The focused handler regression passes for both locked history
+and a verified completed exam. This change is local; deployed response headers
+and normal P.E.R behavior have not been retested for this diff.
+
+## Two-account staging probe — bounded checks completed, 2026-11-18
+
+After specific user approval, two confirmed synthetic Auth users were created
+through staging Dashboard's “Create new user” form with “Auto confirm user”
+checked. The form states that this path sends no confirmation email. Readback
+found each has an approved `gratis` profile, no billing links, and no previous
+exam or P.E.R rows. The user entered the test passwords in the Dashboard;
+neither passwords nor server keys were copied into files or chat.
+
+A first atomic attempt to create both exam and P.E.R fixtures failed because
+the `per_sessions` trigger requires an epoch-guarded RPC. Readback confirmed
+zero rows from that attempt. The subsequent scoped fixture created two
+synthetic `user_exams` rows, one for each new identity; a third A-only row was
+added to distinguish the accounts in the UI. Staging SQL run under the
+`authenticated` role with A's and B's respective claims showed each sees its
+own exam row(s), never the other's. An A-to-B UPDATE was denied by table
+privileges and B's row remained unchanged; an anonymous SELECT was also
+denied. These are hosted database role/claim probes, not HTTP bearer-token
+tests. In the verified feature Preview, A's account page showed two exams
+after app history sync. A was signed out through the app page, and B signed in
+on the same origin; B's account page showed one exam. This is a browser UI
+ownership check, not a direct HTTP cross-account API probe. P.E.R API ownership
+and normal-mode class and account-deletion flows remain unverified. No
+AI/model calls were made for this probe.
+
+During the same Preview probe, the account page's logout controls did not
+respond. Its async initialization can finish after `DOMContentLoaded`, yet it
+registered its menu logout listener only for that event; the visible account
+button had no listener. A local fix binds both controls in either ready state,
+and a focused regression passes. The fix was committed as `883af94`, pushed to
+the approved feature branch and deployed as READY Preview
+`dpl_4QZUXi3g7oM49qyLNJs7BHx6pih2`. The local test covers `loading`,
+`interactive` and `complete` DOM states without duplicate listeners. The
+separate `app.html` menu logout had also worked as a test-only workaround.
+An independent reviewer identified a second
+`interactive`-state timing case; the local fix now covers it and all three
+readiness cases pass the focused test. On 2026-11-18, the user signed in to
+that READY Preview and the app-menu `Logga ut` control was clicked; the page
+returned to its login gate. This verifies the hosted app-menu logout path. It
+does not separately exercise the `konto.html` logout button or prove server-side
+refresh-session revocation. Local Playwright tests of both account and menu
+controls passed and confirmed the local auth key is cleared after logout.
+
+After explicit action-time confirmation, only the two new synthetic Auth users
+were deleted through staging Dashboard. The Dashboard reported success and no
+longer listed them. SQL readback found zero rows for their UUIDs in `auth.users`,
+`profiles`, `user_exams`, `per_sessions`, `auth.sessions`, `storage.objects`,
+and 44 public tables with `user_id` or `student_id` columns. This is a
+point-in-time staging cleanup check, not a claim about backups or all possible
+retention systems. The other three staging accounts were left untouched.
+
+## Fresh security recheck — 2026-11-18
+
+- Read-only migration and catalog checks show `20261118003207` is installed in
+  staging but absent from production. Production still grants browser
+  `EXECUTE` on four `SECURITY DEFINER` trigger/event-trigger functions;
+  staging denies those grants. The four functions are bound as triggers and
+  are not verified data-reading RPC leaks. Applying the staged least-privilege
+  migration to production remains a separate, unapproved production action.
+- The owner-scoped `get_mock_exam_generation_pipeline_status(uuid)` RPC remains
+  executable by `authenticated` and denied to `anon` in both environments.
+  Advisor flags it in both; its HTTP two-account behavior was not tested here.
+- Supabase Advisor reports leaked-password protection disabled in both
+  environments. The organization plan is `free`; no plan, Auth setting or
+  account was changed. Confirm feature eligibility and any cost before trying
+  to enable the protection.
+- Production `GET /api/explain` without credentials returned `401` with
+  `Cache-Control: public, max-age=0, must-revalidate`. Production
+  `OPTIONS /api/explain` returned `405` without CORS allow headers. A static
+  `/app.html` response included `Access-Control-Allow-Origin: *`, but that
+  alone is not evidence of an API data leak. The current production response
+  did not include the security headers in local `vercel.json`.
+- The Vercel CLI's metadata-only environment listing (values stayed encrypted)
+  shows `SUPABASE_SERVICE_ROLE_KEY` in Production and the active feature
+  Preview, plus legacy `SECRET_KEY_SUPABASE` slots. This only confirms variable
+  names and scopes; it cannot establish whether the formerly exposed value is
+  revoked. The Vercel MCP environment listing returned 403. No value was read
+  or changed, so key rotation remains unverified.
+- A new local Vercel rule now assigns `Cache-Control: private, no-store` to
+  `/api/:path*`, covering the API routes that lack handler-level cache headers.
+  The targeted config and handler tests pass. Feature commit `e70189d` is READY
+  in a Vercel Preview. Authenticated `vercel curl` confirmed
+  `Cache-Control: private, no-store` on unauthenticated `GET /api/explain`
+  (401); an authenticated stream response remains untested.
+- In the current working tree, the global CSP additionally includes
+  `base-uri 'self'` and `object-src 'none'` with the existing
+  `frame-ancestors 'self'`. A source scan found no `<base>`, `<object>` or
+  `<embed>` elements; the policy test passes. Feature Preview runtime returned
+  this CSP on `/app.html`. It has no `script-src` and does not mitigate script
+  injection; do not describe it as XSS protection. Production remains
+  unmodified: current `origin/main:vercel.json` has no response-header rules.
+- Local `api/explain.js` now sets `Cache-Control: private, no-store` on GET
+  history before authentication. Two focused handler tests passed for active,
+  locked and verified-history paths after adding the explicit header assertion.
+  This local fix is not deployed; the broad handler test run was interrupted
+  after it remained active and is not counted as passing.
