@@ -2,9 +2,9 @@
 
 ## Security audit checkpoint — 2026-11-18
 
-- Latest feature checkpoint: commit `8112d6e` is pushed to
+- Latest feature checkpoint: commit `07edf28` is pushed to
   `codex/exgen-generation-quality-2026-10-20`; Vercel deployment
-  `dpl_5eQPcEGAMbcrgPRiRsBuvyG4FkMr` is READY. `/app.html` returns 200 and
+  `dpl_9YjcyMMAXqVHVhMjqsTgxTmbMmPs` is READY. `/app.html` returns 200 and
   includes the configured frame, MIME, referrer and CSP headers. This is a
   feature Preview, not Production. Focused security/usage tests pass 24/24;
   migration-file, syntax and diff checks pass.
@@ -13,10 +13,10 @@
   migration candidate restricting `ai_usage_events` to server-role INSERT.
   Independent reviews found no remaining blocker in the logging assertions or
   the candidate's grant scope.
-- A follow-up local regression assertion now executes `TRUNCATE` as `anon`,
-  `authenticated` and `service_role` against the candidate permissions and
-  expects all three to be denied; a synthetic server-role INSERT still passes.
-  This test-only follow-up is not yet in the READY Preview.
+- The PGlite regression test executes `TRUNCATE` as `anon`, `authenticated`
+  and `service_role` against the candidate permissions and expects all three
+  to be denied; a synthetic server-role INSERT still passes. This test is in
+  the latest READY Preview commit, though it does not modify a hosted database.
 - Fresh read-only checks on 2026-11-18 at 11:09 UTC still show effective
   `SELECT` and `TRUNCATE` grants on `ai_usage_events` for both browser roles in
   staging and Production; the new migration has not been applied. RLS has no

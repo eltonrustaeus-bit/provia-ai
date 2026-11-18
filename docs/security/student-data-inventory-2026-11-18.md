@@ -101,6 +101,15 @@ policy, ordinary row reads and writes are denied. This does not establish a
 current row-data breach. However, RLS does not protect `TRUNCATE`, and these
 grants exceed least privilege for server-managed data.
 
+A fresh read-only privilege check at 2026-11-18 11:16 UTC reconfirmed all five
+table privileges (`SELECT`, `INSERT`, `UPDATE`, `DELETE`, `TRUNCATE`) for both
+`anon` and `authenticated` on every relation in the production list and every
+relation in the staging list. The same check confirms the weekly/monthly exam
+count functions are not executable by browser roles in either environment.
+The staging trigger migration is active, but production still allows both
+browser roles to execute `handle_new_user()`. No table rows were queried or
+changed by this check.
+
 Source search found no direct browser-client use of the listed tables. The
 active code uses relevant tables through server routes/modules, including
 `concepts`, `feature_flags`, `per_quota_counters`, `stripe_webhook_events`,
