@@ -3450,6 +3450,7 @@ test("active exam hides P.E.R history and uncertain state fails closed", async (
     calls.length = 0;
     const history = await invoke(undefined, "GET");
     assert.equal(history.statusCode, 409);
+    assert.equal(history.headers["Cache-Control"], "private, no-store");
     assert.equal(history.body.error, "EXAM_ACTIVE");
     assert.ok(calls.every(({ url }) => !url.includes("per_sessions")));
   } finally {
@@ -3474,6 +3475,7 @@ test("P.E.R history stays hidden after abandoned or expired exams until verified
       calls.length = 0;
       const response = await invoke(undefined, "GET");
       assert.equal(response.statusCode, 409, `${state} exam must keep stored P.E.R history locked`);
+      assert.equal(response.headers["Cache-Control"], "private, no-store");
       assert.equal(response.body.error, "PER_HISTORY_LOCKED");
       assert.ok(calls.every(({ url }) => !url.includes("/rest/v1/per_sessions")
         && !url.includes("acquire_per_answer_lease")), `${state} history is rejected before reading it or acquiring a lease`);
@@ -3483,6 +3485,7 @@ test("P.E.R history stays hidden after abandoned or expired exams until verified
     calls.length = 0;
     const verified = await invoke(undefined, "GET");
     assert.equal(verified.statusCode, 200);
+    assert.equal(verified.headers["Cache-Control"], "private, no-store");
     assert.equal(verified.body.history[0].content, "VERIFIED_HISTORY_SENTINEL");
     assert.ok(calls.some(({ url }) => url.includes("/rest/v1/per_sessions")));
   } finally {

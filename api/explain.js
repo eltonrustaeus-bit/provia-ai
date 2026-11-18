@@ -1389,6 +1389,7 @@ function rejectLeaseOutcome(req, res, body, outcome, { history = false, lease = 
 async function handleExplainRequest(req, res, perAnswerLease) {
   // GET — return stored PER history for the authenticated user
   if (req.method === "GET") {
+    res.setHeader("Cache-Control", "private, no-store");
     const user = await requireAuth(req, res);
     if (!user) return;
     const activeCount = await examIssuance.activeExamCount(user.id);
@@ -1853,7 +1854,7 @@ async function handleExplainRequest(req, res, perAnswerLease) {
       // pedagogical stream and answer restrictions.
       const holdOutputUntilReview = !isExamBoundPage(requestPage);
       res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
-      res.setHeader('Cache-Control', 'no-cache, no-transform');
+      res.setHeader('Cache-Control', 'private, no-store, no-transform');
       res.setHeader('X-Accel-Buffering', 'no');
       res.flushHeaders();
 
