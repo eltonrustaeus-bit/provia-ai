@@ -3,21 +3,33 @@
 ## Security audit checkpoint — 2026-11-18
 
 - Latest feature-code checkpoint: commit `1088653` is pushed to
-  `codex/exgen-generation-quality-2026-10-20`; Vercel deployment
-  `dpl_5FzE7tws56NQX7daiqbyiPcmhWfi` is READY. `/app.html` returns 200 and
-  includes `X-Frame-Options: DENY`, MIME/referrer protections, and
-  `frame-src 'none'; form-action 'self'` in CSP. This is a
-  feature Preview, not Production. Focused security/usage tests pass 24/24;
-  migration-file, syntax and diff checks pass.
+  `codex/exgen-generation-quality-2026-10-20`; its code includes the current
+  security headers and was deployed to a feature Preview. No change from this
+  security work has been merged to Production.
+- Preview verification before this status revision: documentation checkpoint
+  `41cf681` was pushed to the same feature branch and Vercel deployment
+  `dpl_C4wTjKaETgXyRLisbH9wnbxy2BVH` was READY. The existing branch Preview
+  alias loaded the ExGen app in the authenticated browser. The present changes
+  to this status file are documentation only.
+- The focused security/usage test command was rerun on 2026-11-18 and passed
+  27/27. This is local evidence; it does not prove hosted Supabase grants or
+  Production behavior. An unauthenticated HTTP request to the protected latest
+  Preview redirects to Vercel SSO, so current headers were not re-read from
+  that request in this check.
+- A second focused privacy, admin/auth and browser-storage suite passed 32/32
+  on 2026-11-18 (`ai-budget`, admin role/passkey, logout, account-storage,
+  app-auth-gate and cookie-consent tests). This confirms offline behavior only;
+  it does not verify hosted provider settings, browser token theft resistance,
+  or cross-provider deletion.
 - The CSP extension passed its focused configuration test 3/3. Static-source
   review found no forms or iframes in the site HTML; an independent reviewer
   found no apparent break to the dynamic auth form or redirect flows.
-- Documentation-only checkpoint `0f88531` is also pushed and READY as
-  `dpl_2UQxdkuHz9D2K7xmywsj46dfdcn5`; the final CSP headers were re-read from
-  its `/app.html` response. Neither checkpoint changes Production.
-- The working tree further restricts the feature CSP with `frame-src 'none'`
-  and `form-action 'self'`. Source search found no HTML iframe or form usage;
-  the focused config test is being extended before this change is published.
+- Earlier documentation checkpoint `0f88531` was READY as
+  `dpl_2UQxdkuHz9D2K7xmywsj46dfdcn5`; the CSP headers were read from its
+  `/app.html` response. Static-source review found no HTML form or iframe use,
+  and an independent reviewer found no apparent break to dynamic auth or
+  redirect flows. The later `41cf681` checkpoint contains no application-code
+  change.
 - The checkpoint replaces three raw database-error logs with fixed event
   labels and an allowlisted SQLSTATE. It also includes a reviewed but unapplied
   migration candidate restricting `ai_usage_events` to server-role INSERT.
@@ -27,11 +39,13 @@
   and `service_role` against the candidate permissions and expects all three
   to be denied; a synthetic server-role INSERT still passes. This test is in
   the latest READY Preview commit, though it does not modify a hosted database.
-- Fresh read-only checks on 2026-11-18 at 11:09 UTC still show effective
+- Fresh read-only checks on 2026-11-18 at 11:09 UTC showed effective
   `SELECT` and `TRUNCATE` grants on `ai_usage_events` for both browser roles in
   staging and Production; the new migration has not been applied. RLS has no
   policies on this table, so row access remains denied by RLS, but direct
-  `TRUNCATE` is not governed by RLS. The staging trigger-function revocation is
+  `TRUNCATE` is not governed by RLS. A staging-first migration candidate was
+  prepared and locally tested, but it has not been applied to staging or
+  Production. The staging trigger-function revocation is
   present; Production still exposes `EXECUTE` on `handle_new_user()` to both
   browser roles. Production `/app.html` returns 200 but does not return the
   feature security headers. No database or Production change was made.
