@@ -14,6 +14,7 @@
 // av sig självt (Codex CR-PER-002).
 
 import { LEVEL_DIFFICULTY } from "./assessment.mjs";
+import { safeDatabaseErrorFields } from "../security/safe-database-diagnostic.mjs";
 
 export const ATTEMPT_HISTORY_LIMIT = 20;
 export const ERROR_HISTORY_LIMIT = 20;
@@ -249,7 +250,11 @@ export async function commitAssessment(supabase, {
     // Inget att applicera, men kedjan är avslutad — markera den så att en retry inte försöker igen.
     const { error: flagError } = await supabase
       .from("student_attempts").update({ mastery_applied: true }).eq("id", attempt.id);
-    if (flagError) console.error("kunde inte markera mastery_applied (insufficient_evidence):", flagError.message, "attempt:", attempt.id);
+    if (flagError) console.error(JSON.stringify({
+      event: "learner_mastery_flag_update_failed",
+      stage: "insufficient_evidence",
+      ...safeDatabaseErrorFields(flagError),
+    }));
     return {
       attempt, assessment: effective, created, mastery: null, errorEvent: null,
       skippedReason: created ? "insufficient_evidence" : "duplicate_submission",
@@ -279,7 +284,11 @@ export async function commitAssessment(supabase, {
   } else {
     const { error: flagError } = await supabase
       .from("student_attempts").update({ mastery_applied: true }).eq("id", attempt.id);
-    if (flagError) console.error("kunde inte markera mastery_applied (utan koncept):", flagError.message, "attempt:", attempt.id);
+    if (flagError) console.error(JSON.stringify({
+      event: "learner_mastery_flag_update_failed",
+      stage: "without_concept",
+      ...safeDatabaseErrorFields(flagError),
+    }));
   }
 
   return {

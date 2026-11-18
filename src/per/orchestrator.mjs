@@ -27,6 +27,7 @@ import { loadLearnerProfile, commitAssessment, assessmentFromRow } from "./learn
 import { decideNextStep, selectDiagnosticConcept, COACHING_ACTIONS } from "./recommendation.mjs";
 import { logUsage } from "./usage.mjs";
 import { callAIRaw } from "../../api/_per-core.js";
+import { safeDatabaseErrorFields } from "../security/safe-database-diagnostic.mjs";
 import perCoach from "../ai/prompts/per-coach/v1.js";
 import { sanitizeQuestionText, sanitizeSourceChunks, filterCitations, sanitizeStudentAnswer } from "./sanitize.mjs";
 
@@ -434,7 +435,10 @@ async function buildAnswerResponse({
         // Tyst ignorerat fel här betydde tidigare att API:t kunde svara ok:true utan sparad
         // rekommendation (Codex CR-PER-021). Logga server-side; eleven får ändå sitt nästa steg
         // i svaret, bara utan sparat id.
-        console.error("kunde inte spara rekommendation:", error.message);
+        console.error(JSON.stringify({
+          event: "per_recommendation_insert_failed",
+          ...safeDatabaseErrorFields(error),
+        }));
       }
     } else {
       recommendationRow = data;

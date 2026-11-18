@@ -30,6 +30,23 @@
   `frame-ancestors 'none'`. The focused header test passes, and the exact READY
   Vercel Preview returned both headers on `/app.html`; a source scan found no
   iframe use. Production headers remain unverified for this commit.
+- Source review found three P.E.R/question-verification error paths that logged
+  raw database error messages; those can include rejected values. The feature
+  branch fix replaces them with fixed event names and an allowlisted SQLSTATE,
+  omitting error text and attempt IDs. Focused tests pass 13/13. This fix is not
+  in Production yet. Other reviewed AI and generation telemetry records
+  counts/status/timing and does not log prompt or answer bodies.
+- A separate source-level retention gap remains: pending `mock_learning_jobs`
+  can retain answer snapshots indefinitely if replay never resumes. The repo
+  has no approved maximum age or cleanup schedule; do not invent one or deploy
+  a deletion schedule until the school/privacy owner sets the policy.
+- A fresh read-only catalog check found browser-role table grants on
+  `public.ai_usage_events` in both staging and production despite RLS with no
+  policies. The code's current writers use only server-role INSERT with a
+  minimal response; no in-repo browser reader was found. A staging-first
+  migration candidate now revokes direct grants and leaves only service-role
+  INSERT. Its PGlite regression test passes; it has not been applied to either
+  hosted database. External consumers remain unverified.
 - No secret values were read. The old key's revocation status remains
   unverified; current Vercel environment metadata and repository source do not
   prove that historical key was revoked.

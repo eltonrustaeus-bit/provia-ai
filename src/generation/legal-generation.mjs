@@ -33,6 +33,7 @@ import legalVerifierCompare from "../ai/prompts/legal-verifier-compare/v1.js";
 import legalRepair from "../ai/prompts/legal-repair/v1.js";
 import { callAIRaw } from "../../api/_per-core.js";
 import { logUsage } from "../per/usage.mjs";
+import { safeDatabaseErrorFields } from "../security/safe-database-diagnostic.mjs";
 
 export const PIPELINE_VERSION = "v1";
 export const PROMPT_VERSION = "v1";
@@ -340,7 +341,10 @@ export async function persistGeneratedQuestion({ supabase, blueprintId, position
     // Codex LOW-fynd (CR-2026-07-2X-012): refaktoreringen till denna delade funktion tappade
     // server-side loggning av detta fel — återställd här (samma plats felet uppstår, oavsett
     // vilken anropare — api/knowledge.js eller scripts/knowledge-shadow-run.mjs — som ringde upp).
-    console.error("question_verifications insert error:", verificationInsertError.message);
+    console.error(JSON.stringify({
+      event: "question_verification_insert_failed",
+      ...safeDatabaseErrorFields(verificationInsertError),
+    }));
   }
 
   // Samma princip som Codex MEDIUM-fyndet i api/knowledge.js (CR-2026-07-2X-007): tyst

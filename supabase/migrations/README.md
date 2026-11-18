@@ -102,7 +102,27 @@ handskrivna migrationer.
 
 `20261012222700_restrict_profiles_client_insert.sql` was drafted from read-only production catalog metadata on 2026-10-12: `profiles_insert_own` checks only `auth.uid() = id`, anon/authenticated have table INSERT grants, and an Auth trigger already creates the default profile via SECURITY DEFINER. The client-side missing-profile fallback is removed. This migration revokes browser INSERT and drops the self-insert policy; rollback is intentionally blocked. It is not applied or JWT/Postgres-tested. Staging has no app schema; restore/reconcile the approved baseline, verify the trigger/policy and synthetic signup/login behavior, then obtain separate apply approval.
 
-The 2026-10-13 local verification confirms the missing-profile app path signs out and fails closed; `tests/frontend/profile-bootstrap.test.mjs` covers it. The migration remains a draft only: staging `public` and migration ledger are both empty. Do not apply until the authoritative staging schema is restored and a separate DDL approval is recorded.
+
+### AI usage event grants — local candidate only
+
+Read-only catalog checks on 2026-11-18 found browser-role table grants on
+`public.ai_usage_events` in staging and production despite RLS being enabled
+with no policies. This means ordinary PostgREST row access is currently denied
+by RLS; the grants are excessive privilege, not proof of a current row-data
+exposure. The code paths found in this repository write telemetry through the
+server role only (`api/_ai-usage.cjs`, `src/per/usage.mjs`); no browser reader
+was found. A future admin view and callers outside this repository remain
+unknown.
+
+`20261118110000_restrict_ai_usage_event_grants.sql` revokes direct table
+privileges from `PUBLIC`, `anon`, `authenticated` and `service_role`, then gives
+`service_role` INSERT only. The paired rollback is intentionally blocked to
+avoid restoring broad access. A PGlite test proves browser access is denied
+and the server role can insert but cannot read, update, delete or truncate; the
+usage-writer tests pass offline. This is a candidate only: it has not been
+applied in staging or production. Before a staging apply, verify external
+readers and review the feature Preview, then obtain separate approval for the
+staging database write.
 
 ### Active exam issuance — local draft only
 
