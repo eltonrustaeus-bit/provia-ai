@@ -2,6 +2,29 @@
 
 ## Security audit checkpoint — 2026-11-18
 
+- Latest feature checkpoint: commit `8112d6e` is pushed to
+  `codex/exgen-generation-quality-2026-10-20`; Vercel deployment
+  `dpl_5eQPcEGAMbcrgPRiRsBuvyG4FkMr` is READY. `/app.html` returns 200 and
+  includes the configured frame, MIME, referrer and CSP headers. This is a
+  feature Preview, not Production. Focused security/usage tests pass 24/24;
+  migration-file, syntax and diff checks pass.
+- The checkpoint replaces three raw database-error logs with fixed event
+  labels and an allowlisted SQLSTATE. It also includes a reviewed but unapplied
+  migration candidate restricting `ai_usage_events` to server-role INSERT.
+  Independent reviews found no remaining blocker in the logging assertions or
+  the candidate's grant scope.
+- A follow-up local regression assertion now executes `TRUNCATE` as `anon`,
+  `authenticated` and `service_role` against the candidate permissions and
+  expects all three to be denied; a synthetic server-role INSERT still passes.
+  This test-only follow-up is not yet in the READY Preview.
+- Fresh read-only checks on 2026-11-18 at 11:09 UTC still show effective
+  `SELECT` and `TRUNCATE` grants on `ai_usage_events` for both browser roles in
+  staging and Production; the new migration has not been applied. RLS has no
+  policies on this table, so row access remains denied by RLS, but direct
+  `TRUNCATE` is not governed by RLS. The staging trigger-function revocation is
+  present; Production still exposes `EXECUTE` on `handle_new_user()` to both
+  browser roles. Production `/app.html` returns 200 but does not return the
+  feature security headers. No database or Production change was made.
 - Current feature branch is `codex/exgen-generation-quality-2026-10-20`.
   Commit `b1f93e3` is pushed and its Vercel Preview is READY. It fixes a false
   account-deletion cleanup warning when the deleted account's local owner

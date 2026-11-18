@@ -78,6 +78,12 @@ test("ai_usage_events is server-write-only after grant restriction", async () =>
     await db.exec("reset role");
     await assert.rejects(db.exec("set role authenticated; select * from public.ai_usage_events;"), /permission denied/);
     await db.exec("reset role");
+    await assert.rejects(db.exec("set role anon; truncate table public.ai_usage_events;"), /permission denied/);
+    await db.exec("reset role");
+    await assert.rejects(db.exec("set role authenticated; truncate table public.ai_usage_events;"), /permission denied/);
+    await db.exec("reset role");
+    await assert.rejects(db.exec("set role service_role; truncate table public.ai_usage_events;"), /permission denied/);
+    await db.exec("reset role");
 
     await db.exec("set role service_role; insert into public.ai_usage_events values (2, 'synthetic'); reset role;");
     assert.deepEqual((await db.query("select id, feature from public.ai_usage_events")).rows, [
