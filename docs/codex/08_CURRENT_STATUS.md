@@ -9,12 +9,13 @@
   Non-matching prompt and study content remains unchanged. Synthetic tests
   cover ordinary and budgeted wrapper paths, API variants and preservation of
   example study text.
-- The change remains local and is not yet committed or deployed. It cannot
+- The change is in feature commit `9a77068` and its Vercel feature Preview. It cannot
   detect names or school references in unlabelled prose and does not redact
-  visible identifiers in OCR image pixels. The OCR image path remains an open
-  privacy gap. It may also modify identifier-like examples in fixed prompt
-  text. Independent read-only review found no blocker for this limited
-  text-pattern scope. Keep the release claim limited to common textual
+  visible identifiers in OCR image pixels. The local OCR-image work below
+  strips selected file metadata, but visible pixel text remains a privacy
+  limitation. The text redactor may also modify identifier-like examples in
+  fixed prompt text. Independent read-only review found no blocker for this
+  limited text-pattern scope. Keep the release claim limited to common textual
   patterns.
 - Validation so far: the combined AI budget/redaction, trigger-privilege,
   P.E.R, grading, OCR and post-grade review command passed 25/25;
@@ -6663,3 +6664,19 @@ enda 12-frågetest. Offline- och mocktester bevisar inte live-modellens
   Samtliga befintliga granskningsgrindar är kvar.
 - [!] Detta är lokal offline-evidens. Livekvalitet, kostnad och svarstid för en
   verklig ersättningsfråga är fortfarande inte uppmätta.
+### OCR-bildars metadata och synliga personuppgifter — lokal feature-branch, 2026-11-18
+
+- [x] Material-OCR, P.E.R:s bild-OCR och handskriftsinlämning normaliserar nu
+  bilden i webbläsaren till en ny JPEG innan den lämnar klienten. Servern
+  upprepar sedan metadatafiltreringen för JPEG/PNG och avvisar korrupta eller
+  andra format före AI-anrop. Ingen rå originalfil används som reserv.
+- [x] Båda uppladdningsytorna berättar att bilden skickas till AI och ber
+  eleven beskära identifierande text. Texten klargör att pixeltext inte
+  maskeras automatiskt.
+- [x] Riktade offline-tester verifierar EXIF/GPS och PNG-metadatafiltrering,
+  JPEG-programsegment/thumbnail och privata PNG-chunkar, giltig bild efter
+  sanering, serverns provider-payload, avvisning av ogiltiga data,
+  fail-closed-klientflöde och svensk/engelsk informationstext.
+- [!] Detta är metadata-rensning i klient och server, inte automatisk
+  borttagning av namn i bildpixlar eller full anonymisering. Endast offline-testat; ingen ny
+  AI-kostnad, stagingdatabas eller Production har använts.

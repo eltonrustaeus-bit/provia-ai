@@ -46,7 +46,7 @@ provider when needed by the feature. No tested general redaction policy was
 found. Preserve this as an open data-minimization item rather than claiming
 that identifiers are scrubbed.
 
-An uncommitted feature-branch change now redacts common email, Swedish personal
+The feature-branch change at `9a77068` redacts common email, Swedish personal
 number, phone-number and explicitly labeled name/school/class fields from
 outgoing text at the shared provider wrapper for Responses, Chat Completions
 and embeddings, including user-sourced text embedded in system messages.
@@ -56,7 +56,27 @@ no blocker for this narrow text-pattern scope. It cannot reliably find names
 or school identifiers mentioned without labels, and it does not inspect or
 redact pixels in OCR images. Some identifier-like examples in fixed system
 text may also be changed. Treat this as partial redaction, not complete
-anonymization or image-path protection.
+anonymization. The image path has a separate feature-branch change under review
+below; neither control should be described as full anonymization.
+
+## OCR image preparation — local feature-branch work, 2026-11-18
+
+- Material OCR, P.E.R material OCR, and handwritten-solution OCR now re-encode
+  selected images through a browser canvas as JPEG before posting them. This
+  strips file metadata such as EXIF and bounds the encoded request size; if
+  decoding or re-encoding fails, the app stops instead of sending original
+  bytes as a fallback.
+- The material and study-flow screens tell students that images are sent to AI
+  and ask them to crop visible names, email addresses, personal ID numbers and
+  school details. The copy explicitly says ExGen does not redact visible text
+  in image pixels. This is user guidance, not automatic image anonymization.
+- Browser and API tests verify normalized JPEG output, removal of EXIF GPS,
+  JPEG application segments, PNG EXIF/text and unknown private ancillary chunks
+  before provider dispatch, fail-closed decoding, and English/Swedish copy.
+  Fixtures are synthetic, not real camera images. The API rejects malformed
+  or other image formats before provider dispatch. This does not remove visible
+  identifiers from image pixels, verify provider retention settings, or prove
+  hosted Production behavior.
 
 The local browser-storage tests and source were rechecked on 2026-11-18. The
 app can retain account-scoped drafts, progress and unsynced results when a

@@ -1790,6 +1790,12 @@
       });
       ocrWrap.appendChild(ocrBtn);
       ocrWrap.appendChild(file);
+      var privacy = el("div", "xf-read", tx(
+        "Bilden skickas till AI för avläsning. Beskär namn, e-post, personnummer och skoluppgifter först. ExGen kan inte dölja text som syns i själva bilden.",
+        "The image is sent to AI for reading. Crop out names, email addresses, personal ID numbers and school details first. ExGen cannot hide text visible in the image itself."
+      ));
+      privacy.style.marginTop = "8px";
+      ocrWrap.appendChild(privacy);
     }
     b.appendChild(ocrWrap);
     }

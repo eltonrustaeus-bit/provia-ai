@@ -4,6 +4,7 @@ const { getSupabaseUrl, getSupabaseServerKey, getSupabaseAdminHeaders } = requir
 const pilotScope = require("./_pilot-scope.cjs");
 const { logAiUsage } = require("./_ai-usage.cjs");
 const { budgetedOpenAIFetch, settleAiSpend } = require("./_ai-usage.cjs");
+const { normalizeOcrImageDataUrl } = require("./_ocr-image.cjs");
 
 function json(res, status, obj) {
   res.statusCode = status;
@@ -207,13 +208,17 @@ module.exports = async function handler(req, res) {
       p = raw ? JSON.parse(raw) : {};
     } catch { return json(res, 400, { ok: false, error: "Invalid JSON" }); }
 
-    const imageDataUrl = String(p.imageDataUrl || "");
+    let imageDataUrl = String(p.imageDataUrl || "");
     const lang = (p.lang === "en") ? "en" : "sv";
     if (!imageDataUrl.startsWith("data:image/")) {
       return json(res, 400, { ok: false, error: "Missing/invalid imageDataUrl" });
     }
     if (imageDataUrl.length > MAX_IMAGE_BYTES) {
       return json(res, 413, { ok: false, error: "Image too large (max 3.8 MB)" });
+    }
+    imageDataUrl = normalizeOcrImageDataUrl(imageDataUrl);
+    if (!imageDataUrl) {
+      return json(res, 400, { ok: false, error: "Invalid or unsupported image; upload a valid JPEG or PNG" });
     }
 
     /* ── Elevlösning ──────────────────────────────────────────────────────
