@@ -842,10 +842,10 @@ document.getElementById("yr").textContent=new Date().getFullYear();
 
   function clearDeletedAccountLocalData(userId){
     // Never sweep shared keys here: a second tab can sign in as B after the
-    // sign-out readback. Only A-keyed data can be removed without racing B.
+    // sign-out readback. The owner marker is reconciled by account-storage.js
+    // on the destination page against whichever session is active then.
     const cleared=window.ExGenLocalDataBoundary?.clearLocalExamData(userId)!==false;
-    const ambiguousLocalData=localStorage.getItem("exgen_local_data_owner")===userId
-      ||sessionStorage.getItem("exgen_generation_recovery_v1")!==null;
+    const ambiguousLocalData=sessionStorage.getItem("exgen_generation_recovery_v1")!==null;
     return cleared&&!ambiguousLocalData;
   }
 
