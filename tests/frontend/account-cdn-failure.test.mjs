@@ -18,7 +18,7 @@ try {
     contentType: "application/json",
     body: JSON.stringify({ allow: true }),
   }));
-  await page.route("**/supabase.min.js", route => route.abort());
+  await page.route("**/js/vendor/supabase-2.106.0.js", route => route.abort());
   await page.route("https://fonts.googleapis.com/**", route => route.abort());
   await page.goto(`${server.url}/konto.html`, { waitUntil: "domcontentloaded" });
 
@@ -36,8 +36,8 @@ try {
   ]);
   await page.locator("#accountLoadError").waitFor({ state: "visible" });
   assert.ok(accountRequests >= 2, "retry reloads the account page");
-  assert.deepEqual(pageErrors, [], "CDN failure is handled without an uncaught page error");
-  console.log("account-cdn-failure: 7 ok, 0 fail");
+  assert.deepEqual(pageErrors, [], "local SDK failure is handled without an uncaught page error");
+  console.log("account-sdk-failure: 7 ok, 0 fail");
 } finally {
   await browser.close();
   await server.close();

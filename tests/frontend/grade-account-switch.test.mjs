@@ -56,7 +56,7 @@ try {
   assert.equal(outcome.ok, false, "A's delayed result cannot be accepted in B's session");
   assert.equal(accountWrites, 0, "A's result cannot be inserted under B");
   const state = await page.evaluate(() => ({
-    history: localStorage.getItem("proviaai_history"),
+    history: window.ExGenLocalDataBoundary.getStudyItem("proviaai_history"),
     pendingB: localStorage.getItem("proviaai_pending_exams:account-b"),
     resultVisible: !!document.querySelector("#resultWrap")?.textContent?.includes("Folkstyre"),
   }));
@@ -108,8 +108,8 @@ try {
   const delayedOutcome = await delayedGrade;
   assert.equal(delayedOutcome.ok, false, "a result finishing after the account switch is rejected");
   const delayedState = await delayedPage.evaluate(() => ({
-    history: localStorage.getItem("proviaai_history"),
-    last: localStorage.getItem("proviaai_last_result"),
+    history: window.ExGenLocalDataBoundary.getStudyItem("proviaai_history"),
+    last: window.ExGenLocalDataBoundary.getStudyItem("proviaai_last_result"),
     pendingA: localStorage.getItem("proviaai_pending_exams:account-a"),
     pendingB: localStorage.getItem("proviaai_pending_exams:account-b"),
   }));

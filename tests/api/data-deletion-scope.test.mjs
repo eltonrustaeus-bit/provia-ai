@@ -49,15 +49,15 @@ assert.match(app.slice(appClearStart, appClearEnd), /clearLocalExamData\(clearUs
 assert.match(improvementClear, /clearLocalExamData\(clearUserId\)/, "coach clear removes only the active account's draft, progress and pending queue");
 const appLogoutStart = app.indexOf("async function logout(options={})");
 const appLogoutEnd = app.indexOf("// ── CENTRAL: läser roll", appLogoutStart);
-assert.match(app.slice(appLogoutStart, appLogoutEnd), /await db\.auth\.signOut\(\)[\s\S]*?await db\.auth\.getSession\(\)[\s\S]*?afterSignOut\?\.session\?\.user\?\.id[\s\S]*?location\.reload\(\);return;[\s\S]*?clearForSignOut\(\)/,
+assert.match(app.slice(appLogoutStart, appLogoutEnd), /await db\.auth\.signOut\(\)[\s\S]*?await db\.auth\.getSession\(\)[\s\S]*?afterSignOut\?\.session\?\.user\?\.id[\s\S]*?location\.reload\(\);return;[\s\S]*?clearForSignOut\(signOutUserId\)/,
   "app logout rechecks the active account after sign-out before clearing shared local data");
 const deletionFinishStart = konto.indexOf("async function finishAccountDeletion");
 const deletionFinishEnd = konto.indexOf("document.getElementById(\"deleteAccountBtn\")", deletionFinishStart);
-assert.match(konto.slice(deletionFinishStart, deletionFinishEnd), /await sb\.auth\.signOut\(\{scope:\"local\"\}\)[\s\S]*?await sb\.auth\.getSession\(\)[\s\S]*?afterSignOut\.session\.user\.id!==userId[\s\S]*?clearLocalExamData\(userId\)[\s\S]*?return false;[\s\S]*?clearDeletedAccountLocalData\(userId\)/,
-  "account deletion rechecks ownership after sign-out and preserves a newly active account");
+assert.match(konto.slice(deletionFinishStart, deletionFinishEnd), /clearPerDraftForAccount\(userId\)[\s\S]*?clearLocalExamData\(userId\)[\s\S]*?await sb\.auth\.signOut\(\{scope:\"local\"\}\)[\s\S]*?await sb\.auth\.getSession\(\)[\s\S]*?afterSignOut\.session\.user\.id!==userId[\s\S]*?return false;[\s\S]*?clearDeletedAccountLocalData\(userId\)/,
+  "account deletion clears A-keyed drafts before sign-out and leaves a newly active account untouched");
 assert.match(checklist, /docs\/codex\/12_DATA_DELETION_GAP\.md/, "pilot start criteria point to the complete deletion gate");
-assert.match(deletionDoc, /local, unpublished self-service deletion candidate/i,
-  "the deletion document distinguishes the local candidate from a verified release");
-assert.match(deletionDoc, /not a staging\/end-to-end deletion test and the route is not deployed/i,
-  "the deletion document keeps staging and deployment gaps explicit");
+assert.match(deletionDoc, /self-service deletion route is present in current `origin\/main` source/i,
+  "the deletion document records the current source state without claiming erasure");
+assert.match(deletionDoc, /missing evidence is a hosted deletion readback/i,
+  "the deletion document keeps the hosted deletion gap explicit");
 console.log("data deletion scope: exam, memory, profile and account deletion boundaries passed");

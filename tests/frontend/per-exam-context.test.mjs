@@ -169,7 +169,7 @@ ok("a failed newer P.E.R. history refresh does not invalidate an older successfu
 await releaseRaceHistoryResponse();
 const raceRefreshResults = await racingHistoryRefreshes;
 const recoveredRaceHistory = await page.evaluate(() => ({
-  stored: JSON.parse(localStorage.getItem("proviaai_per_history") || "[]"),
+  stored: JSON.parse(localStorage.getItem(window.ExGenLocalDataBoundary.perHistoryKeyFor("u1")) || "[]"),
   mask: localStorage.getItem("proviaai_per_exam_history_masked"),
 }));
 ok("successful P.E.R. history survives an overlapping transient refresh failure",
@@ -188,14 +188,14 @@ await page.waitForFunction(() => document.getElementById("perMessages")?.innerTe
 ok("newer P.E.R. history applies while an older refresh is pending", typeof releaseRaceHistoryResponse === "function");
 await releaseRaceHistoryResponse();
 const outOfOrderResults = await outOfOrderHistoryRefreshes;
-const historyAfterOutOfOrder = await page.evaluate(() => JSON.parse(localStorage.getItem("proviaai_per_history") || "[]"));
+const historyAfterOutOfOrder = await page.evaluate(() => JSON.parse(localStorage.getItem(window.ExGenLocalDataBoundary.perHistoryKeyFor("u1")) || "[]"));
 ok("a late older P.E.R. response cannot overwrite newer verified history",
   outOfOrderResults[1]?.[0]?.content === "NEWEST_HISTORY_RESPONSE"
     && outOfOrderResults[0] === false
     && historyAfterOutOfOrder[0]?.content === "NEWEST_HISTORY_RESPONSE",
   JSON.stringify({ outOfOrderResults, historyAfterOutOfOrder }));
 await page.evaluate(history => {
-  localStorage.setItem("proviaai_per_history", JSON.stringify(history));
+  localStorage.setItem(window.ExGenLocalDataBoundary.perHistoryKeyFor("u1"), JSON.stringify(history));
   window.PER.setExamHistoryMasked(true);
   window.PER.setExamHistoryMasked(false);
 }, SAVED_PER_HISTORY);
@@ -263,7 +263,7 @@ holdHistoryResponse = false;
 await page.waitForTimeout(100);
 const historyDuringExam = await page.evaluate(() => ({
   visible: document.getElementById("perMessages")?.innerText || "",
-  stored: JSON.parse(localStorage.getItem("proviaai_per_history") || "[]"),
+  stored: JSON.parse(localStorage.getItem(window.ExGenLocalDataBoundary.perHistoryKeyFor("u1")) || "[]"),
   mask: localStorage.getItem("proviaai_per_exam_history_masked"),
 }));
 ok("P.E.R hides cached full solutions after an exam opens", !historyDuringExam.visible.includes("PRIVATE_OLD_FULL_SOLUTION_MARKER")
@@ -635,7 +635,7 @@ await page.waitForFunction(() => localStorage.getItem("proviaai_per_exam_history
 const historyAfterGrade = await page.evaluate(() => ({
   visible: document.getElementById("perMessages")?.innerText || "",
   mask: localStorage.getItem("proviaai_per_exam_history_masked"),
-  stored: JSON.parse(localStorage.getItem("proviaai_per_history") || "[]"),
+  stored: JSON.parse(localStorage.getItem(window.ExGenLocalDataBoundary.perHistoryKeyFor("u1")) || "[]"),
 }));
 ok("verified result unlocks P.E.R without showing a transcript from another page",
   historyAfterGrade.mask === null && !historyAfterGrade.visible.includes("PRIVATE_OLD_FULL_SOLUTION_MARKER"),
@@ -758,7 +758,7 @@ await page.locator("#perInput").waitFor({ state: "visible", timeout: 3000 });
 await page.fill("#perInput", "Hjälp mig förstå lutningen i en linjär funktion.");
 await page.evaluate(() => {
   document.getElementById("course").value = "Biologi 1";
-  localStorage.setItem("proviaai_mistakes", JSON.stringify([
+  window.ExGenLocalDataBoundary.setStudyItem("proviaai_mistakes", JSON.stringify([
     { course: "Matematik 2b", question: "Lös andragradsekvationen", concept_tag: "andragradsekvationer", user_answer: "x=1" },
     { course: "Biologi  1", question: "Förklara cellandning", concept_tag: "cellandning", user_answer: "i cellen" },
     { course: "Matematik 2b", question: "Beräkna derivatan", concept_tag: "derivata", user_answer: "2x" },

@@ -111,6 +111,16 @@ async function opBlueprint(req, res, user) {
   if (question_count > MAX_QUESTION_COUNT) {
     return res.status(400).json({ error: `question_count får max vara ${MAX_QUESTION_COUNT}` });
   }
+  const cleanSubject = subject.trim();
+  const cleanCourse = typeof course === "string" ? course.trim() : "";
+  const mixJson = question_mix == null ? null : JSON.stringify(question_mix);
+  const suppliedKey = req.body?.idempotency_key;
+  if (cleanSubject.length > 120 || (course != null && (typeof course !== "string" || cleanCourse.length > 120)) ||
+      (source_material_ref != null && (typeof source_material_ref !== "string" || source_material_ref.length > 200)) ||
+      (mixJson !== null && (typeof question_mix !== "object" || Array.isArray(question_mix) || mixJson.length > 2048)) ||
+      (suppliedKey != null && (typeof suppliedKey !== "string" || !suppliedKey.trim() || suppliedKey.length > 200))) {
+    return res.status(400).json({ error: "Ogiltigt eller för långt provunderlag" });
+  }
   const quota = await consumeJobQuota(user.id);
   if (quota === "unavailable") {
     return res.status(503).json({ error: "Genereringstjänsten är tillfälligt otillgänglig." });
@@ -125,12 +135,12 @@ async function opBlueprint(req, res, user) {
       .from("exam_blueprints")
       .insert({
         user_id: user.id,
-        subject: subject.trim().slice(0, 120),
-        course: typeof course === "string" ? course.trim().slice(0, 120) || null : null,
+        subject: cleanSubject,
+        course: cleanCourse || null,
         level,
         question_count,
         question_mix: question_mix ?? null,
-        source_material_ref: typeof source_material_ref === "string" ? source_material_ref.trim().slice(0, 200) || null : null,
+        source_material_ref: typeof source_material_ref === "string" ? source_material_ref.trim() || null : null,
         status: "draft",
         pipeline_version: (await laddaModuler()).PIPELINE_VERSION,
       })
@@ -141,7 +151,7 @@ async function opBlueprint(req, res, user) {
       return res.status(500).json({ error: "Kunde inte skapa exam_blueprint" });
     }
 
-    const idempotencyKey = req.body?.idempotency_key || `${user.id}:${blueprint.id}:blueprint`;
+    const idempotencyKey = suppliedKey || `${user.id}:${blueprint.id}:blueprint`;
     jobInsertStarted = true;
     const { data: job, error: jobError } = await supabase
       .from("generation_jobs")
@@ -153,7 +163,7 @@ async function opBlueprint(req, res, user) {
         idempotency_key: idempotencyKey,
         pipeline_version: (await laddaModuler()).PIPELINE_VERSION,
         prompt_version: (await laddaModuler()).PROMPT_VERSION,
-        input_json: { blueprint_id: blueprint.id, subject, course, level, question_count },
+        input_json: { blueprint_id: blueprint.id, subject: cleanSubject, course: cleanCourse || null, level, question_count },
       })
       .select()
       .single();
@@ -263,10 +273,9 @@ async function opGenerate(req, res, user) {
     result,
   });
   if (!persisted.ok) {
-    // Codex LOW-fynd: läck inte råa DB-feldetaljer till klienten. Logga server-side (Vercel-loggar),
-    // returnera bara en generisk, sanerad text — samma mönster som error_message_sanitized-fältet
-    // i generation_jobs.
-    console.error("exam_questions insert error:", persisted.error);
+    // Database errors can contain source material or student answers. Keep
+    // production diagnostics free of provider-controlled message text.
+    console.error(JSON.stringify({ event: "exam_questions_insert_failed" }));
     await supabase
       .from("generation_jobs")
       .update({ status: "failed", error_code: "persist_error", error_message_sanitized: "Kunde inte spara frågan" })
@@ -364,9 +373,9 @@ async function opPerDiagnose(req, res, user) {
       return res.status(422).json(result);
     }
     return res.status(200).json(result);
-  } catch (e) {
+  } catch {
     await refundAssessmentQuota(user.id);
-    console.error("per diagnose error:", e?.message);
+    console.error(JSON.stringify({ event: "per_diagnose_failed" }));
     return res.status(502).json({ error: "Kunde inte hämta en uppgift just nu" });
   }
 }
@@ -401,9 +410,9 @@ async function opPerAnswer(req, res, user) {
     // Ett redan besvarat svar returnerar den lagrade bedömningen utan ett enda AI-anrop.
     if (result.already_answered) await refundAssessmentQuota(user.id);
     return res.status(200).json(result);
-  } catch (e) {
+  } catch {
     await refundAssessmentQuota(user.id);
-    console.error("per answer error:", e?.message);
+    console.error(JSON.stringify({ event: "per_answer_failed" }));
     return res.status(502).json({ error: "Kunde inte bedöma svaret just nu" });
   }
 }
@@ -426,9 +435,9 @@ async function opPerCoach(req, res, user) {
       return res.status(422).json(result);
     }
     return res.status(200).json(result);
-  } catch (e) {
+  } catch {
     await refundAssessmentQuota(user.id);
-    console.error("per coach error:", e?.message);
+    console.error(JSON.stringify({ event: "per_coach_failed" }));
     return res.status(502).json({ error: "Kunde inte hämta hjälp just nu" });
   }
 }
@@ -436,8 +445,8 @@ async function opPerCoach(req, res, user) {
 async function opPerProfile(req, res, user) {
   try {
     return res.status(200).json(await (await laddaModuler()).getProfile(supabase, user.id));
-  } catch (e) {
-    console.error("per profile error:", e?.message);
+  } catch {
+    console.error(JSON.stringify({ event: "per_profile_failed" }));
     return res.status(500).json({ error: "Kunde inte läsa profilen" });
   }
 }

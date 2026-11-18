@@ -1,5 +1,247 @@
 # 08 Current Status
 
+## Provider text data minimization — feature-branch work in progress, 2026-11-18
+
+- The shared OpenAI wrapper now applies deterministic redaction to outgoing text
+  before Responses, Chat Completions and embeddings requests: email, common
+  Swedish person-number and phone formats, plus explicitly labeled name,
+  school and class values, including user text embedded in system messages.
+  Non-matching prompt and study content remains unchanged. Synthetic tests
+  cover ordinary and budgeted wrapper paths, API variants and preservation of
+  example study text.
+- The change is in feature commit `9a77068` and its Vercel feature Preview. It cannot
+  detect names or school references in unlabelled prose and does not redact
+  visible identifiers in OCR image pixels. The local OCR-image work below
+  strips selected file metadata, but visible pixel text remains a privacy
+  limitation. The text redactor may also modify identifier-like examples in
+  fixed prompt text. Independent read-only review found no blocker for this
+  limited text-pattern scope. Keep the release claim limited to common textual
+  patterns.
+- Validation so far: the combined AI budget/redaction, trigger-privilege,
+  P.E.R, grading, OCR and post-grade review command passed 25/25;
+  `git diff --check` passed. Independent review checked the system-message
+  bypass and false-positive fixes; no blocker remains for the limited
+  text-pattern claim. Image and unlabelled-name coverage remain incomplete.
+
+## Security goal: trigger grants tested in staging — 2026-11-18
+
+- A migration narrows `EXECUTE` on four installed trigger functions and pins
+  the legacy report trigger's `search_path`. The PGlite trigger/temporary-table
+  test, migration-file check and focused deletion/RLS tests pass. The migration
+  was applied only to staging as hosted version `20261118003207`; production
+  was not changed. Rollback-only hosted trigger checks passed. See
+  `docs/security/trigger-function-release-check-2026-11-18.md` for exact
+  preflight and functional staging gates.
+- `docs/security/session-hardening-plan-2026-11-18.md` records why current
+  browser Supabase calls prevent a simple HttpOnly-cookie switch and how to
+  stage PKCE/callback and server-session changes. The current implicit OAuth
+  flow and browser-stored session remain in place.
+- API hardening now adds `Cache-Control: private, no-store` to all
+  `/api/:path*` responses via `vercel.json`, and explicitly sets it on P.E.R
+  history before authentication. The focused config test and two handler tests
+  pass. The change is included in feature commit `c06aeff` and the later
+  security-header commit `e70189d`.
+- The global CSP in the working tree now also sets `base-uri 'self'` and
+  `object-src 'none'` alongside the existing `frame-ancestors 'self'`. This
+  narrow policy avoids inline-script breakage while blocking injected base
+  URLs and plugin content. A source scan found no `<base>`, `<object>` or
+  `<embed>` elements; the focused policy test passes. It does not include
+  `script-src` and is not an XSS mitigation. The change is committed as
+  `e70189d`; its Vercel Preview is READY, and authenticated `vercel curl`
+  verified the actual configured headers on `/app.html` and an unauthenticated
+  JSON response from `/api/explain` (401, `private, no-store`). An authenticated
+  P.E.R stream remains untested.
+- `docs/security/hosted-two-account-test-plan-2026-11-18.md` defines a
+  bounded staging ownership probe. Two synthetic accounts were used, then
+  deleted after explicit approval; readback found zero matching rows in 44
+  public owner-ID tables plus Auth, sessions, exams, P.E.R and Storage.
+- Re-ran focused account deletion, local storage isolation, logout and stale
+  session suites: 9/9 top-level tests passed across seven files. This confirms
+  local account scoping and mock/UI behavior, not hosted cascades or provider
+  deletion. A source review confirmed bearer/refresh tokens remain in
+  `localStorage`, and the logout UI deliberately offers to retain account-
+  scoped drafts/results with no expiry. See the data inventory and deletion
+  gap; do not introduce automatic local deletion until the school-approved
+  retention period and recovery expectations are set.
+- Staging SQL role/claim checks and account pages showed A could see only A's
+  two synthetic exams and B only B's one. This is not a full HTTP/API test;
+  P.E.R history, classes, provider retention and ordinary account deletion
+  remain open.
+- Commit `883af94` fixes account-page logout binding in three DOM-ready states.
+  It is pushed to the feature branch and the exact Vercel Preview
+  `dpl_4QZUXi3g7oM49qyLNJs7BHx6pih2` is READY on that SHA. Local UI tests pass;
+  the hosted app-menu logout was verified after staging login: the app returned
+  to its login gate. The account-page button and server-side session revocation
+  were not separately exercised in this hosted click test.
+- Production `exgen.se` still does not return the configured security headers:
+  a fresh static-page read returned 200 without them, and unauthenticated
+  `GET /api/explain` returned 401 with the generic public cache header. The
+  latest production deployment is `0e267a4`; `origin/main:vercel.json` has no
+  header rules, which explains the gap. The feature Preview has the correct
+  runtime headers, but production remains unchanged pending a separate release
+  approval.
+- Fresh Supabase reads show the trigger-function grant migration is present
+  only in staging, while production still has the four unnecessary browser
+  `EXECUTE` grants. They are trigger/event-trigger functions, not confirmed
+  student-data RPC leaks. Leaked-password protection is still disabled; the
+  Supabase organization is on the Free plan.
+- Metadata-only catalog reads on 2026-11-18 found 15 `public` tables in
+  production and 14 in staging with RLS enabled, zero policies, and effective
+  `SELECT`, `INSERT`, `UPDATE`, `DELETE` and `TRUNCATE` privileges for both
+  `anon` and `authenticated`. The exception is `anon_rate_limit`, whose browser
+  privileges are already absent in staging but remain in production. RLS with
+  no policy denies ordinary row operations, so this is not proof of current
+  row exposure; `TRUNCATE` is not governed by RLS and remains an excessive
+  database privilege. Source review found no direct browser-client references
+  to these tables; observed application uses go through server code. No grant
+  was changed. A narrow staging-first revocation needs its own approval and
+  route regression check before any production decision.
+- A metadata-only function ACL check confirms the exam-count RPC migration is
+  active in both environments: `get_weekly_exam_count(uuid)` and
+  `get_monthly_exam_count(uuid)` are not executable by browser roles. The
+  owner-checked `get_mock_exam_generation_pipeline_status(uuid)` remains
+  executable by `authenticated`; its body checks `auth.uid()` against the
+  requested job owner and returns only that owner's status. Production still
+  grants browser EXECUTE on four trigger/event-trigger functions; staging has
+  revoked those grants. `match_knowledge_chunks(...)` is an invoker RPC
+  executable by browser roles, but its source tables have RLS and no policies;
+  no direct browser call was found, while server retrieval uses it. Treat the
+  excess EXECUTE as unnecessary exposure/abuse surface, not as a confirmed
+  cross-user content leak.
+- In the current feature branch, every OpenAI `/v1/responses` call passes
+  through `budgetedOpenAIFetch`, which forces `store: false` even if a caller
+  attempts `store: true`. The focused offline test passes 13/13, including a
+  production/staging body assertion. `origin/main` does not yet contain this
+  privacy default, so it is not confirmed for Production. OpenAI's current
+  documentation says API abuse-monitoring logs can contain prompts/responses
+  and are generally retained up to 30 days; whether ExGen's actual organization
+  has an approved retention-control exception was not verified. See
+  https://platform.openai.com/docs/guides/your-data.
+- Text sanitizers in `src/per/sanitize.mjs` remove selected prompt-injection
+  phrases and bound lengths; they do not remove personal identifiers such as
+  names, email addresses or student numbers. Study material and answers are
+  intentionally sent to the model; OCR sends the submitted image itself.
+  Existing tests do not establish identifier redaction. Do not claim all PII
+  is filtered before AI processing; define and test a safe redaction policy,
+  including the OCR path, before broadening pupil use.
+- Production `GET /api/explain` returned 401 without a token and the generic
+  Vercel cache header. Local `api/explain.js` now explicitly uses
+  `private, no-store` on GET history; the focused handler tests pass, but this
+  change is not deployed. `OPTIONS /api/explain` returned 405 without CORS
+  allow headers; the production static page did return `Access-Control-Allow-Origin: *`.
+- Vercel environment metadata was read without decrypting values. The CLI lists
+  both `SUPABASE_SERVICE_ROLE_KEY` and legacy `SECRET_KEY_SUPABASE` slots, but
+  metadata cannot prove whether the historically exposed value was revoked.
+  The Vercel connector returned 403 for the same metadata request. No key was
+  read or changed; confirm key status in Supabase before claiming rotation.
+- A protected-preview access attempt accidentally created a separate empty
+  Vercel project `exgen-generation-quality-2026-10-30`. Read-only checks found
+  zero deployments and no environment variables. It is separate from the
+  ExGen project; deletion awaits explicit approval. The temporary local OIDC
+  environment file was removed after use.
+
+## Browser script supply chain — feature checkpoint, 2026-11-18
+
+- The approved account-isolation checkpoint `a6888b2` is on the feature
+  Preview (`dpl_BXoRJkkE3WS5Hm1oVUiJZJZAtTNA`, READY), not `main` or
+  Production. See `docs/security/pilot-security-status-2026-11-17.md` for
+  evidence and limits.
+- This checkpoint replaces runtime CDN JavaScript with
+  fixed first-party bundles for Supabase, Chart, GSAP, KaTeX and vis-network.
+  Source versions, licenses and hashes are in `js/vendor/README.md`; the
+  complete vendor directory must be included in any later commit or pages
+  will fail to load. A browser check loaded real app/account/improvement pages
+  with synthetic OAuth-shaped URL fragments and saw no external script
+  requests. It did not exercise a live OAuth callback.
+- Focused frontend, schema and favicon tests passed; `npm audit
+  --audit-level=low` reported zero advisories for the installed dependencies.
+  Independent review found no code-proven blocker in the reviewed diff, while
+  confirming that the OAuth fragment and browser-stored session remain
+  reachable to first-party JavaScript. This checkpoint changes no database or
+  Production code. Hosted two-account, deletion and Auth flows remain open.
+
+## P.E.R browser-history account isolation — feature Preview, 2026-11-18
+
+- Signed-in P.E.R transcripts now use an account-specific browser key. The old
+  shared key is discarded rather than imported because its owner marker cannot
+  prove that the transcript never mixed two accounts. Delayed server history
+  and streamed answers use the account captured when the request began; an
+  account change masks the visible chat and prevents an old response from
+  entering the new account's local history.
+- Memory-clear and account-deletion cleanup target the captured account's
+  transcript. A failed local clear is reported separately from a successful
+  server clear. The local shortcut no longer closes P.E.R while typing in an
+  editable field. The privacy table names the new key pattern.
+- Offline checks: new same-tab A-to-B delayed-history test passed; storage
+  boundary test passed; P.E.R exam-context 104/104, page-targets 95/95,
+  pilot-session recovery 1/1, and P.E.R focus/clear test passed. These do not
+  establish hosted Auth or full account deletion. A later checkpoint scoped
+  exam history, mistakes, material and coach caches to the account; see the
+  security status document for limits and the feature Preview deployment.
+- An independent read-only review found three specific issues in the first
+  diff: local-clear success wording, an outdated logout test assertion, and a
+  missing visible-history assertion. All three were corrected and the focused
+  tests rerun. The reviewer found no remaining P1/P2 issue introduced by this
+  transcript slice. This is still offline evidence only.
+
+## Local security review follow-up — 2026-11-18
+
+- A draft technical data inventory now records purpose, location/access,
+  observed retention and external recipients with explicit unknowns in
+  `docs/security/student-data-inventory-2026-11-18.md`.
+- Feature-Preview admin role guards prevent self-demotion and ordinary demotion of any
+  existing admin; approval conditionally updates only existing non-privileged
+  profiles. Synthetic helper and handler tests passed 6/6. These changes are
+  published only in Preview. The bearer-only admin write risk remains until an admin-wide
+  step-up, safe enrollment/recovery, and staging rollout are designed.
+- Account-deletion browser cleanup remains unresolved: shared cache keys
+  cannot guarantee protection of another account under concurrent tabs.
+
+## Security feature Preview checkpoint — 2026-11-18
+
+- Production's approved class/profile permission changes remain applied and
+  verified as recorded below. No new production change was made in this
+  follow-up. PR #128 remains draft.
+- Local fixes address concurrent passkey challenge consumption, OpenAI Responses
+  application-state storage (`store:false`), raw payment failure logs, and
+  fail-closed retry for checkout events missing account/plan metadata.
+- Focused local tests passed for passkey challenges, AI budget/provider body,
+  Stripe idempotency/error safety. An attempted account-deletion browser fix
+  failed independent race review and was excluded from this checkpoint. A
+  hosted synthetic deletion transaction was rejected by the staging SQL tool
+  before execution; no hosted deletion claim is made. The detailed evidence
+  and remaining release gates are in
+  `docs/security/pilot-security-status-2026-11-17.md`.
+- Commit `5c177ae` was pushed to the feature branch. Vercel Preview
+  `dpl_wZaeFKJ2sXbucsT8aG3XaVe3YnZa` is READY for its exact Git SHA;
+  PR #128 remains draft. This verifies deployment/build state, not live
+  payment, passkey or account-deletion behavior. `main` and Production app
+  code were not changed by this checkpoint.
+
+## Production class/profile access restrictions — 2026-11-17
+
+- With separate explicit approval, the existing migrations
+  `20261012103949_restrict_direct_class_joins.sql`,
+  `20261117220908_restrict_direct_class_writes.sql`, and
+  `20261012222700_restrict_profiles_client_insert.sql` were applied in that
+  order to production. The Supabase connector recorded hosted versions
+  `20261117224851`, `20261117224945`, and `20261117224953` under the matching
+  migration names. Local filenames and hosted versions differ; reconcile
+  migration history before any future CLI push rather than replaying SQL.
+- Production catalog readback: `anon` and `authenticated` lack
+  INSERT/UPDATE/DELETE on `classes` and `class_members`; `service_role`
+  retains those writes. Browser roles lack profile INSERT. The direct join
+  and profile insert policies are absent. Auth's `on_auth_user_created`
+  trigger is enabled and still invokes SECURITY DEFINER `handle_new_user`.
+  `https://exgen.se/app.html` returned HTTP 200 after application.
+- These checks confirm the database permission boundary and page availability,
+  not a hosted authenticated signup or teacher create/student join/leave.
+  The pilot Preview intentionally blocks class routes; use a safe normal-mode
+  staging path with disposable accounts before claiming the full flow works.
+  PR #128 remains draft; no `main` merge or Production code deploy occurred.
+- The detailed evidence and other open security findings are in
+  `docs/security/pilot-security-status-2026-11-17.md`.
+
 ## Main release — 2026-11-17
 
 - PR #125 was merged to `main` as merge commit `f82c28c0643bc9e5e6d4581cedf744871f4cd28d`.
@@ -6422,3 +6664,22 @@ enda 12-frågetest. Offline- och mocktester bevisar inte live-modellens
   Samtliga befintliga granskningsgrindar är kvar.
 - [!] Detta är lokal offline-evidens. Livekvalitet, kostnad och svarstid för en
   verklig ersättningsfråga är fortfarande inte uppmätta.
+### OCR-bildars metadata och synliga personuppgifter — feature Preview, 2026-11-18
+
+- [x] Material-OCR, P.E.R:s bild-OCR och handskriftsinlämning normaliserar nu
+  bilden i webbläsaren till en ny JPEG innan den lämnar klienten. Servern
+  upprepar sedan metadatafiltreringen för JPEG/PNG och avvisar korrupta eller
+  andra format före AI-anrop. Ingen rå originalfil används som reserv.
+- [x] Båda uppladdningsytorna berättar att bilden skickas till AI och ber
+  eleven beskära identifierande text. Texten klargör att pixeltext inte
+  maskeras automatiskt.
+- [x] Riktade offline-tester verifierar EXIF/GPS och PNG-metadatafiltrering,
+  JPEG-programsegment/thumbnail och privata PNG-chunkar, giltig bild efter
+  sanering, serverns provider-payload, avvisning av ogiltiga data,
+  fail-closed-klientflöde och svensk/engelsk informationstext.
+- [!] Detta är metadata-rensning i klient och server, inte automatisk
+  borttagning av namn i bildpixlar eller full anonymisering. Endast offline-testat; ingen ny
+  AI-kostnad, stagingdatabas eller Production har använts.
+- [x] Kodcommit `b20bfb4` är pushad till feature-branchen och Vercel Preview
+  `dpl_As2ShFssywsCXhsPhyLkzr5bmiDd` är READY på exakt samma SHA. Ingen
+  `main`-, Production- eller databasändring gjordes.

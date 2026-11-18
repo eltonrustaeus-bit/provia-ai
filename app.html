@@ -639,6 +639,7 @@ white-space:nowrap;
 <button class="btn btnG" id="ocrBtn" type="button">OCR till material</button>
 </div>
 <div class="stxt" id="tOcrHint" style="margin-top:8px">Tips: tydlig bild rakt ovanifrån, bra ljus, hög kontrast.</div>
+<div class="stxt" id="tOcrPrivacy" style="margin-top:6px">Bilden skickas till AI för avläsning. Beskär namn, e-post, personnummer och skoluppgifter innan du laddar upp. ExGen kan inte dölja text som syns i själva bilden.</div>
 <div class="stxt" id="ocrStatus"></div>
 </div>
 <div class="tipBox" id="formatHint">Tips: rubriker + punktlistor ger mer exakta frågor och bättre rättning.</div>
@@ -782,7 +783,7 @@ Rätta prov
 </main>
 <footer class="xg-footer" id="footerText">ExGen är studiestöd och ger ingen officiell betygssättning. · <a href="integritetspolicy.html">Integritetspolicy</a></footer>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/js/vendor/supabase-2.106.0.js"></script>
 <script>
 const SUPABASE_URL = window.ExGenRuntime.supabaseUrl.trim();
 const SUPABASE_ANON_KEY_RAW = window.ExGenRuntime.publishableKey;
@@ -814,10 +815,12 @@ const ROLE_LIMITS = {
 
 const $ = (id) => document.getElementById(id);
 function safeJsonParse(s, fallback){ try{ return JSON.parse(s); } catch { return fallback; } }
-function lsGetArray(key){ const v = localStorage.getItem(key); const arr = safeJsonParse(v, []); return Array.isArray(arr) ? arr : []; }
-function lsGetObj(key){ const v = localStorage.getItem(key); const obj = safeJsonParse(v, null); return (obj && typeof obj === "object") ? obj : null; }
-function lsSet(key, val){ try{ localStorage.setItem(key, JSON.stringify(val)); } catch {} }
-function lsRemove(key){ try{ localStorage.removeItem(key); } catch {} }
+function isStudyKey(key){return [LS_HISTORY,LS_MISTAKES,LS_LAST,LS_MATERIAL,LS_TRAIN_PICK,LS_CUSTOM_COURSES].includes(key);}
+function lsRead(key){return isStudyKey(key)?window.ExGenLocalDataBoundary?.getStudyItem(key):localStorage.getItem(key);}
+function lsGetArray(key){ const arr = safeJsonParse(lsRead(key), []); return Array.isArray(arr) ? arr : []; }
+function lsGetObj(key){ const obj = safeJsonParse(lsRead(key), null); return (obj && typeof obj === "object") ? obj : null; }
+function lsSet(key, val){ try{if(isStudyKey(key))window.ExGenLocalDataBoundary?.setStudyItem(key,JSON.stringify(val));else localStorage.setItem(key, JSON.stringify(val));} catch {} }
+function lsRemove(key){ try{if(isStudyKey(key))window.ExGenLocalDataBoundary?.removeStudyItem(key);else localStorage.removeItem(key);} catch {} }
 function escapeHtml(s){
   return String(s ?? "")
     .replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;")
@@ -847,6 +850,8 @@ sv:{
   materialTooLong:"Materialet är för långt. Korta ner det till högst 24 000 tecken innan du fortsätter.",
   ocrTitle:"Bild → OCR (valfritt)",ocrBtn:"OCR till material",
   ocrHint:"Tips: tydlig bild rakt ovanifrån, bra ljus, hög kontrast.",
+  ocrPrivacy:"Bilden skickas till AI för avläsning. Beskär namn, e-post, personnummer och skoluppgifter innan du laddar upp. ExGen kan inte dölja text som syns i själva bilden.",
+  ocrPrepareFailed:"Bilden kunde inte förberedas säkert. Prova att spara den som JPG eller PNG och välj den igen.",
   tip:"Tips: rubriker + punktlistor ger mer exakta frågor och bättre rättning.",
   step2:"Inställningar",step2Sub:"Nivå och antal är förifyllda — kör direkt eller justera. Sen skapas ditt prov",
   level:"Nivå (E / C / A)",course:"Ämne / Kurs",coursePH:"Ex: Matematik 2b",
@@ -894,6 +899,8 @@ en:{
   materialTooLong:"The material is too long. Shorten it to 24,000 characters or fewer before continuing.",
   ocrTitle:"Image → OCR (optional)",ocrBtn:"OCR into material",
   ocrHint:"Tip: sharp photo from above, good light, high contrast.",
+  ocrPrivacy:"The image is sent to AI for reading. Crop out names, email addresses, personal ID numbers and school details before uploading. ExGen cannot hide text visible in the image itself.",
+  ocrPrepareFailed:"The image could not be prepared safely. Try saving it as JPG or PNG and select it again.",
   tip:"Tip: headings + bullet points produce more accurate questions and grading.",
   step2:"Settings",step2Sub:"Level and count are pre-filled — run as is or adjust. Then your exam is created",
   level:"Level (E / C / A)",course:"Subject / Course",coursePH:"e.g., Math / History",
@@ -1304,8 +1311,14 @@ function mergeMistakesFromExamRows(rows){
 
 async function loadExamsFromAccountToLocal(notifyHistoryUpdate=true){
   if(!db)return; const uid=await getUserId(); if(!uid)return;
+  const sessionRevision=window.ExGenLocalDataBoundary?.getSessionRevision?.();
   const{data,error}=await db.from("user_exams").select("id,submission_id,created_at,course,level,qtype,material,exam,answers,result").eq("user_id",uid).order("created_at",{ascending:true}).limit(500);
   if(error)return;
+  const currentUserId=await getUserId();
+  // The request can finish after sign-out or an account switch. Never project
+  // the old account's rows into the shared browser cache for the new session.
+  if(uid!==verifiedUserId||localStorage.getItem("exgen_local_data_owner")!==uid
+    ||sessionRevision!==window.ExGenLocalDataBoundary?.getSessionRevision?.()||uid!==currentUserId)return;
   const remote=data||[]; const queued=readPendingExams(uid);
   const pending=queued.filter(local=>!remote.some(saved=>sameSavedExam(saved,local)));
   if(pending.length!==queued.length)writePendingExams(uid,pending);
@@ -1323,8 +1336,8 @@ async function loadExamsFromAccountToLocal(notifyHistoryUpdate=true){
   });
   lsSet(LS_HISTORY,history);
   const last=filtered&&filtered.length?filtered[filtered.length-1]:null;
-  if(last){lsSet(LS_LAST,{ts:Date.parse(last.created_at)||Date.now(),attempt:history[history.length-1],exam:last.exam,result:last.result,examProof:last.exam?.submission_receipt||null,training_batch_id:last.exam?.training_batch_id||last.submission_id||legacyTrainingBatchId(last),accountSaved:!last.local_only});if(typeof last.material==="string")localStorage.setItem(LS_MATERIAL,last.material);}
-  else{try{localStorage.removeItem(LS_LAST);}catch{}}
+  if(last){lsSet(LS_LAST,{ts:Date.parse(last.created_at)||Date.now(),attempt:history[history.length-1],exam:last.exam,result:last.result,examProof:last.exam?.submission_receipt||null,training_batch_id:last.exam?.training_batch_id||last.submission_id||legacyTrainingBatchId(last),accountSaved:!last.local_only});if(typeof last.material==="string")window.ExGenLocalDataBoundary?.setStudyItem(LS_MATERIAL,last.material);}
+  else{lsRemove(LS_LAST);}
   const oldMistakes=lsGetArray(LS_MISTAKES),newMistakes=mergeMistakesFromExamRows(filtered);
   migrateTrainingPick(oldMistakes,newMistakes);lsSet(LS_MISTAKES,newMistakes);
   if(notifyHistoryUpdate)window.dispatchEvent(new Event("exgen:history-updated"));
@@ -1489,7 +1502,7 @@ function applyLang(){
   set("tStep1",t.step1);set("tStep1Sub",t.step1Sub);set("tPasteLabel",t.pasteLabel);
   const pt=$("pastedText");if(pt)pt.placeholder=t.pastePH;
   updateMaterialCounter();
-  set("tOcrTitle",t.ocrTitle);set("ocrBtn",t.ocrBtn);set("tOcrHint",t.ocrHint);set("formatHint",t.tip);
+  set("tOcrTitle",t.ocrTitle);set("ocrBtn",t.ocrBtn);set("tOcrHint",t.ocrHint);set("tOcrPrivacy",t.ocrPrivacy);set("formatHint",t.tip);
   set("tStep2",t.step2);set("tStep2Sub",t.step2Sub);set("tLevel",t.level);set("tCourse",t.course);
   const c=$("course");if(c)c.placeholder=t.coursePH;
   set("tQType",t.qType);set("qtMix",t.qtMix);set("qtMc",t.qtMc);set("qtShort",t.qtShort);set("qtGraph",t.qtGraph);set("tNum",t.num);
@@ -1690,7 +1703,7 @@ async function logout(options={}){
   if(db){try{await db.auth.signOut();}catch{}}
   const{data:afterSignOut}=db?await db.auth.getSession().catch(()=>({data:null})):({data:null});
   if(afterSignOut?.session?.user?.id){location.reload();return;}
-  const localDataCleared=window.ExGenLocalDataBoundary?.clearForSignOut()!==false;
+  const localDataCleared=window.ExGenLocalDataBoundary?.clearForSignOut(signOutUserId)!==false;
   showLock();
   if(!localDataCleared){
     setLockError(LANG==="sv"
@@ -1878,7 +1891,7 @@ function runTrainModeIfRequested(){
   }
   pendingMistakeTraining={course:training.course,sourceMaterial:training.sourceMaterial,trainingFocus:training.trainingFocus,priorQuestions:training.priorQuestions,sourceReferences:training.sourceReferences};
   if(pastedTextEl())pastedTextEl().value=training.sourceMaterial;
-  try{localStorage.setItem(LS_MATERIAL,training.sourceMaterial);}catch{}
+  window.ExGenLocalDataBoundary?.setStudyItem(LS_MATERIAL,training.sourceMaterial);
   if(qTypeEl())qTypeEl().value="mix";
   let trainingQuestionCount=3;
   if(numQuestionsEl()){
@@ -1897,32 +1910,48 @@ function runTrainModeIfRequested(){
   },50);
 }
 
-/* Krymper en bild innan den skickas till avläsningen.
- *
- * Ett modernt mobilfoto är 4–8 MB. Nedskalat till 1600 px längsta sida landar
- * det på 200–400 kB, vilket sänker både latens och tokenkostnad utan att
- * handskrift blir svårare att tyda — 1600 px räcker gott för en A4-sida.
- *
- * Faller något (exotiskt format, canvas blockerad) returneras originalet
- * hellre än ett fel: en större bild är ett kostnadsproblem, en utebliven
- * avläsning är ett trasigt flöde. */
-async function downscaleImage(file, maxSide, quality){
+/* Normaliserar bildinläsning innan den skickas till OCR.
+ * Canvas-export skapar en ny JPEG och lämnar därmed filens EXIF-metadata bakom.
+ * Detta tar inte bort text/pixelinnehåll; eleven får en separat uppmaning att
+ * beskära synliga identifierare manuellt. Vid decode/canvas-fel stoppar vi
+ * uppladdningen i stället för att skicka originalfilen som reserv. */
+async function prepareImageForAi(file, maxSide=2400, quality=0.92){
+  if(!file || !String(file.type || "").startsWith("image/")) throw new Error("unsupported_image");
+  const objectUrl = URL.createObjectURL(file);
   try{
-    const dataUrl = await fileToDataUrl(file);
-    const img = await new Promise((res, rej)=>{ const i = new Image(); i.onload=()=>res(i); i.onerror=()=>rej(new Error("decode")); i.src = dataUrl; });
+    const img = await new Promise((resolve, reject)=>{
+      const image = new Image();
+      image.onload = ()=>resolve(image);
+      image.onerror = ()=>reject(new Error("image_decode_failed"));
+      image.src = objectUrl;
+    });
     const longest = Math.max(img.naturalWidth, img.naturalHeight);
-    if(!longest || longest <= maxSide) return dataUrl;
-    const scale = maxSide / longest;
-    const c = document.createElement("canvas");
-    c.width = Math.round(img.naturalWidth * scale);
-    c.height = Math.round(img.naturalHeight * scale);
-    const ctx = c.getContext("2d");
-    if(!ctx) return dataUrl;
-    ctx.drawImage(img, 0, 0, c.width, c.height);
-    return c.toDataURL("image/jpeg", quality);
-  }catch(e){
-    try{ return await fileToDataUrl(file); }catch(_){ return ""; }
+    if(!longest) throw new Error("empty_image");
+    let scale = Math.min(1, maxSide / longest);
+    let currentQuality = quality;
+    for(let attempt=0; attempt<8; attempt++){
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
+      canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
+      const context = canvas.getContext("2d");
+      if(!context) throw new Error("canvas_unavailable");
+      context.fillStyle = "#fff";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(img, 0, 0, canvas.width, canvas.height);
+      const dataUrl = canvas.toDataURL("image/jpeg", currentQuality);
+      if(!dataUrl || !dataUrl.startsWith("data:image/jpeg;base64,")) throw new Error("image_encode_failed");
+      if(dataUrl.length <= 3_700_000) return dataUrl;
+      scale *= 0.82;
+      currentQuality = Math.max(0.62, currentQuality - 0.06);
+    }
+    throw new Error("image_too_large_after_encoding");
+  } finally {
+    URL.revokeObjectURL(objectUrl);
   }
+}
+
+async function downscaleImage(file, maxSide=1600, quality=0.85){
+  return prepareImageForAi(file, maxSide, quality);
 }
 
 async function fileToDataUrl(file){ return new Promise((resolve,reject)=>{ const fr=new FileReader(); fr.onload=()=>resolve(String(fr.result||"")); fr.onerror=()=>reject(new Error("FileReader error")); fr.readAsDataURL(file); }); }
@@ -2281,13 +2310,13 @@ try{
     if(!file){setOcrStatus(t.ocrNoFile,"bad");return;}
     setBusy(true,t.ocrWorking);setOcrStatus(t.ocrWorking,"warn");
     try{
-      const dataUrl=await fileToDataUrl(file);
+      const dataUrl=await prepareImageForAi(file);
       const res=await postJson("/api/ocr",{imageDataUrl:dataUrl,lang:LANG});
       if(!res.ok||!res.data||!res.data.ok){setBusy(false);setOcrStatus(`OCR error (HTTP ${res.status}).`,"bad");showDebug(res.raw);return;}
       const extracted=String(res.data.text||"").trim();
       if(extracted){const prefix=(LANG==="sv")?"\n\n--- OCR (bild) ---\n":"\n\n--- OCR (image) ---\n";const base=(pastedTextEl()?.value||"").trim();if(pastedTextEl()){pastedTextEl().value=(base?base+prefix:"")+extracted+"\n";updateMaterialCounter();}}
       setBusy(false);setOcrStatus(t.ocrDone,"ok");
-    }catch(e){setBusy(false);setOcrStatus("OCR error.","bad");reportErr(e);}
+    }catch(e){setBusy(false);setOcrStatus(e && /image_|canvas_|unsupported_image/.test(e.message||"") ? t.ocrPrepareFailed : "OCR error.","bad");reportErr(e);}
   });
 
   // Generering och rättning ligger i namngivna funktioner i stället för direkt
@@ -2790,7 +2819,7 @@ try{
       return deferForAuthVerification();
     }
 
-    try{localStorage.setItem(LS_MATERIAL,pastedText);}catch{}
+    window.ExGenLocalDataBoundary?.setStudyItem(LS_MATERIAL,pastedText);
     if(!renderExam(res.data.exam)){setBusy(false);return {ok:false,error:"Provet kunde inte visas säkert. Försök igen."};}
     let resumeKeyCleared=true;
     let recoveryCleared=true;
@@ -2868,6 +2897,7 @@ try{
     let gradingSession=null;
     try{const snapshot=await db?.auth.getSession();if(!snapshot?.error)gradingSession=snapshot?.data?.session||null;}catch{}
     const gradingOwnerId=gradingSession?.user?.id||"";
+    const gradingSessionRevision=window.ExGenLocalDataBoundary?.getSessionRevision?.();
     if(!gradingOwnerId||!gradingSession?.access_token){
       const msg=LANG==="sv"?"Logga in igen innan du lämnar in provet. Dina svar finns kvar.":"Sign in again before submitting the exam. Your answers are still here.";
       setStatus(msg,"bad");return {ok:false,error:msg};
@@ -2968,6 +2998,11 @@ try{
           const queued=userId?readPendingExams(userId).find(row=>row.exam?.submission_receipt===examProof):null;
           if(queued){
             const retry=await retryPendingExamSave(queued.local_id).catch(()=>({ok:false}));
+            if(gradingSessionRevision!==window.ExGenLocalDataBoundary?.getSessionRevision?.()
+              ||localStorage.getItem("exgen_local_data_owner")!==gradingOwnerId||verifiedUserId!==gradingOwnerId){
+              relockForAuthChange();
+              return {ok:false,error:LANG==="sv"?"Kontot ändrades medan resultatet sparades.":"The account changed while saving the result."};
+            }
             accountSaveFailed=!retry.ok;
             if(retry.ok)lsSet(LS_LAST,{...previous,accountSaved:true});
           }
@@ -3017,7 +3052,7 @@ try{
         if(item.unanswered!==true&&m>0&&got<m){const q=qById.get(String(item.id))||{},mistakeKey=`exam:${localId}:${questionIndex}`;mistakeSourceByKey.set(mistakeKey,{examId:localId,submissionId,course:attempt.course,material:pastedText,accountSaved:!accountSaveFailed,questions:sourceQuestions});mistakes.push({mistake_key:mistakeKey,source_exam_id:localId,ts,course:attempt.course,level:attempt.level,qType:q.type||(qTypeEl()?.value||"mix"),id:String(item.id),question:String(q.question||""),user_answer:String(aById.get(String(item.id))||""),feedback:String(item.feedback||""),model_answer:String(item.model_answer||""),concept_tag:String(item.concept_tag||q.concept_tag||""),error_tags:Array.isArray(item.error_tags)?item.error_tags.slice(0,5):[],topic:String(q.topic||""),subtopic:String(q.subtopic||""),learning_objective:String(item.learning_objective||q.learning_objective||""),points:got,max_points:m});}
       });
       while(mistakes.length>200)mistakes.shift();lsSet(LS_MISTAKES,mistakes);
-      try{localStorage.setItem(LS_MATERIAL,pastedText);}catch{}
+      window.ExGenLocalDataBoundary?.setStudyItem(LS_MATERIAL,pastedText);
       const analyticsSaveFailed=res?.data?.persistence?.mock_result_saved===false;
       const saveWarning=accountSaveFailed?(localCopySaved?(LANG==="sv"?"Resultatet finns kvar på den här enheten men syns inte i ditt konto eller för läraren ännu.":"The result is kept on this device but is not in your account or visible to your teacher yet."):(LANG==="sv"?"Kontosparningen kunde inte bekräftas och webbläsaren kunde inte säkra en lokal kopia. Lämna inte sidan innan du sparat resultatet på annat sätt.":"Account saving could not be confirmed and the browser could not keep a local copy. Do not leave before saving the result another way.")):analyticsSaveFailed?(LANG==="sv"?"Rättningen är sparad i ditt konto, men lärarens resultatsammanställning kunde inte bekräftas.":"Your graded exam is saved to your account, but the teacher's result summary could not be confirmed."):"";
       setStatus(saveWarning||t.gradeDone,accountSaveFailed?"bad":"ok");if(!accountSaveFailed)showToast(t.gradeDone,"ok");setWizardStep(3);
@@ -3090,9 +3125,7 @@ try{
     }
 
     // 2. Clear all local history, mistakes, and cached data
-    [LS_HISTORY, LS_MISTAKES, LS_LAST, LS_MATERIAL, LS_TRAIN_PICK].forEach(k => {
-      try { localStorage.removeItem(k); } catch (_) {}
-    });
+    [LS_HISTORY, LS_MISTAKES, LS_LAST, LS_MATERIAL, LS_TRAIN_PICK].forEach(k => lsRemove(k));
     mistakeSourceByKey.clear();
     pendingMistakeTraining=null;
     currentUnsavedAccountExam=null;
@@ -3354,7 +3387,7 @@ try{
         return { ok: false, error: LANG === "sv" ? "OCR ingår i Basic och uppåt." : "OCR is included with Basic and above.", upgrade: true };
       }
       try {
-        const dataUrl = await fileToDataUrl(file);
+        const dataUrl = await prepareImageForAi(file);
         const res = await postJson("/api/ocr", { imageDataUrl: dataUrl, lang: LANG });
         if (!res.ok || !res.data || !res.data.ok) return { ok: false, error: LANG === "sv" ? "Kunde inte läsa bilden." : "Could not read the image." };
         return { ok: true, text: String(res.data.text || "").trim() };

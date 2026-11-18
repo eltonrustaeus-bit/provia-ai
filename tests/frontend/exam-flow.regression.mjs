@@ -342,22 +342,22 @@ async function toMaterial(page) {
   const { ctx, page, errs } = await mk();
   try {
     await signIn(page, "ordinary-exam-saved-mistake", "sv", {
-      proviaai_mistakes: [{ course: "Matematik 1b", mistake_key: "synthetic-mistake", question: "synthetic" }],
+      "proviaai_mistakes:u1": [{ course: "Matematik 1b", mistake_key: "synthetic-mistake", question: "synthetic" }],
     });
     await page.goto(`${srv.url}/app.html`, { waitUntil: "domcontentloaded" });
     await page.waitForSelector("#xf .xf-screen[data-screen='start'].on", { timeout: 8000 });
-    await page.evaluate(() => localStorage.setItem("proviaai_mistakes", JSON.stringify([
+    await page.evaluate(() => window.ExGenLocalDataBoundary.setStudyItem("proviaai_mistakes", JSON.stringify([
       { course: "Matematik 1b", mistake_key: "synthetic-mistake", question: "synthetic" },
     ])));
-    await page.evaluate(() => localStorage.setItem("proviaai_history", JSON.stringify([
+    await page.evaluate(() => window.ExGenLocalDataBoundary.setStudyItem("proviaai_history", JSON.stringify([
       { ts: 1, course: "Matematik 1b", level: "C", qType: "mix", numQuestions: 3, percent: 70 },
     ])));
     await page.click("#xf .xf-screen[data-screen='start'] .xf-btn.primary");
     await page.fill("#xf .xf-screen[data-screen='subject'] .xf-input", "Matematik 1b");
-    await page.evaluate(() => localStorage.setItem("proviaai_mistakes", JSON.stringify([
+    await page.evaluate(() => window.ExGenLocalDataBoundary.setStudyItem("proviaai_mistakes", JSON.stringify([
       { course: "Matematik 1b", mistake_key: "synthetic-mistake", question: "synthetic" },
     ])));
-    await page.evaluate(() => localStorage.setItem("proviaai_history", JSON.stringify([
+    await page.evaluate(() => window.ExGenLocalDataBoundary.setStudyItem("proviaai_history", JSON.stringify([
       { ts: 1, course: "Matematik 1b", level: "C", qType: "mix", numQuestions: 3, percent: 70 },
     ])));
     await page.click("#xf .xf-screen[data-screen='subject'] .xf-btn.primary");
@@ -369,10 +369,10 @@ async function toMaterial(page) {
       /Träna sparade misstag/.test(aimCopy) && !/viktar jag upp|extra weight/i.test(aimCopy), aimCopy);
     await page.click("#xf .xf-screen[data-screen='aim'] .xf-btn.primary");
     await page.fill("#xf .xf-screen[data-screen='material'] .xf-area", "y = 2x + 1");
-    await page.evaluate(() => localStorage.setItem("proviaai_mistakes", JSON.stringify([
+    await page.evaluate(() => window.ExGenLocalDataBoundary.setStudyItem("proviaai_mistakes", JSON.stringify([
       { course: "Matematik 1b", mistake_key: "synthetic-mistake", question: "synthetic" },
     ])));
-    await page.evaluate(() => localStorage.setItem("proviaai_history", JSON.stringify([
+    await page.evaluate(() => window.ExGenLocalDataBoundary.setStudyItem("proviaai_history", JSON.stringify([
       { ts: 1, course: "Matematik 1b", level: "C", qType: "mix", numQuestions: 3, percent: 70 },
     ])));
     await page.click("#xf .xf-screen[data-screen='material'] .xf-btn.primary");
@@ -1453,8 +1453,8 @@ if (process.env.EXGEN_BUDGET_ERRORS_ONLY === "1") {
     }
     await page.waitForSelector("#xf .xf-screen[data-screen='result'].on", { timeout: 15000 });
     const partialState = await page.evaluate(() => ({
-      history: JSON.parse(localStorage.getItem("proviaai_history") || "[]").at(-1),
-      saved: JSON.parse(localStorage.getItem("proviaai_last_result") || "null"),
+      history: JSON.parse(window.ExGenLocalDataBoundary.getStudyItem("proviaai_history") || "[]").at(-1),
+      saved: JSON.parse(window.ExGenLocalDataBoundary.getStudyItem("proviaai_last_result") || "null"),
     }));
     const partialQualityNotes = await page.locator("#xf .xf-screen[data-screen='result'] .xf-question-quality-note").allInnerTexts();
     ok("rättad delprovsskärm visar fortfarande 8 av 12",
@@ -2241,12 +2241,12 @@ if (process.env.EXAM_FLOW_ONLY_RESULT_RECOVERY) {
     ] }
   }] }));
   await page.addInitScript(() => {
-    localStorage.setItem("proviaai_train_pick", JSON.stringify({ mode: "all", keys: [], course: "Biologi 1" }));
+    window.ExGenLocalDataBoundary.setStudyItem("proviaai_train_pick", JSON.stringify({ mode: "all", keys: [], course: "Biologi 1" }));
   });
   // Träningsunderlag måste komma från ett sparat, rättat konto-prov.
   await page.goto(`${srv.url}/app.html`, { waitUntil: "domcontentloaded" });
   await page.waitForTimeout(1200);
-  await page.evaluate(() => localStorage.setItem("proviaai_train_pick", JSON.stringify({ mode: "all", keys: [], course: "Biologi 1" })));
+  await page.evaluate(() => window.ExGenLocalDataBoundary.setStudyItem("proviaai_train_pick", JSON.stringify({ mode: "all", keys: [], course: "Biologi 1" })));
   await page.goto(`${srv.url}/app.html#train`, { waitUntil: "domcontentloaded" });
   await page.waitForTimeout(3000);
   const st = await page.evaluate(() => {

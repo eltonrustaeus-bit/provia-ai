@@ -48,7 +48,7 @@ globalThis.fetch = async (input, init = {}) => {
 
 const handler = (await import(`../../api/knowledge.js?knowledge-exam-gate-test`)).default;
 
-async function invoke(op = "per_coach") {
+async function invoke(op = "per_coach", extra = {}) {
   const response = {
     statusCode: 200,
     status(code) { this.statusCode = code; return this; },
@@ -58,7 +58,7 @@ async function invoke(op = "per_coach") {
   await handler({
     method: "POST",
     headers: { authorization: "Bearer synthetic" },
-    body: { op, concept_id: "concept-1", question_id: "question-1", answer: "synthetic", idempotency_key: "synthetic" },
+    body: { op, concept_id: "concept-1", question_id: "question-1", answer: "synthetic", idempotency_key: "synthetic", ...extra },
   }, response);
   return response;
 }
@@ -68,6 +68,23 @@ after(() => {
   for (const [key, value] of Object.entries(originalEnv)) {
     if (value === undefined) delete process.env[key];
     else process.env[key] = value;
+  }
+});
+
+test("oversized or malformed blueprint fields are rejected before any quota is spent", async () => {
+  const base = { subject: "Matematik", course: "2b", level: "C", question_count: 12 };
+  for (const field of [
+    { subject: "x".repeat(121) },
+    { course: "x".repeat(121) },
+    { source_material_ref: "x".repeat(201) },
+    { question_mix: ["mc"] },
+    { idempotency_key: "x".repeat(201) },
+  ]) {
+    calls.length = 0;
+    const response = await invoke("blueprint", { ...base, ...field });
+    assert.equal(response.statusCode, 400, JSON.stringify(field));
+    assert.equal(calls.some(({ url }) => url.endsWith("/rpc/per_consume_daily_quota")), false);
+    assert.equal(calls.some(({ url }) => url.includes("/rest/v1/exam_blueprints")), false);
   }
 });
 

@@ -1,9 +1,9 @@
 // js/math-render.js — lazy KaTeX renderer for school math in generated exams.
-// KaTeX (~280kb) is only fetched the first time text actually contains math,
+// KaTeX is served from ExGen's pinned local bundle only when text contains math,
 // so the base page stays light.
 
 let _loading = null;
-const KATEX = 'https://cdn.jsdelivr.net/npm/katex@0.16.11/dist';
+const KATEX = '/js/vendor/katex';
 
 function inject(tag, attrs) {
   return new Promise((resolve) => {

@@ -47,10 +47,14 @@ export function supabaseStore(supabase) {
         .order("expires_at", { ascending: false }).limit(1);
       const rad = data?.[0];
       if (!rad) return null;
-      // Radera FÖRE verifieringen. Se filhuvudet.
-      await supabase.from("admin_passkey_challenges").delete().eq("id", rad.id);
-      if (Date.parse(rad.expires_at) <= Date.now()) return null;
-      return rad.challenge;
+      // Only the request that actually deleted the row may use the challenge.
+      // Two concurrent reads can see the same row, but only one DELETE returns it.
+      const { data: consumed, error } = await supabase.from("admin_passkey_challenges")
+        .delete().eq("id", rad.id).eq("user_id", userId).eq("kind", kind)
+        .select("challenge, expires_at");
+      if (error || !Array.isArray(consumed) || consumed.length !== 1) return null;
+      if (Date.parse(consumed[0].expires_at) <= Date.now()) return null;
+      return consumed[0].challenge;
     },
     async listCredentials(userId) {
       const { data } = await supabase.from("admin_passkeys")

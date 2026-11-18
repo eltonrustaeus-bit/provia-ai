@@ -45,6 +45,7 @@ export default async function handler(req, res) {
   if (pilotScope.denyOutOfScopePilotRoute(req, res)) return;
   if (req.method !== "POST") return res.status(405).json({ error: "Use POST" });
 
+  let phase = "authentication";
   try {
     const user = await requireAuth(req, res);
     if (!user) return;
@@ -65,6 +66,7 @@ export default async function handler(req, res) {
     if (!stripeKey) return res.status(500).json({ error: "Stripe key missing" });
 
     // Get or create Stripe customer
+    phase = "profile_lookup";
     let stripeCustomerId;
     const { data: profile } = await supabase
       .from("profiles")
@@ -73,6 +75,7 @@ export default async function handler(req, res) {
       .maybeSingle();
 
     if (profile?.stripe_customer_id) {
+      phase = "customer_lookup";
       const checkRes = await fetch(`https://api.stripe.com/v1/customers/${profile.stripe_customer_id}`, {
         headers: { Authorization: `Bearer ${stripeKey}` },
       });
@@ -84,6 +87,7 @@ export default async function handler(req, res) {
     }
 
     if (!stripeCustomerId) {
+      phase = "customer_creation";
       const { ok, json: cust } = await stripePost("/v1/customers", {
         email: user.email || "",
         "metadata[supabase_user_id]": user.id,
@@ -130,6 +134,7 @@ export default async function handler(req, res) {
       };
     }
 
+    phase = "session_creation";
     const { ok, status, json: session } = await stripePost("/v1/checkout/sessions", sessionParams, stripeKey);
 
     if (!ok) {
@@ -139,8 +144,9 @@ export default async function handler(req, res) {
 
     return res.status(200).json({ url: session.url });
 
-  } catch (e) {
-    console.error("checkout-session error:", e?.message, e?.stack);
+  } catch {
+    // Provider and database errors can include customer data or request values.
+    console.error(JSON.stringify({ event: "checkout_session_failure", phase }));
     return res.status(500).json({ error: "Internal error" });
   }
 }

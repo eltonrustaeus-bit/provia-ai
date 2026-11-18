@@ -1389,6 +1389,7 @@ function rejectLeaseOutcome(req, res, body, outcome, { history = false, lease = 
 async function handleExplainRequest(req, res, perAnswerLease) {
   // GET — return stored PER history for the authenticated user
   if (req.method === "GET") {
+    res.setHeader("Cache-Control", "private, no-store");
     const user = await requireAuth(req, res);
     if (!user) return;
     const activeCount = await examIssuance.activeExamCount(user.id);
@@ -1788,11 +1789,6 @@ async function handleExplainRequest(req, res, perAnswerLease) {
       structured:     mergedStructured,
     });
 
-    const rawNamePart = (user.email || '').split('@')[0].split(/[.\-_+]/)[0];
-    const studentName = /^[a-zåäöA-ZÅÄÖ]{2,15}$/.test(rawNamePart)
-      ? rawNamePart.charAt(0).toUpperCase() + rawNamePart.slice(1).toLowerCase()
-      : null;
-
     /* Taket avgörs av servern ur provkontexten. helpLevel från klienten är ett
        önskemål — se api/_per-help.js för hela tabellen och skälet. */
     /* Stilen härleds ur samtalshistoriken som redan finns i kroppen — samma
@@ -1830,7 +1826,6 @@ async function handleExplainRequest(req, res, perAnswerLease) {
         quotaRemaining,
         recentMistakes: contextPack.recentMistakes,
         longMemory,
-        studentName,
       });
 
     /* Vilka delar av P.E.R. som faktiskt användes i det här svaret.
@@ -1859,7 +1854,7 @@ async function handleExplainRequest(req, res, perAnswerLease) {
       // pedagogical stream and answer restrictions.
       const holdOutputUntilReview = !isExamBoundPage(requestPage);
       res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
-      res.setHeader('Cache-Control', 'no-cache, no-transform');
+      res.setHeader('Cache-Control', 'private, no-store, no-transform');
       res.setHeader('X-Accel-Buffering', 'no');
       res.flushHeaders();
 

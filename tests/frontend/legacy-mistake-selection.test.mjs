@@ -14,7 +14,7 @@ const expectedKey = "legacy:123:Matematik 2b:old-q:Lös 4x = 20:0";
 
 try {
   const { page, close } = await openPage(browser, `${server.url}/förbättring.html#felbank`, {
-    state: { storage: { exgen_local_data_owner: "u1", proviaai_mistakes: [legacyMistake] } },
+    state: { storage: { exgen_local_data_owner: "u1", "proviaai_mistakes:u1": [legacyMistake] } },
       mocks: { extra: [
         ["**/rest/v1/user_exams**", route => route.fulfill({ status: 503, json: { message: "offline" } })],
         ["**/api/generate-exam?pipeline=start", async route => {
@@ -23,12 +23,12 @@ try {
         }],
       ] },
   });
-  await page.waitForFunction(() => JSON.parse(localStorage.getItem("proviaai_mistakes") || "[]")[0]?.mistake_key);
-  const migrated = await page.evaluate(() => JSON.parse(localStorage.getItem("proviaai_mistakes") || "[]")[0]);
+  await page.waitForFunction(() => JSON.parse(window.ExGenLocalDataBoundary.getStudyItem("proviaai_mistakes") || "[]")[0]?.mistake_key);
+  const migrated = await page.evaluate(() => JSON.parse(window.ExGenLocalDataBoundary.getStudyItem("proviaai_mistakes") || "[]")[0]);
   assert.equal(migrated.mistake_key, expectedKey, "the legacy mistake receives the same deterministic key the training builder understands");
 
   await page.locator(`[data-mistake-key="${expectedKey}"]`).click();
-  const selection = await page.evaluate(() => JSON.parse(localStorage.getItem("proviaai_train_pick") || "null"));
+  const selection = await page.evaluate(() => JSON.parse(window.ExGenLocalDataBoundary.getStudyItem("proviaai_train_pick") || "null"));
   assert.deepEqual(selection.keys, [expectedKey]);
   await page.locator("#trainSelectedBtn").click();
   await page.waitForURL(/app\.html#train$/);

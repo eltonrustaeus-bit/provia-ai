@@ -415,8 +415,8 @@
 
   <footer class="xg-footer" id="footerText">ExGen är studiestöd och ger ingen officiell betygssättning.</footer>
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="/js/vendor/supabase-2.106.0.js"></script>
+  <script src="/js/vendor/chart-4.4.0.js"></script>
   <script>
     /* ── STORAGE KEYS ── */
     const LS_HISTORY='proviaai_history',LS_MISTAKES='proviaai_mistakes',LS_LAST='proviaai_last_result',
@@ -462,9 +462,12 @@
 
     /* ── UTILS ── */
     function sjp(s,fb){try{return JSON.parse(s);}catch{return fb;}}
-    function lsArr(k){const v=localStorage.getItem(k),a=sjp(v,[]);return Array.isArray(a)?a:[];}
-    function lsObj(k){const v=localStorage.getItem(k),o=sjp(v,null);return(o&&typeof o==='object')?o:null;}
-    function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch{}}
+    function isStudyKey(k){return [LS_HISTORY,LS_MISTAKES,LS_LAST,LS_MATERIAL,LS_TRAIN_PICK].includes(k);}
+    function lsRead(k){return isStudyKey(k)?window.ExGenLocalDataBoundary?.getStudyItem(k):localStorage.getItem(k);}
+    function lsArr(k){const a=sjp(lsRead(k),[]);return Array.isArray(a)?a:[];}
+    function lsObj(k){const o=sjp(lsRead(k),null);return(o&&typeof o==='object')?o:null;}
+    function lsSet(k,v){try{if(isStudyKey(k))window.ExGenLocalDataBoundary?.setStudyItem(k,JSON.stringify(v));else localStorage.setItem(k,JSON.stringify(v));}catch{}}
+    function lsRemove(k){try{if(isStudyKey(k))window.ExGenLocalDataBoundary?.removeStudyItem(k);else localStorage.removeItem(k);}catch{}}
     function lsNum(k,fb=0){const n=Number(localStorage.getItem(k)||fb);return Number.isFinite(n)?n:fb;}
     function esc(s){return String(s??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#039;');}
     const $=id=>document.getElementById(id);
@@ -709,9 +712,11 @@
     }
 
     /* ── SMART TIPS ── */
+    let privateViewGeneration=0;
     function tipsCKey(m){return`${String(m.course||'').trim()}::${String(m.id||'').trim()}`;}
-    function getTipsCache(){const o=lsObj(LS_SMART_TIPS_CACHE);return(o&&typeof o==='object')?o:{};}
-    function setTipsCache(c){lsSet(LS_SMART_TIPS_CACHE,c);}
+    function tipsCacheKey(ownerId){return ownerId?`${LS_SMART_TIPS_CACHE}:${encodeURIComponent(ownerId)}`:null;}
+    function getTipsCache(ownerId){const key=tipsCacheKey(ownerId);const o=key?lsObj(key):null;return(o&&typeof o==='object')?o:{};}
+    function setTipsCache(ownerId,c){const key=tipsCacheKey(ownerId);if(key)lsSet(key,c);}
     async function fetchTips(m){
       const{data:sd}=await db.auth.getSession();
       const token=sd?.session?.access_token||'';
@@ -885,7 +890,7 @@
          och vilket som var en engångshändelse. */
       const begreppsAntal={};
       filtered.forEach(x=>{const c=conceptOf(x);if(c)begreppsAntal[c]=(begreppsAntal[c]||0)+1;});
-      const tc=getTipsCache();
+      const tc=getTipsCache(localStorage.getItem('exgen_local_data_owner'));
       const grid=document.createElement('div');grid.className='mistakeGrid';
       list.appendChild(grid);
       filtered.slice().sort((a,b)=>Number(b.ts||0)-Number(a.ts||0)).forEach(m=>{
@@ -970,12 +975,18 @@
         tBtn?.addEventListener('click',async()=>{
           if(isTipsVis()){tBox.setAttribute('hidden','');tBox.textContent='';tBtn.setAttribute('aria-expanded','false');return;}
           tBtn.setAttribute('aria-expanded','true');
-          const cache=getTipsCache(),cached=cache[cKey];
+          const ownerId=localStorage.getItem('exgen_local_data_owner');
+          const viewGeneration=privateViewGeneration;
+          if(!ownerId)return;
+          const cache=getTipsCache(ownerId),cached=cache[cKey];
           tBox.removeAttribute('hidden');
           if(cached){tBox.textContent=String(cached);return;}
           tBtn.setAttribute('disabled','disabled');tBox.textContent='P.E.R analyserar…';
-          try{const text=await fetchTips(m),norm=String(text||'').trim();if(!norm){tBox.textContent='Kunde inte hämta tips — försök igen.';}else{const c2=getTipsCache();c2[cKey]=norm;setTipsCache(c2);tBox.textContent=norm;}}
-          catch{tBox.textContent='Kunde inte hämta tips — försök igen.';}
+          try{const text=await fetchTips(m),norm=String(text||'').trim();
+            if(localStorage.getItem('exgen_local_data_owner')!==ownerId||viewGeneration!==privateViewGeneration||!document.contains(d))return;
+            if(!norm){tBox.textContent='Kunde inte hämta tips — försök igen.';}
+            else{const c2=getTipsCache(ownerId);c2[cKey]=norm;setTipsCache(ownerId,c2);tBox.textContent=norm;}}
+          catch{if(localStorage.getItem('exgen_local_data_owner')===ownerId&&viewGeneration===privateViewGeneration&&document.contains(d))tBox.textContent='Kunde inte hämta tips — försök igen.';}
           finally{tBtn.removeAttribute('disabled');}
         });
         grid.appendChild(d);
@@ -1137,10 +1148,13 @@
       if(!db){if(st){st.textContent='Supabase ej konfigurerad.';st.className='statusText warn';}return;}
       if(st){st.textContent='Synkar…';st.className='statusText';}
       if(syncBtn)syncBtn.setAttribute('disabled','disabled');
+      const syncRevision=window.ExGenLocalDataBoundary?.getSessionRevision?.();
       const r=await fetchUserExams();
       if(!r.ok){if(st){st.textContent=String(r.error||'Sync error');st.className='statusText bad';}if(syncBtn)syncBtn.removeAttribute('disabled');return;}
       const rows=r.rows||[];
-      if(!r.userId||r.userId!==await getUserId()){
+      const initialCurrentId=await getUserId();
+      if(!r.userId||r.userId!==initialCurrentId||localStorage.getItem('exgen_local_data_owner')!==r.userId
+        ||syncRevision!==window.ExGenLocalDataBoundary?.getSessionRevision?.()){
         if(st){st.textContent='Kontot ändrades under synkroniseringen. Uppdatera sidan för att läsa rätt data.';st.className='statusText warn';}
         if(syncBtn)syncBtn.removeAttribute('disabled');
         return;
@@ -1154,15 +1168,17 @@
       const previousFingerprint=await localCoachViewFingerprint(lsArr(LS_HISTORY),lsArr(LS_MISTAKES));
       const nextMistakes=mergeMistakes(rows);
       const nextFingerprint=await localCoachViewFingerprint(h,nextMistakes);
-      if(!r.userId||r.userId!==await getUserId()){
+      const finalCurrentId=await getUserId();
+      if(!r.userId||r.userId!==finalCurrentId||localStorage.getItem('exgen_local_data_owner')!==r.userId
+        ||syncRevision!==window.ExGenLocalDataBoundary?.getSessionRevision?.()){
         if(st){st.textContent='Kontot ändrades under synkroniseringen. Uppdatera sidan för att läsa rätt data.';st.className='statusText warn';}
         if(syncBtn)syncBtn.removeAttribute('disabled');
         return;
       }
       lsSet(LS_HISTORY,h);
       const last2=rows.length?rows[rows.length-1]:null;
-      if(last2){lsSet(LS_LAST,{ts:Date.parse(last2.created_at)||Date.now(),attempt:h[h.length-1],exam:last2.exam,result:last2.result});if(typeof last2.material==='string')localStorage.setItem(LS_MATERIAL,last2.material);}
-      else localStorage.removeItem(LS_LAST);
+      if(last2){lsSet(LS_LAST,{ts:Date.parse(last2.created_at)||Date.now(),attempt:h[h.length-1],exam:last2.exam,result:last2.result});if(typeof last2.material==='string')window.ExGenLocalDataBoundary?.setStudyItem(LS_MATERIAL,last2.material);}
+      else lsRemove(LS_LAST);
       const oldMistakes=lsArr(LS_MISTAKES),newMistakes=nextMistakes;
       migrateTrainingPick(oldMistakes,newMistakes);lsSet(LS_MISTAKES,newMistakes);
       if(!previousFingerprint||!nextFingerprint||previousFingerprint!==nextFingerprint){
@@ -1216,16 +1232,19 @@
     async function hamtaNextFocus(){
       if(nextFocusHamtad) return nextFocus;
       nextFocusHamtad=true;
+      const viewGeneration=privateViewGeneration;
       try{
         const{data:sd}=await db.auth.getSession();
         const token=sd?.session?.access_token||'';
-        if(!token) return null;
+        const ownerId=sd?.session?.user?.id||null;
+        if(!token||!ownerId||localStorage.getItem('exgen_local_data_owner')!==ownerId) return null;
         const r=await fetch('/api/check-role',{
           method:'POST',
           headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
           body:JSON.stringify({action:'next_focus'})
         });
         const d=await r.json().catch(()=>({}));
+        if(localStorage.getItem('exgen_local_data_owner')!==ownerId||viewGeneration!==privateViewGeneration)return null;
         if(r.ok&&d.ok) nextFocus=d;
       }catch(_){ /* rekommendationen är en bonus, aldrig ett skäl att fela sidan */ }
       return nextFocus;
@@ -1679,10 +1698,10 @@
        kvar på siffror från innan senaste synk. */
     flow.on(()=>renderAll());
     let pageOwnerId=localStorage.getItem('exgen_local_data_owner')||null;
-    db?.auth?.onAuthStateChange?.((_event,session)=>{
-      const nextOwner=session?.user?.id||null;
+    function handlePageOwnerChange(nextOwner){
       if(nextOwner===pageOwnerId)return;
       pageOwnerId=nextOwner;
+      privateViewGeneration++;
       if(window.ExGenLocalDataBoundary?.syncSession)window.ExGenLocalDataBoundary.syncSession();
       else{
         [LS_HISTORY,LS_MISTAKES,LS_LAST,LS_MATERIAL,LS_TRAIN_PICK,LS_PER_COACH_CACHE,
@@ -1695,8 +1714,21 @@
       coachPending=null;
       flow.busy('coach',false);
       reportOwner=null;
+      nextFocus=null;
+      nextFocusHamtad=false;
+      USER_NAME='';
       renderAll();
-      if(nextOwner)setTimeout(()=>syncFromAccount(),0);
+      if(nextOwner){
+        setTimeout(()=>syncFromAccount(),0);
+        hamtaNextFocus().then(d=>{if(d?.focus&&localStorage.getItem('exgen_local_data_owner')===nextOwner)renderHem();});
+      }
+    }
+    db?.auth?.onAuthStateChange?.((_event,session)=>{
+      handlePageOwnerChange(session?.user?.id||null);
+    });
+    window.addEventListener('storage',event=>{
+      if(event.key===window.ExGenRuntime?.authStorageKey||event.key==='exgen_local_data_owner'||event.key===null)
+        handlePageOwnerChange(localStorage.getItem('exgen_local_data_owner'));
     });
 
     /* ── RENSA ALL DATA ──
@@ -1737,7 +1769,8 @@
           return;
         }
         [LS_HISTORY,LS_MISTAKES,LS_LAST,LS_MATERIAL,LS_TRAIN_PICK,LS_SMART_TIPS_CACHE,
-         LS_TEACHER_REPORT_CACHE,LS_PER_COACH_CACHE,LS_CLEAR_TS].forEach(k=>localStorage.removeItem(k));
+         LS_TEACHER_REPORT_CACHE,LS_PER_COACH_CACHE,LS_CLEAR_TS].forEach(k=>lsRemove(k));
+        if(clearUserId)window.ExGenLocalDataBoundary?.clearTipsForAccount(clearUserId);
         renderAll();
         btn.removeAttribute('disabled');
         if(!localExamDataCleared)window.alert('Delad lokal historik rensades, men kontots provutkast eller osynkade resultat kunde inte bekräftas raderade.');
@@ -1752,8 +1785,10 @@
       const ok=await gatePage();
       if(!ok) return;
       (async()=>{
+        const nameOwner=localStorage.getItem('exgen_local_data_owner');
+        const nameGeneration=privateViewGeneration;
         USER_NAME=getNameLocal();
-        if(!USER_NAME){const n=await tryLoadName();if(n){USER_NAME=n;try{localStorage.setItem(LS_USER_NAME_A,USER_NAME);}catch{}}}
+        if(!USER_NAME){const n=await tryLoadName();if(n&&nameGeneration===privateViewGeneration&&localStorage.getItem('exgen_local_data_owner')===nameOwner){USER_NAME=n;try{localStorage.setItem(LS_USER_NAME_A,USER_NAME);}catch{}}}
         if(db){const uid=await getUserId();if(uid)await syncFromAccount();}
         renderAll();
       })();

@@ -222,9 +222,14 @@
 
   function $(sel, root) { return (root || document).querySelector(sel); }
 
+  function isStudyKey(key) {
+    return key === LS_HISTORY || key === LS_MISTAKES || key === LS_TRAIN_PICK || key === "proviaai_last_result";
+  }
+
   function lsGet(key, fallback) {
     try {
-      var v = JSON.parse(localStorage.getItem(key) || "null");
+      var raw = isStudyKey(key) ? window.ExGenLocalDataBoundary?.getStudyItem(key) : localStorage.getItem(key);
+      var v = JSON.parse(raw || "null");
       return v == null ? fallback : v;
     } catch (_) { return fallback; }
   }
@@ -235,12 +240,15 @@
      trångt: proviaai_history (60 poster), proviaai_mistakes (200) och
      proviaai_last_result (ett helt prov med resultat) delar samma kvot. */
   function lsSet(key, val) {
-    try { localStorage.setItem(key, JSON.stringify(val)); return true; }
+    try { return isStudyKey(key)
+      ? window.ExGenLocalDataBoundary?.setStudyItem(key, JSON.stringify(val)) === true
+      : (localStorage.setItem(key, JSON.stringify(val)), true); }
     catch (_) { return false; }
   }
 
   function lsDel(key) {
-    try { localStorage.removeItem(key); } catch (_) {}
+    try { if (isStudyKey(key)) window.ExGenLocalDataBoundary?.removeStudyItem(key);
+      else localStorage.removeItem(key); } catch (_) {}
   }
 
   function clamp(n, lo, hi) { return Math.min(hi, Math.max(lo, n)); }
@@ -1782,6 +1790,12 @@
       });
       ocrWrap.appendChild(ocrBtn);
       ocrWrap.appendChild(file);
+      var privacy = el("div", "xf-read", tx(
+        "Bilden skickas till AI för avläsning. Beskär namn, e-post, personnummer och skoluppgifter först. ExGen kan inte dölja text som syns i själva bilden.",
+        "The image is sent to AI for reading. Crop out names, email addresses, personal ID numbers and school details first. ExGen cannot hide text visible in the image itself."
+      ));
+      privacy.style.marginTop = "8px";
+      ocrWrap.appendChild(privacy);
     }
     b.appendChild(ocrWrap);
     }

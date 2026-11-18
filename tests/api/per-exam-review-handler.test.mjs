@@ -105,10 +105,11 @@ let verifiedCoachRowsByUser = null;
 let perSessionMessages = [{ role: "assistant", content: "VERIFIED_HISTORY_SENTINEL" }];
 let memoryEpochEnabled = false;
 let releaseLeaseHook = null;
+let authEmail = "student@example.invalid";
 globalThis.fetch = async (input, init = {}) => {
   const url = typeof input === "string" ? input : input.url;
   calls.push({ url, body: init.body || "" });
-  if (url === `${origin}/auth/v1/user`) return Response.json({ id: userId, email: "student@example.invalid" });
+  if (url === `${origin}/auth/v1/user`) return Response.json({ id: userId, email: authEmail });
   if (url.includes("/rest/v1/rpc/active_exam_count")) return Response.json(activeCount);
   if (url.includes("/rest/v1/rpc/exam_issuance_state")) {
     const payload = JSON.parse(init.body || "{}");
@@ -1161,6 +1162,32 @@ test("authenticated homepage study help answers without requiring an exam or tre
     issuanceState = previous.issuanceState;
     latestSubmissionId = previous.latestSubmissionId;
     providerAnswer = previous.providerAnswer;
+  }
+});
+
+test("ordinary P.E.R help does not send a name inferred from the account email to the model", async () => {
+  const previous = { activeCount, issuanceState, latestSubmissionId, providerAnswer, authEmail };
+  try {
+    activeCount = 0;
+    issuanceState = "missing";
+    latestSubmissionId = null;
+    authEmail = "Uniknamn@example.invalid";
+    providerAnswer = "Öppna provskaparen och lägg in ditt material.";
+    calls.length = 0;
+    const response = await invoke({
+      topic: "", userQuestion: "Hur gör jag ett övningsprov?",
+      pageContext: { page: "startsida" },
+    }, "POST", "application/json");
+    assert.equal(response.statusCode, 200, JSON.stringify(response.body));
+    const provider = calls.find(({ url }) => url === "https://api.openai.com/v1/responses");
+    assert.ok(provider, "ordinary help reaches the model in this synthetic request");
+    assert.doesNotMatch(provider.body, /Uniknamn|uniknamn@example\.invalid/i);
+  } finally {
+    activeCount = previous.activeCount;
+    issuanceState = previous.issuanceState;
+    latestSubmissionId = previous.latestSubmissionId;
+    providerAnswer = previous.providerAnswer;
+    authEmail = previous.authEmail;
   }
 });
 
@@ -3423,6 +3450,7 @@ test("active exam hides P.E.R history and uncertain state fails closed", async (
     calls.length = 0;
     const history = await invoke(undefined, "GET");
     assert.equal(history.statusCode, 409);
+    assert.equal(history.headers["Cache-Control"], "private, no-store");
     assert.equal(history.body.error, "EXAM_ACTIVE");
     assert.ok(calls.every(({ url }) => !url.includes("per_sessions")));
   } finally {
@@ -3447,6 +3475,7 @@ test("P.E.R history stays hidden after abandoned or expired exams until verified
       calls.length = 0;
       const response = await invoke(undefined, "GET");
       assert.equal(response.statusCode, 409, `${state} exam must keep stored P.E.R history locked`);
+      assert.equal(response.headers["Cache-Control"], "private, no-store");
       assert.equal(response.body.error, "PER_HISTORY_LOCKED");
       assert.ok(calls.every(({ url }) => !url.includes("/rest/v1/per_sessions")
         && !url.includes("acquire_per_answer_lease")), `${state} history is rejected before reading it or acquiring a lease`);
@@ -3456,6 +3485,7 @@ test("P.E.R history stays hidden after abandoned or expired exams until verified
     calls.length = 0;
     const verified = await invoke(undefined, "GET");
     assert.equal(verified.statusCode, 200);
+    assert.equal(verified.headers["Cache-Control"], "private, no-store");
     assert.equal(verified.body.history[0].content, "VERIFIED_HISTORY_SENTINEL");
     assert.ok(calls.some(({ url }) => url.includes("/rest/v1/per_sessions")));
   } finally {

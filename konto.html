@@ -439,7 +439,7 @@ document.getElementById("yr").textContent=new Date().getFullYear();
 
 </script>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="/js/vendor/supabase-2.106.0.js"></script>
 <script>
 (async function(){
   function showAccountLoadError(){
@@ -823,10 +823,13 @@ document.getElementById("yr").textContent=new Date().getFullYear();
       });
       const data=await r.json().catch(()=>({}));
       if(r.ok&&data.ok){
-        try{localStorage.removeItem("proviaai_per_history")}catch{}
-        try{localStorage.setItem("proviaai_per_memory_clear_epoch",Date.now()+":"+Math.random().toString(36).slice(2))}catch{}
-        try{window.PER?.clearAfterServerMemoryClear?.()}catch{}
-        showMsg("Sparad P.E.R-historik och långtidsminne har rensats. Pågående svar kan inte återskapa dessa minnen.","ok");
+        try{localStorage.setItem("proviaai_per_memory_clear_epoch",JSON.stringify({accountId:user.id,nonce:Date.now()+":"+Math.random().toString(36).slice(2)}))}catch{}
+        try{window.PER?.clearAfterServerMemoryClear?.(user.id)}catch{}
+        const localHistoryCleared=window.ExGenLocalDataBoundary?.clearPerHistoryForAccount(user.id)===true;
+        showMsg(localHistoryCleared
+          ?"Sparad P.E.R-historik och långtidsminne har rensats. Pågående svar kan inte återskapa dessa minnen."
+          :"P.E.R-minnet har rensats på servern, men den lokala chatthistoriken kunde inte bekräftas rensad. Rensa webbplatsens lagring innan du delar enheten.",
+          localHistoryCleared?"ok":"err");
       }else{
         showMsg("Fel: "+(data.error||"Kunde inte rensa P.E.R-minnet."),"err");
       }
@@ -838,33 +841,43 @@ document.getElementById("yr").textContent=new Date().getFullYear();
   });
 
   function clearDeletedAccountLocalData(userId){
-    let cleared=true;
-    try{if(window.ExGenLocalDataBoundary?.clearForSignOut()===false)cleared=false;}catch{cleared=false;}
-    if(window.ExGenLocalDataBoundary?.clearLocalExamData(userId)===false)cleared=false;
-    try{localStorage.removeItem(window.ExGenRuntime.authStorageKey);}catch{cleared=false;}
-    try{sessionStorage.clear();}catch{cleared=false;}
-    return cleared;
+    // Never sweep shared keys here: a second tab can sign in as B after the
+    // sign-out readback. The owner marker is reconciled by account-storage.js
+    // on the destination page against whichever session is active then.
+    const cleared=window.ExGenLocalDataBoundary?.clearLocalExamData(userId)!==false;
+    const ambiguousLocalData=sessionStorage.getItem("exgen_generation_recovery_v1")!==null;
+    return cleared&&!ambiguousLocalData;
   }
 
   async function finishAccountDeletion(userId,unconfirmed){
+    const perHistoryCleared=window.ExGenLocalDataBoundary?.clearPerHistoryForAccount(userId)!==false;
+    const perDraftCleared=window.ExGenLocalDataBoundary?.clearPerDraftForAccount(userId)!==false;
+    const tipsCleared=window.ExGenLocalDataBoundary?.clearTipsForAccount(userId)!==false;
+    // These keys are owned by A, so clear them even if another tab switches
+    // accounts before the later sign-out readback completes.
+    const ownerExamDataCleared=window.ExGenLocalDataBoundary?.clearLocalExamData(userId)!==false;
     const{data:current}=await sb.auth.getSession().catch(()=>({data:null}));
     if(current?.session?.user?.id!==userId){
-      const examDataCleared=window.ExGenLocalDataBoundary?.clearLocalExamData(userId)!==false;
-      showMsg(examDataCleared
+      showMsg(ownerExamDataCleared&&perHistoryCleared&&perDraftCleared&&tipsCleared
         ?"Raderingen slutfördes för det ursprungliga kontot. Ett annat konto är nu aktivt och dess session och lokala data lämnades orörda."
-        :"Raderingen slutfördes för det ursprungliga kontot, men vissa lokala provdata kunde inte bekräftas rensade. Det andra kontots session och delade data lämnades orörda.","err");
+        :"Raderingen slutfördes för det ursprungliga kontot, men vissa lokala uppgifter kunde inte bekräftas rensade. Det andra kontots session och delade data lämnades orörda.","err");
       return false;
     }
     await sb.auth.signOut({scope:"local"}).catch(()=>{});
     const{data:afterSignOut}=await sb.auth.getSession().catch(()=>({data:null}));
     if(afterSignOut?.session?.user?.id&&afterSignOut.session.user.id!==userId){
-      const examDataCleared=window.ExGenLocalDataBoundary?.clearLocalExamData(userId)!==false;
-      showMsg(examDataCleared
+      showMsg(ownerExamDataCleared&&perHistoryCleared&&perDraftCleared&&tipsCleared
         ?"Raderingen slutfördes för det ursprungliga kontot. Ett annat konto loggades in under utloggningen; dess session och lokala data lämnades orörda."
-        :"Raderingen slutfördes för det ursprungliga kontot, men vissa lokala provdata kunde inte bekräftas rensade. Det andra kontots session och delade data lämnades orörda.","err");
+        :"Raderingen slutfördes för det ursprungliga kontot, men vissa lokala uppgifter kunde inte bekräftas rensade. Det andra kontots session och delade data lämnades orörda.","err");
       return false;
     }
-    const examDataCleared=clearDeletedAccountLocalData(userId);
+    if(afterSignOut?.session?.user?.id===userId){
+      showMsg(ownerExamDataCleared
+        ?"Kontot raderades på servern, men utloggningen kunde inte bekräftas. Ladda om sidan och rensa webbplatsens lagring om sessionen fortfarande visas."
+        :"Kontot raderades på servern, men utloggning och rensning av lokala provdata kunde inte bekräftas. Rensa webbplatsens lagring på den här enheten.","err");
+      return false;
+    }
+    const examDataCleared=clearDeletedAccountLocalData(userId)&&ownerExamDataCleared&&perHistoryCleared&&perDraftCleared&&tipsCleared;
     if(!examDataCleared)window.alert("Kontot har raderats, men vissa lokala provdata kunde inte bekräftas rensade på den här enheten.");
     window.location.replace(unconfirmed?"index.html?accountDeletion=unconfirmed":"index.html");
     return true;
@@ -903,15 +916,25 @@ document.getElementById("yr").textContent=new Date().getFullYear();
   });
 
   /* LOGOUT */
-  /* #xgLogout renderas av js/exgen-shell.js. Knappen hette tidigare
-     #logoutBtn och låg i sidans egen meny.
+  /* Autentiseringen ovan kan bli klar både före och efter DOMContentLoaded.
+     Koppla därför båda synliga utloggningsknapparna när DOM:en finns. */
+  const boundLogoutButtons=new WeakSet();
+  function bindLogoutButtons(){
+    for(const id of ["xgLogout","logoutBtn"]){
+      const button=document.getElementById(id);
+      if(button&&!boundLogoutButtons.has(button)){
+        button.addEventListener("click",handleLogout);
+        boundLogoutButtons.add(button);
+      }
+    }
+  }
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",bindLogoutButtons,{once:true});
+  else{
+    bindLogoutButtons();
+    if(document.readyState==="interactive")document.addEventListener("DOMContentLoaded",bindLogoutButtons,{once:true});
+  }
 
-     Bindningen måste ske på DOMContentLoaded, inte här på toppnivå: det här
-     skriptet ligger sist i <body> och körs UNDER parsningen, medan
-     exgen-shell.js är defer och körs EFTER den. Utan väntan finns knappen inte
-     än, och ett ?. hade gjort den tyst död i stället för att kasta. */
-  document.addEventListener("DOMContentLoaded",()=>{
-  document.getElementById("xgLogout").addEventListener("click",async()=>{
+  async function handleLogout(){
     const{data}=await sb.auth.getSession().catch(()=>({data:null}));
     const userId=data?.session?.user?.id;
     if(userId&&window.ExGenLocalDataBoundary?.hasLocalExamData(userId)){
@@ -930,18 +953,21 @@ document.getElementById("yr").textContent=new Date().getFullYear();
       showMsg("Kontot ändrades innan utloggningen. Ingen annan kontos lokala data rensades.","err");
       return;
     }
-    await sb.auth.signOut();
+    const{error:signOutError}=await sb.auth.signOut();
+    if(signOutError){
+      showMsg("Utloggningen misslyckades. Försök igen.","err");
+      return;
+    }
     const{data:afterSignOut}=await sb.auth.getSession().catch(()=>({data:null}));
     if(afterSignOut?.session?.user?.id){
       showMsg("Utloggningen kunde inte bekräftas. Lokal data lämnades orörd.","err");
       return;
     }
-    if(window.ExGenLocalDataBoundary?.clearForSignOut()===false){
+    if(window.ExGenLocalDataBoundary?.clearForSignOut(userId)===false){
       window.alert("Du är utloggad, men lokalt sparat provmaterial kunde inte bekräftas rensat på den här enheten. Rensa webbplatsens lagring innan du delar enheten.");
     }
     window.location.href="index.html";
-  });
-  });
+  }
 
   /* CHECKOUT */
   window.startCheckout=async function(plan){
@@ -972,7 +998,7 @@ document.getElementById("yr").textContent=new Date().getFullYear();
     var el = document.getElementById("kontoSub");
     if (!el) return;
     var hist = [];
-    try { var v = JSON.parse(localStorage.getItem("proviaai_history") || "[]"); if (Array.isArray(v)) hist = v; } catch (_) {}
+    try { var v = JSON.parse(window.ExGenLocalDataBoundary?.getStudyItem("proviaai_history") || "[]"); if (Array.isArray(v)) hist = v; } catch (_) {}
 
     if (!hist.length) {
       el.textContent = "Inget prov gjort än. Börja i Mockprov så börjar det här fyllas.";

@@ -139,7 +139,7 @@ try {
   });
   assert.deepEqual(subMillisecondCheck, { sameInstant: true, sameIdentity: true, sameMillis: true, distinctInstant: false, distinctIdentity: true },
     "timestamp normalization deduplicates equivalent zones but preserves sub-millisecond distinctions");
-  await page.evaluate(() => localStorage.setItem("proviaai_history", JSON.stringify([{
+  await page.evaluate(() => window.ExGenLocalDataBoundary.setStudyItem("proviaai_history", JSON.stringify([{
     course: "Matematik 1b", level: "C", qType: "graph", numQuestions: 1, percent: 70
   }])));
   await page.locator("#xf .xf-screen[data-screen='start'] .xf-btn.primary").click();
@@ -373,8 +373,8 @@ try {
   page.once("dialog", dialog => dialog.accept());
   await page.getByRole("link", { name: "Träna misstagen" }).click();
   const trainingPick = await page.evaluate(() => ({
-    pick: JSON.parse(localStorage.getItem("proviaai_train_pick") || "null"),
-    batch: JSON.parse(localStorage.getItem("proviaai_last_result") || "null")?.training_batch_id,
+    pick: JSON.parse(window.ExGenLocalDataBoundary.getStudyItem("proviaai_train_pick") || "null"),
+    batch: JSON.parse(window.ExGenLocalDataBoundary.getStudyItem("proviaai_last_result") || "null")?.training_batch_id,
   }));
   assert.deepEqual(trainingPick.pick, { keys: [`exam:${trainingPick.batch}:0`], mode: "selected", course: "Matematik 1b" },
     "the real result-card action passes the exact weak question and course to training");
@@ -384,9 +384,9 @@ try {
     link?.addEventListener("click", event => event.preventDefault(), { capture: true, once: true });
   });
   await page.getByRole("link", { name: "Träna sparade misstag" }).evaluate(anchor => anchor.click());
-  assert.deepEqual(await page.evaluate(() => JSON.parse(localStorage.getItem("proviaai_train_pick") || "null")),
+  assert.deepEqual(await page.evaluate(() => JSON.parse(window.ExGenLocalDataBoundary.getStudyItem("proviaai_train_pick") || "null")),
     { keys: [], mode: "all", course: "" }, "the separate saved-mistakes action explicitly selects all mistakes");
-  await page.evaluate(selected => localStorage.setItem("proviaai_train_pick", JSON.stringify(selected)), trainingPick.pick);
+  await page.evaluate(selected => window.ExGenLocalDataBoundary.setStudyItem("proviaai_train_pick", JSON.stringify(selected)), trainingPick.pick);
   const queuedBeforeRetry = await page.evaluate(() => {
     const key = Object.keys(localStorage).find((name) => name.startsWith("proviaai_pending_exams:"));
     return { key, length: key ? JSON.parse(localStorage.getItem(key) || "[]").length : 0 };
@@ -422,8 +422,8 @@ try {
   assert.equal(Date.parse(legacyRemote.created_at), Date.parse(legacyPending.created_at), "both timestamp representations identify the same instant");
   savedExamRows.push(legacyRemote);
   const selectedAfterReload = await page.evaluate(() => ({
-    batch: JSON.parse(localStorage.getItem("proviaai_last_result") || "null")?.training_batch_id,
-    pick: JSON.parse(localStorage.getItem("proviaai_train_pick") || "null"),
+    batch: JSON.parse(window.ExGenLocalDataBoundary.getStudyItem("proviaai_last_result") || "null")?.training_batch_id,
+    pick: JSON.parse(window.ExGenLocalDataBoundary.getStudyItem("proviaai_train_pick") || "null"),
   }));
   assert.ok(selectedAfterReload.batch, "a legacy pending exam receives a stable batch identity after reload");
   assert.ok(selectedAfterReload.pick?.keys?.includes(`exam:${selectedAfterReload.batch}:0`),
@@ -434,8 +434,8 @@ try {
   assert.equal(accountSaveAttempts, 1, "an existing legacy account row is detected without a duplicate insert");
   assert.equal(savedExamRows.length, 1, "retry creates only one account row");
   const selectionAfterSync = await page.evaluate(() => ({
-    pick: JSON.parse(localStorage.getItem("proviaai_train_pick") || "null"),
-    keys: JSON.parse(localStorage.getItem("proviaai_mistakes") || "[]").map(row => row.mistake_key),
+    pick: JSON.parse(window.ExGenLocalDataBoundary.getStudyItem("proviaai_train_pick") || "null"),
+    keys: JSON.parse(window.ExGenLocalDataBoundary.getStudyItem("proviaai_mistakes") || "[]").map(row => row.mistake_key),
   }));
   assert.ok(selectionAfterSync.keys.includes(`exam:${selectedAfterReload.batch}:0`), "retry preserves the pending question identity after account sync");
   assert.ok(selectionAfterSync.pick.keys.includes(`exam:${selectedAfterReload.batch}:0`), "saved training selection still points at the synced mistake");
@@ -452,7 +452,7 @@ try {
   assert.equal("graph_spec" in gradeBody.questions[0], false);
   assert.equal(gradeBody.mode, undefined);
 
-  const storedMistakes = await page.evaluate(() => JSON.parse(localStorage.getItem("proviaai_mistakes") || "[]"));
+  const storedMistakes = await page.evaluate(() => JSON.parse(window.ExGenLocalDataBoundary.getStudyItem("proviaai_mistakes") || "[]"));
   assert.ok(storedMistakes.some((item) => item.id === "graph-1" && item.course === "Matematik 1b"),
     `the actual graph result is stored as a course-scoped weak item: ${JSON.stringify(storedMistakes)}`);
   const savedGraphMistake = storedMistakes.findLast((item) => item.id === "graph-1");
@@ -464,19 +464,19 @@ try {
   const trainingStartup = await page.evaluate(() => ({
     hash: location.hash,
     owner: localStorage.getItem("exgen_local_data_owner"),
-    mistakes: localStorage.getItem("proviaai_mistakes"),
-    material: localStorage.getItem("proviaai_last_material"),
+    mistakes: window.ExGenLocalDataBoundary.getStudyItem("proviaai_mistakes"),
+    material: window.ExGenLocalDataBoundary.getStudyItem("proviaai_last_material"),
     contractOn: document.querySelector("#xf .xf-screen[data-screen='contract']")?.classList.contains("on"),
     training: window.buildMistakeTrainingContext(
-      JSON.parse(localStorage.getItem("proviaai_mistakes") || "[]"),
-      JSON.parse(localStorage.getItem("proviaai_train_pick") || "{}").keys || null,
-      JSON.parse(localStorage.getItem("proviaai_train_pick") || "{}").course || "",
+      JSON.parse(window.ExGenLocalDataBoundary.getStudyItem("proviaai_mistakes") || "[]"),
+      JSON.parse(window.ExGenLocalDataBoundary.getStudyItem("proviaai_train_pick") || "{}").keys || null,
+      JSON.parse(window.ExGenLocalDataBoundary.getStudyItem("proviaai_train_pick") || "{}").course || "",
     ),
   }));
   assert.ok(/Linjens lutning visar hur mycket y förändras/.test(trainingStartup.material || ""), JSON.stringify(trainingStartup));
   assert.equal(trainingStartup.training.ok, true, JSON.stringify(trainingStartup.training));
   await page.waitForSelector("#xf .xf-screen[data-screen='contract'].on");
-  const trainingMaterial = await page.evaluate(() => localStorage.getItem("proviaai_last_material") || "");
+  const trainingMaterial = await page.evaluate(() => window.ExGenLocalDataBoundary.getStudyItem("proviaai_last_material") || "");
   assert.match(trainingMaterial, /Linjens lutning visar hur mycket y förändras/,
     "mistake training puts the original saved source in the material field");
   assert.doesNotMatch(trainingMaterial, /Rita grafen till y = 2x \+ 1|Rätt y-skärning|Begrepp: Lutning|graph_line_incorrect/,

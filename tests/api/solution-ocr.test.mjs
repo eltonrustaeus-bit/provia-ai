@@ -30,7 +30,8 @@ process.env.SUPABASE_URL = "https://sb.test";
 process.env.SUPABASE_SERVICE_ROLE_KEY = "svc";
 
 const handler = require(join(root, "api", "ocr.js"));
-const PNG = "data:image/png;base64,iVBORw0KGgo=";
+const { normalizeOcrImageDataUrl } = require(join(root, "api", "_ocr-image.cjs"));
+const PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
 
 /* Bygger en request som ocr.js kan läsa. Den läser rå body via req.on("data"),
    så en vanlig objektlitteral räcker inte. */
@@ -123,12 +124,24 @@ console.log("\n— MATERIALVÄGEN ÄR ORÖRD —");
     seen.profileHeaders?.Authorization === "Bearer svc" && seen.profileHeaders?.apikey === "svc",
     JSON.stringify(Object.keys(seen.profileHeaders || {})));
   check("T1 materialvägens prompt är oförändrad OCR-prompt", /Du är OCR/.test(seen.system), seen.system);
+  const sentImage = seen.payload?.input?.flatMap((item) => item.content || []).find((item) => item.type === "input_image")?.image_url;
+  check("T1 provider receives server-normalized image bytes", sentImage === normalizeOcrImageDataUrl(PNG), String(sentImage).slice(0, 48));
   check("T1 material-OCR mäter provider usage utan materialinnehåll",
     seen.usageEvents.length === 1 && seen.usageEvents[0].feature === "ocr" &&
     seen.usageEvents[0].user_id === "u1" && seen.usageEvents[0].subscription_tier === "premium" &&
     seen.usageEvents[0].input_tokens === 41 && seen.usageEvents[0].output_tokens === 9 &&
     !JSON.stringify(seen.usageEvents).includes(PNG) && !JSON.stringify(seen.usageEvents).includes("Extract text."),
     JSON.stringify(seen.usageEvents));
+}
+
+console.log("\n— OGILTIGA BILDDATA STOPPAS FÖRE MODELLANROP —");
+{
+  const { status, seen } = await run(
+    { imageDataUrl: "data:image/jpeg;base64,not-base64!", lang: "sv" },
+    { modelOut: { ignored: true } }
+  );
+  check("ogiltig bild avvisas", status === 400);
+  check("ogiltig bild når inte OpenAI", seen.payload === null);
 }
 
 console.log("\n— KONTRAKTET —");

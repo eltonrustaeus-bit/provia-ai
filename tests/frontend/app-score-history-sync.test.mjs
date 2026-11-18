@@ -76,15 +76,15 @@ try {
   });
   try {
     await page.waitForFunction(() => {
-      const history = JSON.parse(localStorage.getItem("proviaai_history") || "[]");
+      const history = JSON.parse(window.ExGenLocalDataBoundary.getStudyItem("proviaai_history") || "[]");
       return history.length === 9 && history.every(row => row.accountSaved === true);
     });
-    const history = await page.evaluate(() => JSON.parse(localStorage.getItem("proviaai_history") || "[]"));
+    const history = await page.evaluate(() => JSON.parse(window.ExGenLocalDataBoundary.getStudyItem("proviaai_history") || "[]"));
     assert.deepEqual(history.map(row => row.percent), [null, null, null, null, 90, null, null, 92, null],
       "the account sync preserves missing, malformed, non-finite and impossible scores as missing");
     assert.deepEqual([0, 1, 2, 3, 5, 6, 8].map(index => [history[index].total_points, history[index].max_points]),
       Array.from({ length: 7 }, () => [null, null]));
-    const mistakes = await page.evaluate(() => JSON.parse(localStorage.getItem("proviaai_mistakes") || "[]"));
+    const mistakes = await page.evaluate(() => JSON.parse(window.ExGenLocalDataBoundary.getStudyItem("proviaai_mistakes") || "[]"));
     assert.deepEqual(mistakes.map(item => [item.id, item.points, item.max_points]), [
       ["valid-miss", 1, 2], ["zero-miss", 0, 2], ["broken-answer-list", 0, 2],
     ], "only valid question bindings with finite, in-range scores populate the synced mistake bank");

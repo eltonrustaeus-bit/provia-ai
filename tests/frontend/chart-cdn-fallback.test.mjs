@@ -7,7 +7,7 @@ import path from "node:path";
 const { chromium } = await import(ROOT + "/node_modules/playwright/index.mjs");
 const server = await serve(ROOT);
 
-test("history remains readable and syncable when Chart.js CDN fails", async () => {
+test("history remains readable and syncable when the local Chart.js bundle fails", async () => {
   const browser = await chromium.launch();
   try {
   const created = ["2026-10-01T10:00:00.000Z", "2026-10-08T10:00:00.000Z"];
@@ -28,7 +28,7 @@ test("history remains readable and syncable when Chart.js CDN fails", async () =
   for (const width of [1280, 390]) {
     let examReads = 0;
     const extra = [
-      ["**/chart.umd.min.js", route => route.abort()],
+      ["**/js/vendor/chart-4.4.0.js", route => route.abort()],
       ["**/rest/v1/user_exams**", route => {
         examReads++;
         route.fulfill({ json: rows });
@@ -108,7 +108,7 @@ test("history chart exposes the same result values when Chart.js loads", async (
         waitUntil: "domcontentloaded",
         settle: 1600,
         mocks: { extra: [
-          ["**/chart.umd.min.js", route => route.fulfill({
+          ["**/js/vendor/chart-4.4.0.js", route => route.fulfill({
             contentType: "application/javascript",
             body: "window.Chart = class { constructor(canvas, config) { window.__chartConfig = config; } destroy() {} };",
           })],
@@ -128,7 +128,7 @@ test("history chart exposes the same result values when Chart.js loads", async (
         assert.deepEqual(await page.evaluate(() => window.__chartConfig.data.datasets[0].data), [50, 100, null, null, null, null, null]);
         await page.waitForFunction(() => window.__perTestCtx()?.page === "förbättring");
         const perContext = await page.evaluate(() => ({
-          context: window.__perTestCtx(), history: JSON.parse(localStorage.getItem("proviaai_history") || "[]"),
+          context: window.__perTestCtx(), history: JSON.parse(window.ExGenLocalDataBoundary.getStudyItem("proviaai_history") || "[]"),
         }));
         assert.equal(perContext.context.userScore, undefined,
           `the improvement page does not send browser-derived scores as verified context: ${JSON.stringify(perContext)}`);
@@ -213,7 +213,7 @@ test("chart construction failure keeps visible result fallback and text table", 
       waitUntil: "domcontentloaded",
       settle: 1600,
       mocks: { extra: [
-        ["**/chart.umd.min.js", route => route.fulfill({
+        ["**/js/vendor/chart-4.4.0.js", route => route.fulfill({
           contentType: "application/javascript",
           body: "window.Chart = class { constructor() { throw new Error('synthetic chart failure'); } destroy() {} };",
         })],

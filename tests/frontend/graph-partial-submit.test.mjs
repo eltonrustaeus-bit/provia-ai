@@ -8,7 +8,7 @@ let gradeBody = null;
 
 try {
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
-  await mockApis(page, { profiles: { id: "partial-graph-student", approved: true, role: "premium" }, extra: [
+  await mockApis(page, { profiles: [{ id: "u1", approved: true, role: "premium" }], extra: [
     ["**/api/abandon-exam*", (route) => {
       const url = new URL(route.request().url());
       return route.fulfill({ json: url.searchParams.has("submission_id")
@@ -70,7 +70,7 @@ try {
   assert.match(warning, /1 obesvarad fråga/);
   assert.deepEqual(gradeBody?.answers, [{ id: "graph-1", answer: "" }],
     "an incomplete graph is graded as skipped, never sent as a malformed partial answer");
-  const mistakes = await page.evaluate(() => JSON.parse(localStorage.getItem("proviaai_mistakes") || "[]"));
+  const mistakes = await page.evaluate(() => JSON.parse(window.ExGenLocalDataBoundary.getStudyItem("proviaai_mistakes") || "[]"));
   assert.equal(mistakes.some((item) => item.id === "graph-1"), false,
     "a skipped graph is not recorded as an observed mistake");
   await page.getByRole("button", { name: "Försök igen på grafen" }).click();
@@ -79,6 +79,7 @@ try {
     "the verified graph answer can be requested after grading");
 
   await page.goto(`${server.url}/app.html`, { waitUntil: "networkidle" });
+  await page.getByRole("button", { name: "Ta bort lokal återställning" }).click();
   await page.locator("#xf .xf-screen[data-screen='start'] .xf-btn.primary").click();
   await page.locator("#xf .xf-screen[data-screen='subject'] .xf-input").fill("Matematik 1b");
   await page.locator("#xf .xf-screen[data-screen='subject'] .xf-btn.primary").click();

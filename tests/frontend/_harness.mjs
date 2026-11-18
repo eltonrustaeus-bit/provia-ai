@@ -225,11 +225,8 @@ export async function mockApis(page, {
   // EFTER den generella. Fälla 1.
   await page.route("**/api/check-role", r => r.fulfill({ json: { allow, ok: true, role, approved } }));
   await page.route("**/rest/v1/**", r => r.fulfill({ json: restRows, headers: corsHeaders }));
-  await page.route("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2**", r => r.fulfill({
-    status: 200,
-    contentType: "application/javascript; charset=utf-8",
-    body: fs.readFileSync(join(ROOT, "node_modules/@supabase/supabase-js/dist/umd/supabase.js")),
-  }));
+  // Let the local server deliver the exact vendored Supabase bundle used by
+  // production. Mock only network API responses, not the authentication SDK.
   const profileRows = profiles === undefined
     ? [{ id: "u1", approved, role }]
     : profiles;

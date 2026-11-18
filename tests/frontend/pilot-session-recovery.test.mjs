@@ -97,7 +97,7 @@ test("pilot P.E.R preserves study data and restores its unsent question through 
       else localStorage.removeItem(authKey);
       if (initialSession) {
         localStorage.setItem("exgen_local_data_owner", initialSession.user.id);
-        localStorage.setItem("proviaai_history", JSON.stringify([{ course: "Sparat material" }]));
+        localStorage.setItem(`proviaai_history:${initialSession.user.id}`, JSON.stringify([{ course: "Sparat material" }]));
         localStorage.setItem(`exgen_flow_draft_${initialSession.user.id}`, JSON.stringify({ course: "Sparat provutkast" }));
       }
     }, { authKey: PILOT_AUTH_KEY, initialSession: session });
@@ -131,7 +131,7 @@ test("pilot P.E.R preserves study data and restores its unsent question through 
     const after401 = await page.evaluate(authKey => ({
       auth: localStorage.getItem(authKey),
       owner: localStorage.getItem("exgen_local_data_owner"),
-      history: localStorage.getItem("proviaai_history"),
+      history: window.ExGenLocalDataBoundary.getStudyItem("proviaai_history"),
       draft: localStorage.getItem("exgen_flow_draft_account-a"),
       question: document.getElementById("perInput").value,
       reauth: sessionStorage.getItem("exgen_pilot_reauth_required"),
@@ -173,7 +173,7 @@ test("pilot P.E.R preserves study data and restores its unsent question through 
       });
 
     const afterLogin = await page.evaluate(authKey => ({
-      history: localStorage.getItem("proviaai_history"),
+      history: window.ExGenLocalDataBoundary.getStudyItem("proviaai_history"),
       draft: localStorage.getItem("exgen_flow_draft_account-a"),
       reauth: sessionStorage.getItem("exgen_pilot_reauth_required"),
       pending: sessionStorage.getItem("exgen_pilot_pending_per_question"),
@@ -222,7 +222,7 @@ test("pilot P.E.R preserves study data and restores its unsent question through 
       && !document.getElementById("perInput")?.value, null, { timeout: 7000 });
     const switchedAccount = await switchPage.evaluate(() => ({
       owner: localStorage.getItem("exgen_local_data_owner"),
-      history: localStorage.getItem("proviaai_history"),
+      history: window.ExGenLocalDataBoundary.getStudyItem("proviaai_history"),
       draft: localStorage.getItem("exgen_flow_draft_account-a"),
       pending: sessionStorage.getItem("exgen_pilot_pending_per_question"),
       restoredNotice: [...document.querySelectorAll("#perMessages .per-msg.teacher")].some(el => el.textContent.includes("Din fråga är återställd"))
@@ -461,8 +461,8 @@ test("pilot P.E.R preserves study data and restores its unsent question through 
       "the reviewed answer replaces the original in the same chat bubble");
     assert.equal(await reviewPage.locator("#perMessages").getByText("Svar sparat.", { exact: true }).count(), 0);
     assert.equal(await reviewPage.locator("#perMessages").getByText("En kort precisering.", { exact: true }).count(), 1);
-    assert.doesNotMatch(await reviewPage.evaluate(() => localStorage.getItem("proviaai_per_history")), /P\.E\.R-kontroll|jag kontrollerade mitt svar/i);
-    assert.match(await reviewPage.evaluate(() => localStorage.getItem("proviaai_per_history")), /En kort precisering\./,
+    assert.doesNotMatch(await reviewPage.evaluate(() => localStorage.getItem(window.ExGenLocalDataBoundary.perHistoryKeyFor("account-a"))), /P\.E\.R-kontroll|jag kontrollerade mitt svar/i);
+    assert.match(await reviewPage.evaluate(() => localStorage.getItem(window.ExGenLocalDataBoundary.perHistoryKeyFor("account-a"))), /En kort precisering\./,
       "the local conversation cache follows the persisted replacement");
 
     const reviewFailurePage = await openPilotPage(makeSession("account-a"), "account-a", null,
@@ -473,7 +473,7 @@ test("pilot P.E.R preserves study data and restores its unsent question through 
     await reviewFailurePage.locator("#perMessages").getByText("Jag kunde inte säkerställa svaret. Skicka frågan igen.", { exact: true }).waitFor();
     assert.equal(await reviewFailurePage.locator("#perMessages").getByText("Ett osäkert svar.", { exact: true }).count(), 0,
       "a failed correction never remains as the visible final answer");
-    assert.match(await reviewFailurePage.evaluate(() => localStorage.getItem("proviaai_per_history")),
+    assert.match(await reviewFailurePage.evaluate(() => localStorage.getItem(window.ExGenLocalDataBoundary.perHistoryKeyFor("account-a"))),
       /Jag kunde inte säkerställa svaret/,
       "the local P.E.R history follows the safe persisted notice");
 

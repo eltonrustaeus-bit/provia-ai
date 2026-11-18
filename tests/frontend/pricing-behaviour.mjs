@@ -50,7 +50,7 @@ async function mk(s = {}) {
       contentType: "application/javascript",
       body: `window.ExGenRuntime = Object.freeze({ environment: "unconfigured", projectRef: "", supabaseUrl: "", publishableKey: "", appOrigin: "http://localhost", authStorageKey: "exgen-test-auth-token" });`,
     })],
-    ["**/supabase.min.js", route => route.fulfill({
+    ["**/js/vendor/supabase-2.106.0.js", route => route.fulfill({
       contentType: "application/javascript",
       body: "window.supabase = { createClient() { throw new Error('client created without runtime config'); } };",
     })],
@@ -67,7 +67,7 @@ async function mk(s = {}) {
     state: {
       signedIn,
       role: s.role || null,
-      storage: { proviaai_history: s.history || [], ...(signedIn ? { exgen_local_data_owner: "u1" } : {}) },
+      storage: { "proviaai_history:u1": s.history || [], ...(signedIn ? { exgen_local_data_owner: "u1" } : {}) },
     },
   });
 }

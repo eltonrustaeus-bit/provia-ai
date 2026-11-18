@@ -40,7 +40,7 @@ async function mk(path, { explainHandler, additionalMocks = [], waitUntil = "net
       extra,
     },
     state: {
-      storage: { proviaai_history: [{ percent: 62, course: "Biologi 1", level: "C", ts: Date.now() }] },
+      storage: { "proviaai_history:u1": [{ percent: 62, course: "Biologi 1", level: "C", ts: Date.now() }] },
     },
   });
 }
@@ -70,10 +70,10 @@ async function assertPageTopic(path, expectedPage) {
         mode: "exam",
       };
       window.PER.describe({ page: "startsida" });
-      localStorage.setItem("proviaai_mistakes", JSON.stringify([
+      window.ExGenLocalDataBoundary.setStudyItem("proviaai_mistakes", JSON.stringify([
         { course: "PRIVATE_STALE_COURSE", concept_tag: "PRIVATE_STALE_MISTAKE" },
       ]));
-      localStorage.setItem("proviaai_history", JSON.stringify([{ percent: 92 }]));
+      window.ExGenLocalDataBoundary.setStudyItem("proviaai_history", JSON.stringify([{ percent: 92 }]));
       window.__homepageReadLocalStudyData = false;
       const originalGetItem = Storage.prototype.getItem;
       Storage.prototype.getItem = function (key) {
@@ -591,7 +591,7 @@ await assertPageTopic("/förbättring.html", "förbättring");
   await routeFinished;
   const afterSwitch = await page.evaluate(() => ({
     messages: document.querySelector("#perMessages")?.textContent || "",
-    history: localStorage.getItem("proviaai_per_history") || "",
+    history: localStorage.getItem(window.ExGenLocalDataBoundary.perHistoryKeyFor("u2")) || "",
   }));
   ok("ordinary chat A→B switch discards the delayed answer", !afterSwitch.messages.includes("PRIVATE_OLD_ACCOUNT_PER_MARKER"));
   ok("ordinary chat A→B switch does not cache the delayed answer", !afterSwitch.history.includes("PRIVATE_OLD_ACCOUNT_PER_MARKER"));
@@ -639,7 +639,7 @@ await assertPageTopic("/förbättring.html", "förbättring");
   await page.waitForFunction(() => document.querySelector("#perSendBtn")?.disabled === false, null, { timeout: 5000 });
   const afterLateResponse = await page.evaluate(() => ({
     messages: document.querySelector("#perMessages")?.textContent || "",
-    history: localStorage.getItem("proviaai_per_history") || "",
+    history: localStorage.getItem(window.ExGenLocalDataBoundary.perHistoryKeyFor("u2")) || "",
   }));
   ok("late response after account switch is not shown", !afterLateResponse.messages.includes("PRIVATE_LATE_OLD_ACCOUNT_PER_MARKER"));
   ok("late response after account switch is not cached", !afterLateResponse.history.includes("PRIVATE_LATE_OLD_ACCOUNT_PER_MARKER"));

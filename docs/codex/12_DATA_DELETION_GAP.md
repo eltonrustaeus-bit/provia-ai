@@ -1,10 +1,27 @@
 # Data deletion: pilot gate
 
-## Current release boundary — 2026-10-19
+## Current release boundary — 2026-11-18
 
-This document describes a local, unpublished self-service deletion candidate, not a verified release. The code and offline tests do not establish that account deletion, database cascades, Storage cleanup, provider retention, browser queues, or cross-device revocation work end to end.
+The self-service deletion route is present in current `origin/main` source, but
+it is not a verified end-to-end deletion release. Source and offline tests do
+not establish that Auth deletion, database cascades, Storage cleanup, provider
+retention, browser queues, or cross-device revocation work together on the
+deployed service. Do not describe the presence of a route as proof of erasure.
 
-The deletion flow must be verified using synthetic accounts in isolated staging before any real-student pilot. Staging schema, Auth/Storage behavior, deployed route availability, and database cascade behavior must be checked independently. This is not a staging/end-to-end deletion test and the route is not deployed.
+The deletion flow must be verified using synthetic accounts in isolated staging
+before any real-student pilot. Staging schema, Auth/Storage behavior, route
+availability, and database cascade behavior must be checked independently.
+The missing evidence is a hosted deletion readback. A synthetic
+staging SQL transaction was rejected before execution, so no deletion rows
+were created or removed by that attempt.
+
+The feature Preview at `b07e57f` uses account-scoped keys for P.E.R transcripts,
+exam history, mistakes, material and coach caches and discards ambiguous legacy
+values. Its local two-tab and deletion tests reduce the earlier shared-cache
+risk, but they do not prove a hosted Auth deletion, cross-device clearing or
+every concurrent tab ordering. Production still runs the older browser code.
+Keep this gap visible until a synthetic hosted deletion and second-device
+readback pass; a single local ownership check is insufficient.
 
 ## Required before real student accounts
 

@@ -87,7 +87,7 @@ try {
   await page.waitForSelector(".xf-exam.on .xf-question-quality-note");
 
   assert.equal(generatedRequest?.numQuestions, 3, "the fast default exam size reaches generation");
-  assert.match(await page.locator(".xf-question-quality-note").innerText(), /requested 3 questions.*1 question passed quality review and is included/i);
+  assert.match(await page.locator(".xf-question-quality-note").innerText(), /requested 3 questions.*1 valid question is included/i);
   const noteLayout = await page.locator(".xf-question-quality-note").evaluate((note) => {
     const noteRect = note.getBoundingClientRect();
     const questionRect = document.querySelector(".xf-exam.on .xf-q-text").getBoundingClientRect();
@@ -119,13 +119,13 @@ try {
   assert.equal(await page.getByText("Your answer", { exact: true }).count(), 1);
   assert.equal(await page.getByText("Full-credit answer", { exact: true }).count(), 1);
   assert.equal(await page.getByRole("button", { name: "Try again — new questions, same level" }).count(), 1);
-  assert.match(await page.locator("#xf .xf-screen[data-screen='result'] .xf-question-quality-note").innerText(), /requested 3 questions.*1 question passed quality review and is included/i,
+  assert.match(await page.locator("#xf .xf-screen[data-screen='result'] .xf-question-quality-note").innerText(), /requested 3 questions.*1 valid question is included/i,
     "the result view repeats the shortfall so grading cannot make the partial exam look complete");
   assert.equal(savedExam?.requested_question_count, 3, "saved exam metadata retains the originally requested count");
   assert.equal(savedExam?.partial_delivery, true, "saved exam metadata retains that only a partial exam was issued");
   await page.reload({ waitUntil: "networkidle" });
   await page.waitForSelector("#xf .xf-screen.on");
-  const restoredHistory = await page.evaluate(() => JSON.parse(localStorage.getItem("proviaai_history") || "[]"));
+  const restoredHistory = await page.evaluate(() => JSON.parse(window.ExGenLocalDataBoundary.getStudyItem("proviaai_history") || "[]"));
   assert.equal(restoredHistory.at(-1)?.numQuestions, 3, "account history restores the requested count after reload");
   assert.equal(restoredHistory.at(-1)?.partialDelivery, true, "account history preserves partial status after reload");
 } finally {
