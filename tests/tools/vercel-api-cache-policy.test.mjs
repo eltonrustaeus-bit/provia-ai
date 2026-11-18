@@ -21,6 +21,7 @@ test("content security policy blocks plugin content and injected base URLs witho
   assert.ok(csp);
   assert.match(csp, /(?:^|;\s*)base-uri 'self'(?:;|$)/);
   assert.match(csp, /(?:^|;\s*)object-src 'none'(?:;|$)/);
-  assert.match(csp, /(?:^|;\s*)frame-ancestors 'self'(?:;|$)/);
+  assert.match(csp, /(?:^|;\s*)frame-ancestors 'none'(?:;|$)/);
+  assert.equal(pageRule.headers.find(({ key }) => key.toLowerCase() === "x-frame-options")?.value, "DENY");
   assert.doesNotMatch(csp, /script-src/);
 });

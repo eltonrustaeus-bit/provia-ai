@@ -1,5 +1,39 @@
 # 08 Current Status
 
+## Security audit checkpoint — 2026-11-18
+
+- Current feature branch is `codex/exgen-generation-quality-2026-10-20`.
+  Commit `b1f93e3` is pushed and its Vercel Preview is READY. It fixes a false
+  account-deletion cleanup warning when the deleted account's local owner
+  marker remains until the destination page reconciles it. The new browser
+  test uses mocked deletion/Auth endpoints; it is offline evidence, not a
+  hosted deletion test. Cross-tab account-switch timing is not verified.
+- Fresh read-only catalog checks on both hosted projects found RLS enabled on
+  all public relations inspected (66 staging, 63 production). The advisors
+  report 36 staging and 33 production relations with RLS but no policies; many
+  are intended server-only tables. `TRUNCATE` is directly granted to both
+  `anon` and `authenticated` on 47 staging and 42 production relations. RLS
+  does not govern `TRUNCATE`; this is excess privilege, but metadata alone
+  does not prove an HTTP/Data API exploit path. No grant was changed.
+- Fresh function ACL checks show the four trigger/event-trigger functions
+  revoked from browser roles in staging, while production still grants their
+  `EXECUTE` through public/default grants. They are not ordinary result-returning
+  RPCs, so this is unnecessary privilege rather than a confirmed student-data
+  leak. Production Supabase Advisor reports 4 anonymous and 5 authenticated
+  SECURITY DEFINER functions; staging reports one authenticated warning for
+  the owner-checked pipeline-status RPC.
+- Both hosted Supabase Advisors still report leaked-password protection as
+  disabled. `match_knowledge_chunks` has a mutable search path in both; the
+  production advisor also reports the unfixed report-trigger path. These are
+  metadata/advisor observations only. No Auth setting or database was changed.
+- Local `vercel.json` now sets `X-Frame-Options: DENY` and
+  `frame-ancestors 'none'`. A source scan found no iframe use. The focused
+  header test passes, but this change is not yet committed/deployed in this
+  checkpoint. Production headers remain unverified for this commit.
+- No secret values were read. The old key's revocation status remains
+  unverified; current Vercel environment metadata and repository source do not
+  prove that historical key was revoked.
+
 ## Provider text data minimization — feature-branch work in progress, 2026-11-18
 
 - The shared OpenAI wrapper now applies deterministic redaction to outgoing text
@@ -194,8 +228,9 @@
   profiles. Synthetic helper and handler tests passed 6/6. These changes are
   published only in Preview. The bearer-only admin write risk remains until an admin-wide
   step-up, safe enrollment/recovery, and staging rollout are designed.
-- Account-deletion browser cleanup remains unresolved: shared cache keys
-  cannot guarantee protection of another account under concurrent tabs.
+- The local false cleanup warning from a lingering owner marker is fixed in
+  feature commit `b1f93e3` and has an offline browser regression test. Hosted
+  account deletion and cross-tab account-switch behavior remain unverified.
 
 ## Security feature Preview checkpoint — 2026-11-18
 
