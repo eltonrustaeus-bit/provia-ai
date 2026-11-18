@@ -2,7 +2,7 @@
 
 ## Security audit checkpoint — 2026-11-18
 
-- Latest feature checkpoint: commit `1088653` is pushed to
+- Latest feature-code checkpoint: commit `1088653` is pushed to
   `codex/exgen-generation-quality-2026-10-20`; Vercel deployment
   `dpl_5FzE7tws56NQX7daiqbyiPcmhWfi` is READY. `/app.html` returns 200 and
   includes `X-Frame-Options: DENY`, MIME/referrer protections, and
@@ -12,6 +12,9 @@
 - The CSP extension passed its focused configuration test 3/3. Static-source
   review found no forms or iframes in the site HTML; an independent reviewer
   found no apparent break to the dynamic auth form or redirect flows.
+- Documentation-only checkpoint `0f88531` is also pushed and READY as
+  `dpl_2UQxdkuHz9D2K7xmywsj46dfdcn5`; the final CSP headers were re-read from
+  its `/app.html` response. Neither checkpoint changes Production.
 - The working tree further restricts the feature CSP with `frame-src 'none'`
   and `form-action 'self'`. Source search found no HTML iframe or form usage;
   the focused config test is being extended before this change is published.
