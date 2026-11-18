@@ -26,10 +26,10 @@
   disabled. `match_knowledge_chunks` has a mutable search path in both; the
   production advisor also reports the unfixed report-trigger path. These are
   metadata/advisor observations only. No Auth setting or database was changed.
-- Local `vercel.json` now sets `X-Frame-Options: DENY` and
-  `frame-ancestors 'none'`. A source scan found no iframe use. The focused
-  header test passes, but this change is not yet committed/deployed in this
-  checkpoint. Production headers remain unverified for this commit.
+- Feature commit `4036389` sets `X-Frame-Options: DENY` and
+  `frame-ancestors 'none'`. The focused header test passes, and the exact READY
+  Vercel Preview returned both headers on `/app.html`; a source scan found no
+  iframe use. Production headers remain unverified for this commit.
 - No secret values were read. The old key's revocation status remains
   unverified; current Vercel environment metadata and repository source do not
   prove that historical key was revoked.
