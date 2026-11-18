@@ -59,7 +59,7 @@ text may also be changed. Treat this as partial redaction, not complete
 anonymization. The image path has a separate feature-branch change under review
 below; neither control should be described as full anonymization.
 
-## OCR image preparation — local feature-branch work, 2026-11-18
+## OCR image preparation — feature Preview, 2026-11-18
 
 - Material OCR, P.E.R material OCR, and handwritten-solution OCR now re-encode
   selected images through a browser canvas as JPEG before posting them. This

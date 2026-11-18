@@ -6664,7 +6664,7 @@ enda 12-frågetest. Offline- och mocktester bevisar inte live-modellens
   Samtliga befintliga granskningsgrindar är kvar.
 - [!] Detta är lokal offline-evidens. Livekvalitet, kostnad och svarstid för en
   verklig ersättningsfråga är fortfarande inte uppmätta.
-### OCR-bildars metadata och synliga personuppgifter — lokal feature-branch, 2026-11-18
+### OCR-bildars metadata och synliga personuppgifter — feature Preview, 2026-11-18
 
 - [x] Material-OCR, P.E.R:s bild-OCR och handskriftsinlämning normaliserar nu
   bilden i webbläsaren till en ny JPEG innan den lämnar klienten. Servern
@@ -6680,3 +6680,6 @@ enda 12-frågetest. Offline- och mocktester bevisar inte live-modellens
 - [!] Detta är metadata-rensning i klient och server, inte automatisk
   borttagning av namn i bildpixlar eller full anonymisering. Endast offline-testat; ingen ny
   AI-kostnad, stagingdatabas eller Production har använts.
+- [x] Kodcommit `b20bfb4` är pushad till feature-branchen och Vercel Preview
+  `dpl_As2ShFssywsCXhsPhyLkzr5bmiDd` är READY på exakt samma SHA. Ingen
+  `main`-, Production- eller databasändring gjordes.
