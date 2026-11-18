@@ -1,5 +1,6 @@
 const { getSupabaseUrl, getSupabaseAdminHeaders, getSupabaseServerKey } = require("./_supabase-server-key.cjs");
 const { randomUUID } = require("node:crypto");
+const { redactProviderUserData } = require("./_ai-pii-redaction.cjs");
 
 const MAX_DB_INTEGER = 2_147_483_647;
 const STEPS = new Set(["embed", "generate", "verify_compare", "verify_blind", "repair", "grade", "validate", "assemble"]);
@@ -162,9 +163,10 @@ async function budgetedOpenAIFetch(url, init, { userId, fetchImpl = globalThis.f
   const embedding = pathname.endsWith("/embeddings");
   // Responses otherwise retain application state by default. All app callers
   // pass through this wrapper, including P.E.R., grading, OCR and exams.
-  const privacyBody = pathname.endsWith("/responses") && body && typeof body === "object" && !Array.isArray(body)
-    ? { ...body, store: false }
-    : body;
+  const redactedBody = redactProviderUserData(body, pathname);
+  const privacyBody = pathname.endsWith("/responses") && redactedBody && typeof redactedBody === "object" && !Array.isArray(redactedBody)
+    ? { ...redactedBody, store: false }
+    : redactedBody;
   const reservation = await reserveAiSpend({ userId, model: privacyBody?.model, body: privacyBody, embedding }, { env, fetchImpl });
   if (!reservation.ok) {
     const response = Response.json({
@@ -288,4 +290,5 @@ module.exports = {
   PILOT_STAGING_REF, PILOT_USER_ID, PILOT_BUDGET_USD, RATES_PER_MILLION,
   isBudgetedPilot, pilotBudgetCapUsd, normalizeBudgetBody, estimateWorstCaseUsd, actualCostUsd,
   reserveAiSpend, settleAiSpend, settleRejectedAiSpend, budgetedOpenAIFetch, budgetFailureStatus,
+  redactProviderUserData,
 };

@@ -46,6 +46,18 @@ provider when needed by the feature. No tested general redaction policy was
 found. Preserve this as an open data-minimization item rather than claiming
 that identifiers are scrubbed.
 
+An uncommitted feature-branch change now redacts common email, Swedish personal
+number, phone-number and explicitly labeled name/school/class fields from
+outgoing text at the shared provider wrapper for Responses, Chat Completions
+and embeddings, including user-sourced text embedded in system messages.
+Focused synthetic tests cover those routes and preservation of unrelated
+system instructions and ordinary study text. An independent code review found
+no blocker for this narrow text-pattern scope. It cannot reliably find names
+or school identifiers mentioned without labels, and it does not inspect or
+redact pixels in OCR images. Some identifier-like examples in fixed system
+text may also be changed. Treat this as partial redaction, not complete
+anonymization or image-path protection.
+
 The local browser-storage tests and source were rechecked on 2026-11-18. The
 app can retain account-scoped drafts, progress and unsynced results when a
 user chooses to keep them at logout; the current key definitions have no

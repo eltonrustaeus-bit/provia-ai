@@ -1,5 +1,27 @@
 # 08 Current Status
 
+## Provider text data minimization — feature-branch work in progress, 2026-11-18
+
+- The shared OpenAI wrapper now applies deterministic redaction to outgoing text
+  before Responses, Chat Completions and embeddings requests: email, common
+  Swedish person-number and phone formats, plus explicitly labeled name,
+  school and class values, including user text embedded in system messages.
+  Non-matching prompt and study content remains unchanged. Synthetic tests
+  cover ordinary and budgeted wrapper paths, API variants and preservation of
+  example study text.
+- The change remains local and is not yet committed or deployed. It cannot
+  detect names or school references in unlabelled prose and does not redact
+  visible identifiers in OCR image pixels. The OCR image path remains an open
+  privacy gap. It may also modify identifier-like examples in fixed prompt
+  text. Independent read-only review found no blocker for this limited
+  text-pattern scope. Keep the release claim limited to common textual
+  patterns.
+- Validation so far: the combined AI budget/redaction, trigger-privilege,
+  P.E.R, grading, OCR and post-grade review command passed 25/25;
+  `git diff --check` passed. Independent review checked the system-message
+  bypass and false-positive fixes; no blocker remains for the limited
+  text-pattern claim. Image and unlabelled-name coverage remain incomplete.
+
 ## Security goal: trigger grants tested in staging — 2026-11-18
 
 - A migration narrows `EXECUTE` on four installed trigger functions and pins

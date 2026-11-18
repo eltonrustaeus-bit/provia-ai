@@ -7,7 +7,7 @@ const { streamGeneration } = require("../../api/generate-exam.js");
 const {
   PILOT_USER_ID, PILOT_BUDGET_USD, isBudgetedPilot, pilotBudgetCapUsd, normalizeBudgetBody,
   estimateWorstCaseUsd, actualCostUsd, reserveAiSpend, settleAiSpend, budgetedOpenAIFetch,
-  settleRejectedAiSpend,
+  settleRejectedAiSpend, redactProviderUserData,
 } = require("../../api/_ai-usage.cjs");
 
 const stagingEnv = {
@@ -212,6 +212,57 @@ test("Responses requests disable provider application-state storage in both envi
     assert.equal(providerBody.store, false, "even an accidental caller override cannot retain a response");
     assert.equal(providerBody.input, "synthetic study text");
   }
+});
+
+test("provider-bound text redacts common identifiers while preserving nonmatching study text", () => {
+  const body = redactProviderUserData({
+    model: "gpt-6-luna",
+    input: [
+      { role: "system", content: "Explain the equation 2 + 3 and keep the system text.\nElevens svar: e-post ada@example.invalid" },
+      { role: "user", content: "Namn: Ada Lovelace\nSkola: Facetten, Åtvidaberg\nE-post: ada@example.invalid\nTelefon: 070-123 45 67\nPersonnummer: 20080307-1234\nLös x: 2 + 3 = 5. Ada Lovelace skrev om matematik. Decimaltest: 0.00000001. Inledande ord Skola: innehåll." },
+    ],
+  }, "/v1/responses");
+  assert.equal(body.input[0].content, "Explain the equation 2 + 3 and keep the system text.\nElevens svar: e-post [e-post borttagen]");
+  assert.match(body.input[1].content, /\[identifierare borttagen\]/);
+  assert.match(body.input[1].content, /\[e-post borttagen\]/);
+  assert.match(body.input[1].content, /\[telefonnummer borttaget\]/);
+  assert.match(body.input[1].content, /\[personnummer borttaget\]/);
+  assert.match(body.input[1].content, /Lös x: 2 \+ 3 = 5\./);
+  assert.match(body.input[1].content, /Decimaltest: 0\.00000001\./, "decimal study text must not look like a phone number");
+  assert.match(body.input[1].content, /Inledande ord Skola: innehåll\./,
+    "a label-like word inside ordinary prose must not delete the rest of the line");
+  assert.match(body.input[1].content, /Ada Lovelace skrev om matematik/,
+    "unlabelled names are not reliably detectable and remain a documented limitation");
+});
+
+test("provider text redaction covers chat-completion and embedding user inputs", () => {
+  const chat = redactProviderUserData({ messages: [
+    { role: "system", content: "System fixed prompt must remain unchanged." },
+    { role: "user", content: [{ type: "text", text: "Svara på ämnet. Maila mig på elton@example.invalid." }] },
+  ] }, "/v1/chat/completions");
+  assert.equal(chat.messages[0].content, "System fixed prompt must remain unchanged.");
+  assert.match(chat.messages[1].content[0].text, /\[e-post borttagen\]/);
+
+  const embedding = redactProviderUserData({ input: ["Samhällskunskap", "ada@example.invalid"] }, "/v1/embeddings");
+  assert.deepEqual(embedding.input, ["Samhällskunskap", "[e-post borttagen]"]);
+});
+
+test("shared provider wrapper redacts outbound user content for ordinary accounts", async () => {
+  let sent;
+  const response = await budgetedOpenAIFetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ model: "gpt-4o-mini", messages: [
+      { role: "system", content: "Keep this fixed instruction." },
+      { role: "user", content: "E-post: elev@example.invalid. Förklara fotosyntesen." },
+    ] }),
+  }, { userId: "ordinary-user", env: { OPENAI_API_KEY: "synthetic-only" }, fetchImpl: async (_url, init) => {
+    sent = JSON.parse(init.body);
+    return Response.json({ choices: [] });
+  } });
+  assert.equal(response.ok, true);
+  assert.equal(sent.messages[0].content, "Keep this fixed instruction.");
+  assert.equal(sent.messages[1].content, "E-post: [e-post borttagen]. Förklara fotosyntesen.");
 });
 
 test("generation streams settle unknown outcomes conservatively without freeing budget", async () => {
